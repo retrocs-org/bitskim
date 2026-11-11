@@ -1,0 +1,2 @@
+#include <windows.h>
+1 ICON "assets/icons/BitSkim-Windows-Classic.ico"

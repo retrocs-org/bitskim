@@ -1,0 +1,778 @@
+@database BitSkim.guide
+@author "BitSkim contributors"
+@(c) "BitSkim 0.1 - MIT license; see LICENSE and third-party notices"
+@toc MAIN
+@node MAIN "BitSkim 0.1 - AmigaOS manual"
+
+                         @{b}BitSkim 0.1@{ub}
+                 Different generations. Same network.
+
+ Disk-backed queues send one file at a time. Browse the whole list
+ with Previous/Next; approve once and choose one folder.
+ Choose Accept all and one destination folder for that listed batch.
+ Main progress shows one bar, the current filename, amounts and speed.
+ The bar starts afresh for every file. The outgoing waiting count appears
+ below it. Negotiated batches show 1/2, 2/2 etc. for sending and receiving.
+ Older single-file offers have no remote batch total.
+ Hold the right mouse button for the Queue menu: Continue/Retry,
+ Pause after file, Skip idle file and Clear waiting. There is no extra
+ queue window or clickable progress row.
+
+ @{"Quick start" link "QUICKSTART"}        @{"Requirements" link "REQUIREMENTS"}
+ @{"Installation" link "INSTALL"}       @{"Find a computer" link "DISCOVERY"}
+ @{"Send a file" link "SENDING"}        @{"Receive a file" link "RECEIVING"}
+ @{"Transfer tools" link "TOOLS"}     @{"Folders and disk space" link "FOLDERS"}
+ @{"Collection results and retry" link "RESULTS"}
+ @{"Progress and cancel" link "PROGRESS"}  @{"Preferences" link "PREFERENCES"}
+ @{"Themes" link "THEMES"}             @{"Iconify and background" link "BACKGROUND"}
+ @{"ARexx commands" link "AREXX"}       @{"NovaDock integration" link "NOVADOCK"}
+ @{"Details and events" link "DETAILS"}  @{"Troubleshooting" link "TROUBLE"}
+ @{"Limits and safety" link "SAFETY"}    @{"Files and settings" link "FILES"}
+ @{"Update or remove" link "MAINTENANCE"} @{"Project information" link "ABOUT"}
+
+ Transfers are unencrypted. Use a trusted local network.
+ Computer names and installation IDs are not authenticated identities.
+
+ Open this manual with the Help button in BitSkim or BitSkimPrefs, or
+ double-click BitSkim.guide. MultiView is required to display it.
+ @{"Updating a running client" link UpdateRestart}
+ @{"Accept all files in a batch" link FileBatches}
+ @{"Network capabilities" link NetworkCapabilities}
+@endnode
+
+@node QUICKSTART "Quick start"
+
+ 1. Start your Amiga TCP/IP stack and check that networking works.
+ 2. Open BitSkim on the Amiga and on another computer on your LAN.
+ 3. Select the other computer in NEARBY COMPUTERS.
+ 4. Drop one Workbench file into the main BitSkim window, or choose
+    Send file and enter its full Amiga path.
+ 5. On the receiving computer, accept the offer and choose where to save.
+ 6. Wait for successful delivery confirmation. A full progress bar alone
+    is not the sender's final delivery confirmation.
+
+ If discovery does not find the other computer, enter its IPv4 address
+ in IP or IP:port and press Return, then send. The other computer must
+ be reachable and running BitSkim.
+
+ The Preferences program is installed in SYS:Prefs by default. The default
+ theme is Catppuccin Mocha; neither app opens a private full-screen view.
+
+ @{"Installation" link "INSTALL"}  @{"Sending" link "SENDING"}  @{"Receiving" link "RECEIVING"}
+@endnode
+
+@node REQUIREMENTS "Requirements"
+
+ - AmigaOS 3.x with Workbench, at least 640 x 256 pixels.
+ - An AmiTCP-compatible TCP/IP stack exposing bsdsocket.library v4+.
+   Roadshow is the initial real-stack target.
+ - A working network interface and route to the other computer.
+ - Writable storage for received files and enough free space.
+ - MultiView for this AmigaGuide manual.
+ - The system Installer v42+ for the optional installation script.
+
+ The executable targets the 68000 instruction set. Minimum RAM and real
+ 68000 performance have not been certified. Startup checks do not
+ establish compatibility with every Amiga/network stack.
+
+ Other clients include Apple silicon macOS and Windows 10 x64. RISC OS
+ ARM2 and StrongARM builds are experimental and not runtime certified.
+ Use short Latin-1 filenames for transfers involving classic machines.
+
+ Networking depends on the configured TCP/IP stack. BitSkim
+ does not install or reconfigure Roadshow, an Ethernet driver or a bridge.
+ Network setup tools are separate from the BitSkim package.
+
+ @{"Network discovery" link "DISCOVERY"}  @{"Troubleshooting" link "TROUBLE"}
+@endnode
+
+@node INSTALL "Install on Workbench"
+
+ Unpack the entire Amiga ZIP. Keep the outer BitSkim.info beside the
+ BitSkim drawer; it is the drawer's icon. Inside are the client,
+ BitSkimPrefs, the Installer, its launcher, this guide and their icons.
+
+ Double-click Install-BitSkim. The project icon runs StartInstaller,
+ which prefers SYS:System/Installer and falls back to C:Installer.
+ Close BitSkimPrefs before installing or updating.
+
+ Novice mode uses the standard paths automatically, adds BitSkim to
+ WBStartup and launches it after installing. Choose Average/Expert in
+ the Installer welcome screen for custom installation. Intermediate
+ chooses the two executable drawers; Expert also chooses shared data.
+ Both ask about boot startup. Fresh installs also ask about launching;
+ updates automatically stop the clients and restart the installed app.
+ See @{"Updating a running client" link UpdateRestart}. Default locations:
+
+   Main app drawer: SYS:Utilities (executable and icon directly here)
+   Prefs drawer:    SYS:Prefs     (Preferences executable and icon)
+   Shared parent:   SYS:          (creates iconless SYS:BitSkim/)
+
+ Shared Plugins, Tools, Themes and Images reserve future resources.
+ The current client has no plugin/skin loader; artwork remains embedded.
+ No shared drawer .info is installed. Show All Files can still reveal it.
+
+ Fixed locations:
+   HELP:BitSkim.guide     guide and its project icon
+   ENV:BitSkim/BitSkim.prefs      live settings
+   ENVARC:BitSkim/BitSkim.prefs   permanent settings
+
+ Settings project icons open the selected BitSkimPrefs executable.
+ Both programs find Help through the installation records. Keep HELP:
+ available; the installer creates no assign and edits no startup scripts.
+ Installer tools stay in the unpacked package, alongside InstallAssets/.
+
+ Recorded installations offer only Update/Uninstall. Updates retain the
+ three recorded app/data locations, migrate the guide to HELP:,
+ and migrate saved settings without replacing an existing new archive.
+ Partial records stop the operation. Custom unregistered copies are not
+ disk-scanned; standard older layouts use their documented locations automatically.
+
+ A leftover SYS:Utilities/BitSkim drawer blocks the direct executable path.
+ Installation preserves it as BitSkim.previous, including unknown files
+ and its icon. If that backup already exists, installation stops without
+ overwriting it. Run the installer from the separate Bin distribution.
+
+ Portable alternative: keep the complete unpacked drawer together.
+
+ Shell installation alternative, from the unpacked package drawer:
+
+   Installer Install-BitSkim APPNAME BitSkim
+
+ The Installer preserves settings and received files. It does not install
+ a TCP/IP stack, add an assign or edit startup scripts. Novice mode adds
+ an owned WBStartup launcher and starts the app automatically.
+ Novice starts the client automatically. Intermediate/Expert ask whether to launch after installing. SYS:WBStartup/BitSkimStart reads the recorded application path;
+ it does not contain a second copy of the main app. Its DONOTWAIT icon
+ avoids waiting for the app to quit during boot. Uninstall removes this
+ entry only when ENVARC:BitSkim/startup-owned proves installer ownership.
+ Networking must already be available when the app starts.
+
+ @{"Update/removal" link "MAINTENANCE"}  @{"Files in the package" link "FILES"}
+@endnode
+
+@node DISCOVERY "Find a computer"
+
+ Nearby computers normally appear automatically on the same IPv4 subnet.
+ Select a row, then send or drop a file. Use the up/down controls to
+ browse more than five nearby entries. Refresh requests discovery now.
+
+ Discovery uses UDP 46440. File transfers use TCP, normally port 46440.
+ Firewalls, guest Wi-Fi isolation, VPNs and NAT can prevent
+ broadcast discovery or incoming connections.
+
+ To connect manually, enter an address in IP or IP:port and press Return:
+
+   172.16.1.20
+   172.16.1.20:46441
+
+ Use the port shown by the receiving client. Do not enter a web URL.
+ Manual IP bypasses discovery, not routing or firewall restrictions.
+
+ The Amiga listener can be selected from Shell:
+
+   Bin:BitSkim/BitSkim PORT=46441
+
+ A default-port conflict may cause the Amiga client to try 46441. Read
+ the actual port in its footer. Discovery remains on UDP 46440.
+
+ Idle entries normally expire after 90 seconds. Certain connection
+ failures remove a peer sooner; fresh discovery can add it again.
+
+ While iconified, outgoing searches stop and the local peer list clears.
+ Restore the window to resume discovery. This is an optimization.
+
+ @{"Background operation" link "BACKGROUND"}  @{"No peers found" link "TROUBLE"}
+@endnode
+
+@node SENDING "Send a file"
+
+ Select a nearby peer. Choose Send file to open a nonblocking path window,
+ or find a file in Workbench and drop it into BitSkim's main window.
+ The path window shows its recipient. Enter a complete Amiga filename:
+
+   Work:Files/example.txt
+
+ Clicking Send in that path window uses its displayed recipient, even if
+ the main selection later changes. A drop into the main window uses the
+ main window's current selection. Only one regular file is supported.
+ Directories and multiple-file drops are rejected.
+
+ For a discovered recipient, BitSkim retains its stable installation ID
+ and checks the remote HELLO identity before offering the file. A missing
+ or ambiguous ID is an error; it does not silently choose another peer.
+ Explicit manual-IP sending remains an address-based operation.
+
+ The receiver must accept and choose a destination according to its own
+ preferences. Sending does not bypass consent or overwrite protection.
+ Avoid changing the source file until the transfer finishes.
+
+ Progress counts payload written to the local connection. Delivery is
+ confirmed only by the receiver's final checksum/save acknowledgement.
+
+ @{"Progress/cancel" link "PROGRESS"}  @{"Filename limits" link "SAFETY"}
+@endnode
+
+@node RECEIVING "Receive a file"
+
+ By default an incoming offer opens a themed, nonblocking window showing
+ the sender label, filename, size and proposed full destination path.
+ Review it and choose Accept or Decline. Closing the offer declines it.
+
+ Edit the full save path if you want a different drawer or filename:
+
+   Work:Downloads/example.txt
+
+ No destination is created before acceptance. BitSkim receives into a
+ temporary file, checks CRC-32 and finalizes without silently replacing
+ an existing destination. A collision may select a numbered alternative;
+ on old filesystems, keep the final leafname within their length limit.
+
+ Networking, discovery and ARexx continue while the offer/path window is
+ open. Remote cancellation or timeout invalidates and closes a stale
+ offer, so a late click cannot accept an old transfer.
+
+ In General preferences (Allow incoming is in Network):
+
+ - Allow incoming transfers controls whether offers can be received.
+ - Automatically accept offers avoids the manual decision only when
+   Always ask where to save is off.
+ - Always ask still opens the editable save-path window with auto-accept.
+ - Choose a persistent folder for unattended reception. RAM: is volatile.
+
+ Auto-accept with Always ask disabled can receive while iconified.
+ Files are never opened automatically after reception.
+
+ @{"Receiving preferences" link "PREFERENCES"}  @{"Safety" link "SAFETY"}
+@endnode
+
+@node PROGRESS "Progress, cancellation and delivery"
+
+ During sending/receiving the client shows transferred and total size,
+ percentage, remaining data and recent payload speed. Sizes use binary
+ units (KiB/MiB/GiB). Early speed samples or a stall can show zero.
+
+ The engine streams small chunks rather than buffering the whole file.
+ Only one transfer is active at a time. Window redraws are throttled on
+ the Amiga to reduce work on classic CPUs.
+
+ Cancel stops the active transfer and removes its incomplete receive
+ file. A best-effort CANCEL frame informs the other peer; a broken or
+ blocked connection can instead appear as a connection failure there.
+ Closing a send-path selection window just cancels that selection.
+
+ Recipient decisions time out after 120 seconds. Other connection
+ inactivity times out after about 30 seconds. Detection is not instant.
+
+ If completion is unconfirmed, the receiver may already have saved the
+ file before its acknowledgement was lost. Check there before retrying.
+ CRC-32 detects accidental corruption; it is not cryptographic protection.
+
+ @{"Background" link "BACKGROUND"}  @{"Troubleshooting" link "TROUBLE"}
+@endnode
+
+@node PREFERENCES "Preferences"
+
+ Open Preferences in the client, or start BitSkimPrefs from SYS:Prefs.
+ The editor works without a TCP/IP stack and does not open a listener.
+ Its sections are General, Appearance, Network and About.
+
+ GENERAL
+   Client name: how this installation is labelled on the LAN. The initial
+   name comes from the hostname. Keep it short; the protocol permits
+   63 UTF-8 bytes, which can be fewer than 63 non-ASCII characters.
+
+   Start iconified: begins with a Workbench AppIcon on the next launch.
+   Close window to iconify: keeps the client running when Close is used.
+   Both iconify options default off and are enabled only by your choice.
+   Use Quit to exit explicitly in close-to-iconify mode.
+
+   Automatically accept offers, Always ask where to save and Folder
+   control file acceptance and destination. Auto-accept respects Always ask.
+
+ APPEARANCE
+   Select a theme and inspect its preview. Use or Save applies the choice.
+
+ NETWORK
+   Visible on network controls discovery advertising. Visibility is not
+   access control: manual-IP reception can remain enabled while hidden.
+   Allow incoming transfers gates all incoming file offers.
+
+ ABOUT
+   Version, project repository and planned website.
+
+ Use writes only live ENV: settings and applies them for this session.
+ Save writes ENV: and ENVARC: for this session and future boots. Revert restores the opening values. Cancel or
+ closing the editor discards changes. Saving signals the primary BITSKIM
+ host to reload when idle; a transfer is not reconfigured halfway through.
+ Secondary hosts can use ARexx RELOAD explicitly. The last saved editor
+ wins if multiple copies are open.
+
+ Installed live settings use ENV:BitSkim/BitSkim.prefs; saved settings use
+ ENVARC:BitSkim/BitSkim.prefs. Older flat/shared settings are read only
+ as fallback when canonical settings are absent.
+ The Help button opens this guide without discarding the current draft.
+
+ @{"Themes" link "THEMES"}  @{"Background" link "BACKGROUND"}
+@endnode
+
+@node THEMES "Themes and Workbench windows"
+
+ Eight choices are available:
+
+   Catppuccin Latte       Catppuccin Frappe
+   Catppuccin Macchiato   Catppuccin Mocha (default)
+   BitSkim Rosewater      BitSkim Mint
+   Arctic                Classic
+
+ In Appearance, click the theme selector to cycle forward; Shift-click
+ cycles backward. The preview is illustrative and performs no transfer.
+ Use or Save applies the selected theme.
+
+ Both applications use ordinary Workbench windows. Content, buttons,
+ selectors and peer rows use application pens. Intuition title bars and
+ system dialogs follow Workbench styling. No private screen is opened
+ and no other application's colours are changed.
+
+ Low-colour screens approximate the palette using available pens.
+ Classic uses Workbench colours. Modeless transfer windows own their
+ screen locks/pens, independently of the main window's lifetime.
+
+ @{"Preferences" link "PREFERENCES"}  @{"Project information" link "ABOUT"}
+@endnode
+
+@node BACKGROUND "Iconify and background operation"
+
+ Iconify hides the main window behind a Workbench AppIcon. Double-click
+ that icon to restore it. Optional Start iconified and Close window to
+ iconify settings are in General preferences.
+
+ While hidden, BitSkim keeps incoming transfers, discovery replies,
+ ARexx commands and event history active. It pauses outgoing peer searches,
+ clears the cached peer list and avoids unnecessary UI work. PEERS=0 in
+ STATUS is therefore normal until discovery resumes on restore.
+
+ SHOW restores and refreshes discovery. REFRESH alone does not override
+ the iconified search policy. SENDID requires the peer to be in the current
+ catalog; manual-address SEND does not require a catalog entry.
+
+ An offer needing attention can show the main window and its modeless
+ offer dialog. An unattended accepted transfer can remain iconified.
+ Existing modeless windows have independent resources; hiding the main
+ window does not invalidate them.
+
+ Use Quit, ARexx QUIT or a Shell Ctrl-C break to exit. Incoming reception
+ stops when the process exits. Iconify is not an operating-system login
+ item and does not itself add anything to WBStartup.
+
+ @{"ARexx" link "AREXX"}  @{"NovaDock" link "NOVADOCK"}
+@endnode
+
+@node AREXX "Local ARexx commands"
+
+ With rexxsyslib.library available the client registers BITSKIM, or
+ BITSKIM.1 through BITSKIM.99 if names are occupied. The port remains
+ available while iconified. Run RexxMast to execute scripts using RX.
+
+ Example script:
+
+   OPTIONS RESULTS
+   ADDRESS BITSKIM 'STATUS'
+   IF RC = 0 THEN SAY RESULT
+
+ Supplied examples live in ARexx/ beside the application:
+
+   RX Bin:BitSkim/ARexx/Status.rexx
+   RX Bin:BitSkim/ARexx/DockStatus.rexx
+
+ Queries:
+   VERSION       application version (0.1)
+   CAPABILITIES  independent ARexx extension version and feature flags
+   STATUS        decimal KEY=VALUE progress/policy fields, including BPS
+   SESSION       session-generation token
+   DETAILS       current/most recently started transfer details
+   LAST          retained most recent terminal transfer result
+   PEERS         stable advertised peer IDs
+   PEERINFO id   escaped details for one stable ID
+   EVENTS seq    legacy retained event list
+   EVENTDETAILS seq  session-aware events with IDs/results
+   ERROR         diagnostic for the most recent failed command
+
+ Actions:
+   SHOW / HIDE                 restore / iconify
+   PREFS / RELOAD              open preferences / reload when idle
+   REFRESH                     request discovery when searches are active
+   VISIBLE ON / OFF            session visibility policy
+   RECEIVING ON / OFF          session incoming-transfer policy
+   SEND ip[:port] "Amiga:path"  address-based send
+   SENDID id "Amiga:path"      stable-ID send
+   CANCEL / QUIT               cancel transfer / exit
+
+ Commands are case insensitive. Quoted arguments support spaces; double
+ the matching quote to include it. Backslashes are literal, not escapes.
+ Native command paths use Amiga Latin-1 bytes, not UTF-8.
+
+ RC 0 means success/accepted, 10 bad command/arguments, 20 failure/busy/
+ unavailable/shutdown. Sending is asynchronous: accepted is not delivered.
+ On failure no result Argstring is returned; query ERROR for diagnostics.
+
+ Legacy PEER index remains available but is unsafe for a retained recipient
+ selection because discovery can reorder entries. Use stable IDs instead.
+ Management is local only, never exposed over the file-transfer protocol.
+ There is no ARexx command to bypass normal incoming acceptance policy.
+
+ @{"Details/events" link "DETAILS"}  @{"NovaDock" link "NOVADOCK"}
+@endnode
+
+@node DETAILS "ARexx details, outcomes and events"
+
+ STATUS contains numeric decimal key=value tokens separated by whitespace.
+ It never contains free-text names or errors. Unknown fields should be
+ tolerated. BPS is recent payload bytes/second; zero is inactive/unknown.
+
+ DETAILS and LAST have AVAILABLE=0 when no record exists. Otherwise they
+ include SESSION, qualified ID, ACTIVE, INCOMING, BYTES, TOTAL, RESULT,
+ FILENAME, PEER, ADDRESS and ERROR. LAST stays readable while idle and
+ during the next transfer; the next terminal result replaces it.
+
+ Results:
+   0 pending   1 complete   2 failed   3 cancelled   4 declined
+
+ Text values use byte-wise percent encoding. Decode once. Letters,
+ digits, hyphen, period, underscore and tilde are literal; other bytes
+ are %HH. Empty values follow '=' directly. '+' is not a space.
+ Names/filenames are UTF-8; diagnostics are opaque bytes and can contain
+ invalid UTF-8 from a remote peer. Never execute diagnostic text.
+
+ EVENTS returns LATEST/LOST and sequence:type pairs. EVENTDETAILS also
+ includes SESSION and sequence:type:qualified-id:result entries.
+ Types: 1 peers changed, 2 offer, 3 status, 4 complete, 5 error.
+ A terminal result can first appear on a status event, including decline.
+
+ The newest 32 events are kept without being consumed by reads. Fast
+ progress can overflow history. LOST=1 or a changed SESSION requires
+ resynchronization using STATUS and LAST. Counters start at 1; generation
+ changes before 32-bit sequence/counter reuse. Restart clears history and
+ snapshots. Session/transfer IDs are local observation tokens, not security.
+
+ Maximum complete command: 1199 bytes; successful response: 4095 bytes.
+ For the complete machine contract, see ARexx/NOVADOCK.md in the package
+ or docs/NOVADOCK.md in source. ERROR is host-global and another client
+ can replace that diagnostic; transfer IDs/results are authoritative.
+
+ @{"Commands" link "AREXX"}  @{"NovaDock" link "NOVADOCK"}
+@endnode
+
+@node NOVADOCK "NovaDock and other applications"
+
+ NovaDock can discover BITSKIM or a numbered host and query capabilities.
+ Existing integrations using numeric STATUS, SHOW, REFRESH, RECEIVING,
+ PREFS and CANCEL remain supported. ARexx protocol 2 adds optional details,
+ retained results, session-aware events and stable-ID recipient APIs.
+
+ A plugin should hold at most one asynchronous request in flight and keep
+ each RexxMsg/argument alive until the reply arrives, even after its own
+ timeout. A timeout is not proof that a transfer failed.
+
+ Suggested polling:
+   1. CAPABILITIES and STATUS.
+   2. EVENTDETAILS with a private cursor; compare SESSION every time.
+   3. On LOST/session change, resynchronize with STATUS and LAST.
+   4. Deduplicate outcome badges using LAST's qualified transfer ID.
+   5. For a future recipient picker, use PEERS, PEERINFO and SENDID.
+
+ Modeless transfer windows keep the client task servicing ARexx. Native
+ startup errors before host registration and the separate preferences
+ program are different from the running client's management loop.
+
+ The dock plugin decides how to display icons, badges and notifications.
+ A direct drop onto a dock tile depends on that plugin's implementation;
+ installing BitSkim alone does not implement it inside another product.
+ No NovaDock plugin binary or network/bridge tool is installed here.
+
+ @{"Details/events" link "DETAILS"}  @{"Troubleshooting" link "TROUBLE"}
+@endnode
+
+@node TROUBLE "Troubleshooting"
+
+ Cannot open bsdsocket.library:
+   Start a compatible TCP/IP stack first. In test execution, ensure the chosen
+   networking method really provides the guest stack/interface you intend.
+
+ No peers appear:
+   Restore the client if iconified, then Refresh. Check visibility and
+   receiving policy on the recipient. Try its explicit IP/port. Verify
+   subnet, route, firewall and Wi-Fi isolation on both computers.
+
+ Port busy or wrong endpoint:
+   Close duplicate processes or choose PORT= from Shell. Read the actual
+   TCP port in the footer, especially when testing on a shared host.
+
+ Path/filename rejected:
+   Use a complete native path and an existing writable drawer. Incoming
+   Amiga leafnames must be Latin-1 and at most 30 characters. Unsupported
+   Unicode names need renaming on the sender. A numbered collision suffix
+   also needs to fit the old filesystem's limit.
+
+ Cannot create/finalize a file:
+   Check free space, write protection, volume availability and the final
+   filename. BitSkim does not silently overwrite an existing destination.
+   On modern filesystems lacking safe finalization primitives it fails.
+
+ Waiting, timeout or unconfirmed delivery:
+   Check the other host and link. The receiver may already have saved a
+   completed file whose final acknowledgement was lost. Verify before retry.
+
+ Preferences did not change the running copy:
+   Wait until the active transfer finishes. Saving signals the primary
+   BITSKIM host; send RELOAD to a numbered secondary host explicitly.
+
+ Help does not open:
+   Keep the guide in the selected help drawer and reinstall if locations
+   have moved. Portable copies can keep it beside the apps. Check MultiView is
+   available as SYS:Utilities/MultiView or C:MultiView. You can open the
+   guide manually. Its .info is a project icon, not the client executable.
+
+ Native Amiga dialogs, networking and installers need guest/
+ hardware checks; host tests and successful builds do not certify them.
+
+ @{"Requirements" link "REQUIREMENTS"}  @{"Safety" link "SAFETY"}
+@endnode
+
+@node SAFETY "Limits and safety"
+
+ BitSkim 0.1 transfers are unencrypted. Names, IPs and installation IDs
+ are not authenticated. Stable-ID checks prevent accidental recipient
+ changes; they do not provide cryptographic pairing. Use a trusted LAN
+ and do not forward the listening port to the public Internet.
+
+ CRC-32 detects accidental corruption, not malicious modification.
+ Received files are never executed or opened automatically.
+
+ One regular file per transfer, one active transfer per client, maximum
+ 2,147,483,647 bytes. No directories, resume or encryption on Amiga. The queue uses temporary storage; see FileBatches.
+ Files are byte-preserving; platform metadata, Amiga protection bits and
+ automatic companion .info files are not bundled. Send an .info separately
+ if desired. Never assume a downloaded file is safe just because it arrived.
+
+ Incoming Amiga filenames are limited to 30 Latin-1 characters. Other
+ receivers impose their own filesystem limits. RISC OS proposed leafnames
+ are shortened for old FileCore; that client is experimental.
+
+ Very large files, full/removable volumes, slow real hardware and routed
+ networks require further validation. The shipped validation notes/source
+ build records distinguish tested behavior from intended compatibility.
+
+ @{"Progress" link "PROGRESS"}  @{"Project information" link "ABOUT"}
+@endnode
+
+@node FILES "Files and settings"
+
+ In the unpacked distribution package:
+   BitSkim                 main Workbench client
+   BitSkim.info            main application icon
+   BitSkimPrefs             separate preferences editor
+   BitSkimPrefs.info        preferences icon
+   BitSkim.guide            this AmigaGuide manual
+   BitSkim.guide.info       manual project icon (MultiView)
+   Install-BitSkim          Installer script
+   Install-BitSkim.info     installer project icon (StartInstaller)
+   StartInstaller           system Installer launcher
+   StartBitSkim              small WBStartup launcher template
+   ARexx/                   example scripts and integration contract
+   BUILD-PROVENANCE.json    source/toolchain/payload build record
+   README.MD, INSTALLATION.md, LICENSE and third-party notices
+
+ Installation-location files live in ENV:BitSkim/ and ENVARC:BitSkim/:
+   app.path, prefs.path, shared.path, guide.path
+ These contain literal selected paths, never Shell commands.
+
+ The Installer and its launcher are not copied into installed locations.
+ Keep the distribution package to update/remove later.
+
+ The outer BitSkim.info belongs beside the drawer, not inside it.
+ The inner BitSkim.info belongs beside the main executable.
+ The drawer and installer use the supplied software-package/install art.
+
+ Settings:
+   ENV:BitSkim/BitSkim.prefs       installed live settings
+   ENV:BitSkim.prefs        legacy/portable live settings
+   ENVARC:BitSkim/BitSkim.prefs   permanent settings
+   ENVARC:BitSkim.prefs     legacy/portable persistent settings
+
+ Keep the installation ID unique to each computer. Copying another
+ machine's saved settings can duplicate its advertised ID.
+ Received files go to the configured/chosen path, not necessarily here.
+ RAM: contents disappear on restart.
+
+ @{"Install" link "INSTALL"}  @{"Update/remove" link "MAINTENANCE"}
+@endnode
+
+@node MAINTENANCE "Update and remove"
+
+ Close BitSkim (including iconified copies) and BitSkimPrefs first.
+ Run Install-BitSkim from the newly unpacked full archive. Check the
+ installer-displayed directories, then Update BitSkim. Registered copies
+ retain the three selectable paths without destination questions.
+ Help and settings use their fixed system locations.
+
+ To remove, select Uninstall BitSkim for the displayed installation. Only known bundled
+ files, including the manual and its icon, are removed. Settings, received
+ files, unknown files and the drawer itself remain. Remove empty leftover
+ drawers manually if desired.
+
+ Manual update is also possible by copying the new complete package.
+ Portable copies can stay together. Installed copies use the central
+ location metadata. Keep the installer/launcher package for maintenance.
+ Avoid replacing files while a transfer is active.
+
+ Version stays 0.1 until the owner requests a version change. New packages
+ carry source and payload fingerprints to avoid mixing old binaries with
+ new source. Build records are not publisher signatures or authentication.
+
+ @{"Package files" link "FILES"}  @{"Project information" link "ABOUT"}
+@endnode
+
+@node ABOUT "About BitSkim"
+
+ BitSkim 0.1 - first public release in preparation.
+ Native interfaces share a small, bounded, nonblocking C transfer engine.
+
+ Source repository:
+   https://github.com/retrocs-org/bitskim
+
+ Planned public website (future launch):
+   https://bitskim.retrocs.org
+
+ Source code and project-generated art: see the included MIT license.
+ Supplied artwork and third-party components have their recorded notices.
+ Catppuccin palette credits and the NovaDock-derived installer launcher's
+ license are included with the package. No platform-vendor affiliation
+ or Apple AirDrop interoperability is implied.
+
+ The application uses no accounts or cloud relay. Modern macOS/Windows TLS,
+ authenticated pairing and broader platform features require separately
+ designed extensions; they are not enabled by an option in this version.
+
+ This manual uses plain ASCII and local AmigaGuide links for classic
+ Workbench viewers. The URLs above are informational, not shell actions.
+
+ @{"Contents" link "MAIN"}  @{"Quick start" link "QUICKSTART"}
+@endnode
+
+
+@node UpdateRestart "Updating a running client"
+ Close BitSkimPrefs before upgrading. Update automatically requests normal
+ shutdown of all registered BitSkim clients. Active transfers are cancelled
+ and waiting queues are discarded. If shutdown takes over ten seconds,
+ update aborts before replacing program files.
+
+ After a successful upgrade, one copy of the installed app starts using its
+ saved preferences. Failed or aborted updates do not launch the app.
+ StopBitSkim is a package-only helper and is not installed.
+@endnode
+
+@node NetworkCapabilities "Network capabilities"
+ Every current client announces its supported transfer features and limits
+ in broadcast discovery, then confirms them on the live connection.
+ Amiga reports plaintext only, a 2 GiB-minus-one per-file limit, UTF-8 wire
+ names up to 255 bytes, and mapped Latin-1 save names up to 30 bytes.
+ Collections use one browsable list and one destination folder.
+ Modern Mac and Windows clients prefer automatic TLS when possible and
+ otherwise allow Amiga plaintext. Their Force encryption setting prevents
+ transfers with this plaintext-only Amiga implementation. No directories,
+ active-file pause, TLS or interrupted-file resume are advertised by Amiga.
+ ARexx NETWORKCAPS reports the local numeric capability profile.
+@endnode
+
+@node FileBatches "Accept all files in a batch"
+ Updated senders offer the complete list for one recipient. Browse with
+ Previous/Next, then Accept all and select one folder. Temporary storage
+ is required (T: normally uses RAM). Count ceiling: 32760 files.
+ BitSkim shows the proposed local filenames and sizes. Names may be adapted
+ for the Amiga. Choose the existing folder in Save all in folder, then
+ Accept all. Each following listed file uses that folder without asking
+ again. Existing files are preserved and collisions get numbered names.
+
+ This permission applies only to this list, sender and order. Cancellation,
+ errors, changed offers or a two-minute gap between files require fresh
+ consent. Additional files added later are a new offer. Older clients
+ still ask per file. No folders are transferred and archives are not
+ automatically unpacked. Batch files currently restart from the beginning
+ after interruption; modern single-file resume is a separate feature.
+@endnode
+
+@node TOOLS "Transfer tools, conflicts and history"
+ Hold the right mouse button and choose Tools / Transfers / Diagnostics.
+ The modeless window keeps transfers and ARexx running. Page scrolls;
+ History toggles diagnostics and recent results; Older cycles the last
+ eight results; Retry queues an unsuccessful outgoing file to its saved
+ stable peer ID. The path and result remain available until exit.
+
+ Conflicts also appears in incoming offers and collection approvals.
+ It cycles Rename (default), Skip and Replace for this session.
+ It applies to the remaining files of an approved collection. Rename
+ preserves extensions and chooses an unused name. Skip needs an updated
+ sender; otherwise rename or decline. Replace checks the complete new
+ file before moving the original to a same-folder BK backup and committing.
+ If finalization fails and restoration is blocked, retain that backup.
+ Explicit Replace may replace an earlier duplicate; Rename retains all.
+
+ Single-file and collection suggestions share conservative Amiga mapping:
+ Latin-1-compatible names, 30 bytes and retained extensions where possible.
+ This is safe on older filesystems even when the OS supports longer names.
+ Modern device pairing is unavailable on the plaintext Amiga client.
+
+ Updated peers negotiate written-file CRC verification. The temporary
+ file is read back in bounded slices before final commit and acknowledgement.
+ Legacy transfers retain the original streamed CRC/receipt protocol.
+ CRC detects accidental damage, not malicious network modification.
+
+ Diagnostics show the stack API, bind/listen ports, peer endpoint, caps,
+ limits and last error. They do not start or reconfigure Roadshow or UAE.
+@endnode
+
+@node FOLDERS "Folders and disk space"
+
+ Send and receive dialogs remember separate last-used folders. Missing
+ folders fall back to the configured default. History is saved locally in
+ ENVARC:BitSkim/BSFOLD.DAT.
+
+ Progress includes the current file position, overall payload bytes and
+ speed. Cancel discards the remaining files and removes the current partial
+ file; completed files stay saved.
+
+ Transfer tools includes Test network. It checks the entered or most recent
+ peer over TCP without sending a file. See Diagnostics for the result.
+
+ Drop a Workbench drawer or enter its path to send a folder. Nested and
+ empty directories are included. Updated peers show the whole list and
+ approve it once into a chosen parent folder. A fresh, uniquely named root
+ is created; existing folders are never merged or replaced. Older clients
+ cannot receive folders. Files still stream one at a time.
+
+ Tree previews wrap two paths per page. Names are adapted for the receiver;
+ Amiga defaults remain conservative at 30 bytes per name. Relative wire
+ paths allow 255 UTF-8 bytes and 16 components. Queue capacity includes
+ directories. Links, special files and filesystem metadata are not sent.
+ Cancel leaves created folders and completed files intact. A retry creates
+ another safe root rather than merging into the previous partial folder.
+
+ The incoming dialog shows estimated required and available disk space.
+ Checks run before approval and before every file. The estimate includes
+ allocation overhead and a reserve; it does not credit replaced or skipped
+ files. An unavailable space query is shown explicitly and does not block
+ receiving. Space is not reserved, so later writes can still fail.
+ Temporary queue and manifest spools also need free disk space.
+@endnode
+
+@node RESULTS "Collection results and retry"
+
+ Before approval, BitSkim shows file count, folder count and payload size.
+ Transfer tools retains the latest incoming and outgoing result counts.
+ Queue / Retry failed only rebuilds failed payloads when the queue is empty.
+ Completed, skipped and cancelled files are excluded. A folder retry makes
+ a fresh root with only the needed parent directories. A failed folder scan
+ needs an explicit requeue. Check the receiver after an unconfirmed result.
+ Enable Completion beep in General to announce successful delivery.
+@endnode

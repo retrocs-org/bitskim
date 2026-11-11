@@ -1,0 +1,13 @@
+{
+  "source": "Generic-Amiga-Installer-Icons.zip supplied by project owner",
+  "archive_sha256": "6c0a9eb32ceec69b4f464a1fdbb56141f7299ce04713d67287140f028ced626d",
+  "files": {
+    "SoftwarePackage.info": "c150a0a55709466069be4202f3a3411b157421d3b8a645bd7489f7da09894f3c",
+    "Install.info": "dee9746a9c814fe8977fe222427d441dc97fd35a8dad477d31f04452e49d7fb8"
+  },
+  "mapping": {
+    "SoftwarePackage.info": "BitSkim drawer icon (WBDRAWER)",
+    "Install.info": "Install-BitSkim project icon (DefaultTool=StartInstaller)"
+  },
+  "artwork": "Both planar image states are retained byte-for-byte. Only Workbench metadata and drawer geometry are adapted."
+}

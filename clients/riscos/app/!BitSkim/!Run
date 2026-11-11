@@ -1,0 +1,4 @@
+Set BitSkim$Dir <Obey$Dir>
+IconSprites <BitSkim$Dir>.!Sprites
+WimpSlot -min 1024k -max 1024k
+Run <BitSkim$Dir>.!RunImage

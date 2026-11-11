@@ -1,0 +1,176 @@
+--- a/configure.in
++++ b/configure.in
+@@ -106,6 +106,9 @@
+ 
+ # Determine operating system
+ case "$host" in
++  *darwin*)
++        os_type="DARWIN"
++        ;;
+   *freebsd*)
+ 	os_type="FREEBSD"
+ 	;;
+--- a/gcc/gcc/config.h
++++ b/gcc/gcc/config.h
+@@ -12,6 +12,14 @@
+ 
+ #ifdef HOST_ARM_RISCOS
+ #include "config/arm/xm-riscos.h"
++#elif HOST_ARM_DARWIN
++#include "config/arm/xm-arm.h"
++#undef HOST_BITS_PER_LONG
++#define HOST_BITS_PER_LONG 64
++#undef HOST_FLOAT_WORDS_BIG_ENDIAN
++#define HOST_FLOAT_WORDS_BIG_ENDIAN 0
++#define POSIX
++#define HAVE_ATEXIT
+ #elif HOST_ARM_LINUX
+ #include "config/arm/xm-linux.h"
+ #elif HOST_I386_CYGWIN
+--- a/gcc/gcc/hconfig.h
++++ b/gcc/gcc/hconfig.h
+@@ -7,10 +7,19 @@
+ #else
+ #include "auto-host.h"
+ #endif
++
+ #include "gansidecl.h"
+ 
+ #ifdef HOST_ARM_RISCOS
+ #include "config/arm/xm-riscos.h"
++#elif HOST_ARM_DARWIN
++#include "config/arm/xm-arm.h"
++#undef HOST_BITS_PER_LONG
++#define HOST_BITS_PER_LONG 64
++#undef HOST_FLOAT_WORDS_BIG_ENDIAN
++#define HOST_FLOAT_WORDS_BIG_ENDIAN 0
++#define POSIX
++#define HAVE_ATEXIT
+ #elif HOST_ARM_LINUX
+ #include "config/arm/xm-linux.h"
+ #elif HOST_I386_CYGWIN
+--- a/gcc/gcc/config/arm/xm-arm.h
++++ b/gcc/gcc/config/arm/xm-arm.h
+@@ -29,7 +29,11 @@
+ #define HOST_BITS_PER_CHAR 8
+ #define HOST_BITS_PER_SHORT 16
+ #define HOST_BITS_PER_INT 32
++#ifdef HOST_ARM_DARWIN
++#define HOST_BITS_PER_LONG 64
++#else
+ #define HOST_BITS_PER_LONG 32
++#endif
+ #define HOST_BITS_PER_LONGLONG 64
+ 
+ /* A code distinguishing the floating point format of the host
+--- a/gcc/gcc/config/arm/arm.c
++++ b/gcc/gcc/config/arm/arm.c
+@@ -535,7 +535,7 @@
+   if ((TARGET_SOFT_FLOAT || arm_fpu != FP_HARD) && (tune_flags & FL_MODE32) == 0)
+     flag_schedule_insns = flag_schedule_insns_after_reload = 0;
+ 
+-  arm_prog_mode = TARGET_APCS_32 ? PROG_MODE_PROG32 : PROG_MODE_PROG26;
++  arm_prgmode = TARGET_APCS_32 ? PROG_MODE_PROG32 : PROG_MODE_PROG26;
+ 
+   if (structure_size_string != NULL)
+     {
+--- a/gcc/gcc/Makefile.in
++++ b/gcc/gcc/Makefile.in
+@@ -37,7 +37,7 @@
+ $(gccobjdir)/%.o: %.c
+ 	$(CC) $(CFLAGS) -o $@ -c $< $(INCLUDES)
+ 
+-all: comp-stg1 comp-stg2
++all: comp-stg1
+ 
+ comp-stg1: c docs
+ comp-stg2: comp-stg1 cp cp f77 gpc objc java
+--- a/gcc/gcc/Makelibs
++++ b/gcc/gcc/Makelibs
+@@ -109,14 +109,14 @@
+ 		$(insthdr) cp/inc "$$hdr" . $(ux_gccpkg)/$(gn_gplusplus_include_dir) $(ro_gccpkg)/$(gn_gplusplus_include_dir); \
+ 	done
+ 
+-$(ux_gcc_bin_dir)/$(TRG)/libgcc.o: $(GPP_LIB) $(GCC_LIB_ULIB) \
++$(ux_gcc_bin_dir)/$(TRG)/libgcc.o:  $(GCC_LIB_ULIB) \
+ 	$(GCC_LIB_COMMON) $(FP_BIT_DOUBLE) $(FP_BIT_SINGLE)
+-	$(CROSS_AR) $(CROSS_AR_FLAGS) -c $@ $(GPP_LIB) $(GCC_LIB_ULIB) \
++	$(CROSS_AR) $(CROSS_AR_FLAGS) -c $@  $(GCC_LIB_ULIB) \
+ 	$(GCC_LIB_COMMON) $(FP_BIT_DOUBLE) $(FP_BIT_SINGLE)
+ 
+-$(ro_gcc_bin_dir)/$(TRG)/o/libgcc: $(GPP_LIB) $(GCC_LIB_ULIB) \
++$(ro_gcc_bin_dir)/$(TRG)/o/libgcc:  $(GCC_LIB_ULIB) \
+ 	$(GCC_LIB_COMMON) $(FP_BIT_DOUBLE) $(FP_BIT_SINGLE)
+-	$(CROSS_AR) $(CROSS_AR_FLAGS) -c $@ $(GPP_LIB) $(GCC_LIB_ULIB) \
++	$(CROSS_AR) $(CROSS_AR_FLAGS) -c $@  $(GCC_LIB_ULIB) \
+ 	$(GCC_LIB_COMMON) $(FP_BIT_DOUBLE) $(FP_BIT_SINGLE)
+ 
+ ############################################################################
+--- a/riscos-aof/libfile/BList.h
++++ b/riscos-aof/libfile/BList.h
+@@ -309,7 +309,7 @@
+  	void sort(int (*f)(const T&,const T&))
+  	{
+ 	 // List_Base::sort(
+-	 cerr << "Sort nicht implementiert." << endl;
++	 std::cerr << "Sort nicht implementiert." << std::endl;
+ 	 f=f;
+  	 assert(0);
+  	}
+@@ -380,6 +380,8 @@
+ 
+ template <class T> class List_of_p : public List<T *>
+ {
++using List<T *>::m_size;
++using List<T *>::m_data;
+  public:
+ 	T *head()
+ 	{
+@@ -639,6 +641,8 @@
+ 
+ template <class T> class Listiter : public Const_listiter<T>
+ {
++using Const_listiter<T>::m_list;
++using Const_listiter<T>::m_pos;
+  friend class List<T>;
+ 
+  public:
+--- a/riscos-aof/libfile/TimeStamp.h
++++ b/riscos-aof/libfile/TimeStamp.h
+@@ -44,7 +44,7 @@
+  	 	}
+ 
+ #ifdef CROSS_COMPILE
+-		time ((time_t *) &m_exe);
++		m_exe = (int) time(NULL);
+ 		m_load = 0;
+ #else
+  	 	unsigned char bf[5];
+@@ -61,7 +61,7 @@
+  	BString asString()
+  	{
+ #ifdef CROSS_COMPILE
+-		return BString (ctime ((time_t *) &m_exe));
++		time_t value=(unsigned int)m_exe; return BString (ctime (&value));
+ #else
+  	 	char *fmt = "%24:%MI:%SE %DY-%M3-%CE%YR";
+  	 	char res[200];
+--- a/libiberty/stpcpy.c
++++ b/libiberty/stpcpy.c
+@@ -1,3 +1,5 @@
++#undef _FORTIFY_SOURCE
++#define _FORTIFY_SOURCE 0
+ /****************************************************************************
+  *
+  * $Source: /usr/local/cvsroot/gccsdk/unixlib/source/stpcpy.c,v $
+--- a/riscos-aof/libfile/Makefile
++++ b/riscos-aof/libfile/Makefile
+@@ -3,7 +3,7 @@
+ 
+ ifeq (${STAGE},stage1)
+ CXXFLAGS += -DCROSS_COMPILE
+-linklibs = -lstdc++
++linklibs =
+ exesfx = 
+ else
+ CC = $(CROSS_CC)

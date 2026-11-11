@@ -1,0 +1,110 @@
+#
+# NetDrv makefile
+#
+# Naming is hard and evolves, so please excuse some of the complications.
+# The key thing is that NETDRV gets compiled and turns into NETDRIVE.EXE
+# and the ASM files turn into NETDRIVE.SYS.
+#
+# Possible compiler options.  We're using the ones to generate compact, but slow code.
+#
+# -oa   Relax alias checking
+# -ob   Try to generate straight line code
+# -oe - expand user functions inline (-oe=20 is default)
+# -oh   Enable repeated optimizations
+# -oi   generate certain lib funcs inline
+# -oi+  Set max inline depth (C++ only, use -oi for C)
+# -ok   Flowing of register save into function flow graph
+# -ol   loop optimizations
+# -ol+  loop optimizations plus unrolling
+# -or   Reorder for pipelined (486+ procs); not sure if good to use
+# -os   Favor space over time
+# -ot   Favor time over space
+# -ei   Allocate an "int" for all enum types
+# -zp2  Allow compiler to add padding to structs
+# -zpw  Use with above; make sure you are warning free!
+# -0    8088/8086 class code generation
+# -s    disable stack overflow checking
+# -zmf  put each function in a new code segment; helps with linking
+
+# For this code performance is not an issue.  Make it small.
+
+tcp_h_dir = ..\..\TCPINC\
+tcp_c_dir = ..\..\TCPLIB\
+common_h_dir = ..\..\INCLUDE
+
+memory_model = -ms
+compile_options = -0 $(memory_model) -DCFG_H="netdrv.cfg" -oh -ok -os -s -oa -ei -zp2 -zpw -we -zmf
+compile_options += -i=$(tcp_h_dir) -i=$(common_h_dir)
+
+tcpobjs = packet.obj arp.obj eth.obj ip.obj utils.obj timer.obj ipasm.obj udp.obj dns.obj trace.obj
+
+all : clean netdrv.exe nd_cache.exe netdrive.sys rename
+
+install : .symbolic
+	@copy *.sys ..\..\execs
+	@copy *.exe ..\..\execs
+
+rename : .symbolic
+	@rename netdrv.exe netdrive.exe
+
+clean : .symbolic
+	@del netdrv.exe
+	@del netdrive.exe
+	@del netdrive.sys
+	@del nd_cache.exe
+	@del *.obj
+	@del *.map
+	@del *.lst
+	@del simple_tmp.asm
+	@del chksum_t.*
+
+# Not used at the moment; use this if you move to the large memory model.
+patch : .symbolic
+	..\..\utils\ptach netdrv.exe netdrv.map $(memory_model)
+
+.asm : $(tcp_c_dir)
+
+.cpp : $(tcp_c_dir)
+
+.asm.obj :
+	wasm -0 $(memory_model) $[*
+
+.cpp.obj :
+	wpp $[* $(compile_options)
+
+netdrv.exe : $(tcpobjs) netdrv.obj
+	wlink system dos option map option eliminate option stack=4096 name $@ file *.obj
+
+nd_cache.exe : nd_cache.obj
+	wlink system dos option map option eliminate option stack=4096 name $@ file nd_cache.obj
+
+
+netdrive.obj :
+	bash fixdate.sh
+	@rename simple_tmp.asm netdrive.asm
+	wasm netdrive.asm
+	@del netdrive.asm
+
+netdrive.sys : netdrive.obj
+	wlink system dos file netdrive.obj
+	exe2bin netdrive.exe netdrive.sys
+	@del netdrive.exe
+
+
+# Special binaries for chksum code testing.  These are not normally built.
+
+checksum_test : clean chksum_t.sys chksum_t.exe
+
+chksum_t.exe : chksum_test.obj ipasm.obj
+	wlink system dos option map option eliminate option stack=4096 name $@ file chksum_test.obj file ipasm.obj
+
+chksum_t.obj :
+	bash fixdate.sh
+	@rename simple_tmp.asm chksum_t.asm
+	wasm chksum_t.asm -dCHKSUM_TESTING
+	@del chksum_t.asm
+
+chksum_t.sys : chksum_t.obj
+	wlink system dos file chksum_t.obj
+	exe2bin chksum_t.exe chksum_t.sys
+	@del chksum_t.exe

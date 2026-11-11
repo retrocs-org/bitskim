@@ -1,0 +1,10 @@
+[
+ {"id":"latte","name":"Catppuccin Latte","dark":false,"base":"eff1f5","surface":"e6e9ef","text":"4c4f69","muted":"5c5f77","accent":"8839ef","shine":"ffffff","shadow":"bcc0cc"},
+ {"id":"frappe","name":"Catppuccin Frappe","dark":true,"base":"303446","surface":"414559","text":"c6d0f5","muted":"b5bfe2","accent":"babbf1","shine":"626880","shadow":"232634"},
+ {"id":"macchiato","name":"Catppuccin Macchiato","dark":true,"base":"24273a","surface":"363a4f","text":"cad3f5","muted":"b8c0e0","accent":"c6a0f6","shine":"5b6078","shadow":"181926"},
+ {"id":"mocha","name":"Catppuccin Mocha","dark":true,"base":"1e1e2e","surface":"313244","text":"cdd6f4","muted":"bac2de","accent":"cba6f7","shine":"585b70","shadow":"11111b"},
+ {"id":"rosewater","name":"BitSkim Rosewater","dark":true,"base":"1e1e2e","surface":"313244","text":"cdd6f4","muted":"bac2de","accent":"f5e0dc","shine":"585b70","shadow":"11111b"},
+ {"id":"mint","name":"BitSkim Mint","dark":true,"base":"24273a","surface":"363a4f","text":"cad3f5","muted":"b8c0e0","accent":"8bd5ca","shine":"5b6078","shadow":"181926"},
+ {"id":"arctic","name":"Arctic","dark":true,"base":"26343d","surface":"354752","text":"e7eff2","muted":"bdcdd4","accent":"91d4dc","shine":"627e8e","shadow":"17232b"},
+ {"id":"classic","name":"Classic","dark":false,"base":"aaaaaa","surface":"c4c4c4","text":"111111","muted":"333333","accent":"2044aa","shine":"ffffff","shadow":"555555"}
+]

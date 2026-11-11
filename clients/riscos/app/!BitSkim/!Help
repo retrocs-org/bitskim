@@ -1,0 +1,14 @@
+BitSkim 0.1 - RISC OS 3.x development port
+
+Experimental build. No native RISC OS runtime or hardware validation yet.
+See README in the distribution for exact requirements and limitations.
+
+Select a nearby computer, then drag one existing disk file from the Filer
+onto the main window, or enter its full RISC OS path and choose Send file.
+A manual IPv4 address may include :port. Incoming offers show an editable
+save path. Existing files are preserved; old FileCore leafnames are limited
+to 10 characters. Preferences are stored in Choices inside !BitSkim.
+
+The icon bar entry restores the window. Menu on the entry opens Preferences.
+Use the Quit button to exit. TCP/IP is still active while on the icon bar.
+Transfers are unencrypted and sender names are not verified.

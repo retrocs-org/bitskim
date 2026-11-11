@@ -1,0 +1,222 @@
+{
+  "macos": {
+    "target": "macos",
+    "version": "0.1",
+    "source_sha256": "f9975295457efbb5f16919bce62032477ddf2e1d7cfd7cb7410fe8743a0bf909",
+    "dependencies": {},
+    "artifacts": {
+      "build/macos/BitSkim.app": "0135f73a53f7a378eb19399d09acfa1213fea98e0c0ded5108a662c8d07097da"
+    },
+    "toolchain": {
+      "executable": "swiftc",
+      "version": "Apple Swift version 6.4.2 (swiftlang-6.4.2.1.9 clang-2100.4.1.1)\nTarget: arm64-apple-macosx27.2.0\nswift-driver version: 1.168.6",
+      "sha256": "bb1ae529b66944ead40f8d87962a71f6f5fa70b9c710e10e5dee90db450c5e8a"
+    },
+    "notarization": {
+      "status": "Accepted",
+      "submission_id": "1e83fcbc-e3e1-4de0-9328-c7835b9b91eb",
+      "ticket_stapled": true
+    }
+  },
+  "amiga": {
+    "target": "amiga",
+    "version": "0.1",
+    "source_sha256": "f9975295457efbb5f16919bce62032477ddf2e1d7cfd7cb7410fe8743a0bf909",
+    "dependencies": {},
+    "artifacts": {
+      "build/amiga/BitSkim": "e86099c1a2189c8e2a739afff3ca74aca4d72c3a619c028a82d25327d901f584",
+      "build/amiga/BitSkimPrefs": "32d7e9c3472a577988e24c987a619eb060da4e8943f38f79cfce48087507abd4",
+      "build/amiga/BitSkim.info": "880a4f0ff8e51b64f836e7e62efb86e9cabc054e23e5b564c3598230a7f314df",
+      "build/amiga/BitSkimPrefs.info": "b28d098723667a422c5798678de779a3c723e7e348fb2c425d8a44dae5c6ec3b",
+      "build/amiga/BitSkimDrawer.info": "b0856c527402fa48c1936ff0166b921896eb78a3ff0e8f46f70f7d5b3a227009",
+      "build/amiga/StartInstaller": "298790219c920d9b5a8f3d744928a501ef48a9328c368edfa7c382b1ffe70f19",
+      "build/amiga/StartBitSkim": "6af148122d7f63fe38895db3aac8d0ac6891e6c8738aaef4a53bcc79a86e4c2b",
+      "build/amiga/StopBitSkim": "d777125d53141d4401b7454bb24937ad08b7a83a784d8ec350ed7817d36ea395",
+      "build/amiga/BitSkim.guide": "5e9323984fbcca18d635944e5247ca0649b5955c1d1758ea684fcec7ba8a655a",
+      "build/amiga/BitSkim.guide.info": "5c0a492070297fa9dd3ae7873c8f93cb417de18fe6b1ad22fef16649f8ec25c8",
+      "build/amiga/Install-BitSkim": "854ffb5ab9b71cedd558e75780209d378a9dc7770b92c8dc7c40b4aa6653f33e",
+      "build/amiga/Install-BitSkim.info": "e919fdb6f95bd43506db98cad7dae9dff4ae8707796d6a9cf389dfc9afd2de17",
+      "build/amiga/InstallAssets/SettingsDrawer.info": "b0856c527402fa48c1936ff0166b921896eb78a3ff0e8f46f70f7d5b3a227009",
+      "build/amiga/InstallAssets/BitSkim.prefs.info": "9f8a522adc72b4bfed717481785bcc7c644361a56455dffcd36b329380a113e6",
+      "build/amiga/InstallAssets/Startup.info": "880a4f0ff8e51b64f836e7e62efb86e9cabc054e23e5b564c3598230a7f314df"
+    },
+    "toolchain": {
+      "executable": "m68k-amigaos-gcc",
+      "version": "m68k-amigaos-gcc (AmigaDev 16.2-rc23) 16.2.1b 20261010182711\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+      "sha256": "de317be4c5c538a1964194d82f90fea603fe109d0a46d8084b7edc22acb6cbcc"
+    }
+  },
+  "windows": {
+    "target": "windows",
+    "version": "0.1",
+    "source_sha256": "f9975295457efbb5f16919bce62032477ddf2e1d7cfd7cb7410fe8743a0bf909",
+    "dependencies": {},
+    "artifacts": {
+      "build/windows/BitSkim.exe": "0b3c7161152a5d29f12c72c660ed4926f96b950cecb9ccd58d761f3533e610a3",
+      "build/windows/BitSkim-CoreCheck.exe": "92daf9361b1d88daea8e54ee0b284f625d97d6328ff65d348f9541e6a93dcd5b"
+    },
+    "toolchain": {
+      "executable": "x86_64-w64-mingw32-gcc",
+      "version": "x86_64-w64-mingw32-gcc (GCC) 16.2.0\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+      "sha256": "79708a2ac50166252c813e9f9cd38ef8c03aa82d68949aabd97cad53224fae80"
+    }
+  },
+  "windows-legacy": {
+    "target": "windows-legacy",
+    "version": "0.1",
+    "source_sha256": "f9975295457efbb5f16919bce62032477ddf2e1d7cfd7cb7410fe8743a0bf909",
+    "dependencies": {},
+    "artifacts": {
+      "build/windows-legacy/BitSkim.exe": "efb276c62aed3e69a3ab93f6e313b0855a278b3a9b2f153378b23c5d8c0fb2e3"
+    },
+    "toolchain": {
+      "executable": "i686-w64-mingw32-gcc",
+      "version": "i686-w64-mingw32-gcc (GCC) 16.2.0\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+      "sha256": "1cf45b5db53734e2c0b389ef411431bf92886957af14b5ea8d6ef0c2cd068625"
+    }
+  },
+  "atari-sting": {
+    "target": "atari-sting",
+    "version": "0.1",
+    "source_sha256": "f9975295457efbb5f16919bce62032477ddf2e1d7cfd7cb7410fe8743a0bf909",
+    "dependencies": {},
+    "artifacts": {
+      "build/atari/sting/BITSKIM.PRG": "176020a4a9dd165b567c643cc3e1f9154089a82028ff210ca47ab6943ae317e9",
+      "build/atari/sting/bitskim.o": "515ee02251c58c068280cff89d0ac020410ec1282a3dc85485fd33cbdaf576cc",
+      "build/atari/sting/platform.o": "5447c58c810875ec01ff423b065ff5a94d8001b828496202ea9d462c371b1416",
+      "build/atari/sting/main.o": "459acb5c6e6ac49bd572c883e4c71da321252cc321aa85173699340902464d26",
+      "build/atari/sting/sting.o": "6dbe7e85d4b8537b8e34e0f089b875d2c4123e4d218d74108561f31129c8ec5d"
+    },
+    "toolchain": {
+      "executable": "m68k-atari-mint-gcc",
+      "version": "m68k-atari-mint-gcc (MiNT 20230719) 4.6.4\nCopyright (C) 2011 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+      "sha256": "14afff44672808875c7ea3e448e037d32034c87a294b5c5a3717b841be1d9b1e"
+    }
+  },
+  "atari-mintnet": {
+    "target": "atari-mintnet",
+    "version": "0.1",
+    "source_sha256": "f9975295457efbb5f16919bce62032477ddf2e1d7cfd7cb7410fe8743a0bf909",
+    "dependencies": {},
+    "artifacts": {
+      "build/atari/mintnet/BITSKIM.PRG": "ea3f24c96306f7c8d167667612bf7743c0921a941bb8929b46049435624832c1",
+      "build/atari/mintnet/bitskim.o": "51383bee55dd825960445fdd1383b2a56b732f0c67d26e7c088b163af0949f44",
+      "build/atari/mintnet/platform.o": "60ec6d4170d4ac17910368d4e0661ba4d0eb3ffd71572b73408e10b0609c5990",
+      "build/atari/mintnet/main.o": "21d46e42008c25525e08e18c935f870869e67013df5f8b202f926b5585a2a947"
+    },
+    "toolchain": {
+      "executable": "m68k-atari-mint-gcc",
+      "version": "m68k-atari-mint-gcc (MiNT 20230719) 4.6.4\nCopyright (C) 2011 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+      "sha256": "14afff44672808875c7ea3e448e037d32034c87a294b5c5a3717b841be1d9b1e"
+    }
+  },
+  "atari-mintnet060": {
+    "target": "atari-mintnet060",
+    "version": "0.1",
+    "source_sha256": "f9975295457efbb5f16919bce62032477ddf2e1d7cfd7cb7410fe8743a0bf909",
+    "dependencies": {},
+    "artifacts": {
+      "build/atari/mintnet060/BITSKIM.PRG": "85d2283fde051b22c96d86aecc954b9c937af6c97c52a4852440cc3500edb911",
+      "build/atari/mintnet060/bitskim.o": "5a1eb91810ae1580c70c420538d656868a228a45dfbd0ff7fbb84180d77f33c8",
+      "build/atari/mintnet060/platform.o": "bfa3407e7fdb18fb9fc21056a293171178a958fd005b84119a0451f3dfe69066",
+      "build/atari/mintnet060/main.o": "6bcd5115b6681bc6ef28933aa46297683f81ee2b8c473ed81501626217a24261"
+    },
+    "toolchain": {
+      "executable": "m68k-atari-mint-gcc",
+      "version": "m68k-atari-mint-gcc (MiNT 20230719) 4.6.4\nCopyright (C) 2011 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+      "sha256": "14afff44672808875c7ea3e448e037d32034c87a294b5c5a3717b841be1d9b1e"
+    }
+  },
+  "dos": {
+    "target": "dos",
+    "version": "0.1",
+    "source_sha256": "f9975295457efbb5f16919bce62032477ddf2e1d7cfd7cb7410fe8743a0bf909",
+    "dependencies": {},
+    "artifacts": {
+      "build/dos/BITSKIM.EXE": "cf51490e92c9305891f4547276d719ce66012eea041a78c17c57229d0a81ed85"
+    },
+    "toolchain": {
+      "executable": "Open Watcom wcc/wpp/wasm/wlink (DOS)",
+      "compiler_sha256": "df32d22219d7000d836084f049ea71e5c9664235e0a3445c505e64ff0ea3cd15",
+      "version": "Version 2.0 beta Nov  8 2026 06:44:08 (32-bit)"
+    }
+  },
+  "riscos-arm2": {
+    "target": "riscos-arm2",
+    "version": "0.1",
+    "source_sha256": "f9975295457efbb5f16919bce62032477ddf2e1d7cfd7cb7410fe8743a0bf909",
+    "dependencies": {},
+    "artifacts": {
+      "build/riscos/arm2/!BitSkim": "b29ab24bb754bf296117572d2b279dabb06f4a022f2f21478eceaf383e2d2085",
+      "build/riscos/arm2/main.o": "4160dcccc27c3f99f34dd1dac9ec4be9bdf2b2b73ed23d0baa1ca64f65ad1c66",
+      "build/riscos/arm2/bitskim.o": "caf738a147085bc2048b03c57d35a083b83ec6a991b2bf90d7b3283ee02fb31f",
+      "build/riscos/arm2/platform.o": "54071d2d0d894aaecd6ed6ca37391d11473258ade854f877575aad598ad93050",
+      "build/riscos/arm2/riscos-file.o": "9d64a7058aa90587b6a795e1ca17f1caf15f56b3aaedf972424b5181a4fc03b0"
+    },
+    "toolchain": {
+      "executable": "gcc",
+      "version": "2_95_4",
+      "sha256": "749e1b689520b0fc5c1b52ed19e3717e5089f9f6d55f6b2f423cff737e5e2994"
+    }
+  },
+  "riscos-strongarm": {
+    "target": "riscos-strongarm",
+    "version": "0.1",
+    "source_sha256": "f9975295457efbb5f16919bce62032477ddf2e1d7cfd7cb7410fe8743a0bf909",
+    "dependencies": {},
+    "artifacts": {
+      "build/riscos/strongarm/!BitSkim": "9be6797c665bd92048d00c79e386fb81b15e2662a80e560be7e2f2b4a9673841",
+      "build/riscos/strongarm/main.o": "f206696173e673c05dd4d8d1d283ba419c7242dcdfd1d6824cbbf917681083a4",
+      "build/riscos/strongarm/bitskim.o": "a57062cebbddb73dfe59f75b6e655593d1069e6938e7186ee49e446dd13a71f9",
+      "build/riscos/strongarm/platform.o": "f01f0568890ec644574e7905efdde6ca5efb018543874b85c753311b8622c4bd",
+      "build/riscos/strongarm/riscos-file.o": "0805171084b033dd41c2ebc959812a2bdc75d4159ab2f82acf345d20fd167cee"
+    },
+    "toolchain": {
+      "executable": "gcc",
+      "version": "2_95_4",
+      "sha256": "749e1b689520b0fc5c1b52ed19e3717e5089f9f6d55f6b2f423cff737e5e2994"
+    }
+  },
+  "dmg": {
+    "target": "dmg",
+    "version": "0.1",
+    "source_sha256": "f9975295457efbb5f16919bce62032477ddf2e1d7cfd7cb7410fe8743a0bf909",
+    "dependencies": {
+      "macos": {
+        "build/macos/BitSkim.app": "0135f73a53f7a378eb19399d09acfa1213fea98e0c0ded5108a662c8d07097da"
+      }
+    },
+    "artifacts": {
+      "outputs/BitSkim-0.1-macOS-arm64.dmg": "5c864dc98b1ec1766d89497d8372592a2fb8fa152bd9e7e399c69dd4cdfdd739"
+    },
+    "toolchain": {
+      "executable": "hdiutil",
+      "version": "Usage: /usr/bin/hdiutil <verb> <options>\n<verb> is one of the following:\nhelp\nattach\ndetach\neject\nverify\ncreate\ncompact\nconvert\nburn\ninfo\nchecksum\nchpass\nerasekeys\nimageinfo\nisencrypted\nmakehybrid\nmount\nmountvol\nunmount\nplugins\nresize\nsegment\npmap\nudifderez\nudifrez\nhelp\t\t\t   display more detailed help\n\nhdiutil: WARNING: 'hdiutil attach ...' is deprecated. Please use 'diskutil image attach ...' instead.\nUsage:\thdiutil attach [options] <image>\n\thdiutil attach -help\n\nhdiutil: WARNING: 'hdiutil detach ...' is deprecated. Please use 'diskutil eject ...' instead.\nUsage:\thdiutil detach [options] <devname>\n\thdiutil detach -help\n\n\teject is a synonym for detach...\nhdiutil: WARNING: 'hdiutil detach ...' is deprecated. Please use 'diskutil eject ...' instead.\nUsage:\thdiutil detach [options] <devname>\n\thdiutil detach -help\n\nUsage:\thdiutil verify [options] <image>\n\thdiutil verify -help\n\nhdiutil: WARNING: 'hdiutil create ...' is deprecated. Please use 'diskutil image create ...' instead.\nUsage:\thdiutil create <sizespec> [options] <imagepath>\n\thdiutil create -help\n\nUsage:\thdiutil compact [options] <image>\n\thdiutil compact -help\n\nhdiutil: WARNING: 'hdiutil convert ...' is deprecated. Please use 'diskutil image create from ...' instead.\nUsage:\thdiutil convert -format <format> -o <outfile> [options] <image>\n\thdiutil convert -help\n\nUsage:\thdiutil burn [options] <image>\n\thdiutil burn -help\n\nUsage:\thdiutil info [options]\n\thdiutil info -help\n\nUsage:\thdiutil checksum -type <checksumType> [options] <image>\n\thdiutil checksum -help\n\nhdiutil: WARNING: 'hdiutil chpass ...' is deprecated. Please use 'diskutil image chpass ...' instead.\nUsage:\thdiutil chpass [options] <image>\n\thdiutil chpass -help\n\nUsage:\thdiutil erasekeys <image>\n\thdiutil erasekeys -help\n\nhdiutil: WARNING: 'hdiutil imageinfo ...' is deprecated. Please use 'diskutil image info ...' instead.\nUsage:\thdiutil imageinfo [options] <image>\n\thdiutil imageinfo -help\n\nUsage:\thdiutil isencrypted <image>\n\thdiutil isencrypted -help\n\nUsage:\thdiutil makehybrid -o <outfile> [options] <source>\n\thdiutil makehybrid -help\n\nhdiutil: WARNING: 'hdiutil attach ...' is deprecated. Please use 'diskutil image attach ...' instead.\nUsage:\thdiutil attach [options] <image>\n\thdiutil attach -help\n\nhdiutil: WARNING: 'hdiutil mountvol ...' is deprecated. Please use 'diskutil mount ...' instead.\nUsage:\thdiutil mountvol [options] <devname>\n\thdiutil mountvol -help\n\nhdiutil: WARNING: 'hdiutil unmount ...' is deprecated. Please use 'diskutil unmount ...' instead.\nUsage:\thdiutil unmount [options] <mountpoint>\n\thdiutil unmount -help\n\nUsage:\thdiutil plugins [options]\n\thdiutil plugins -help\n\nhdiutil: WARNING: 'hdiutil resize ...' is deprecated. Please use 'diskutil image resize ...' instead.\nUsage:\thdiutil resize <sizespec> [options] <image>\n\thdiutil resize -help\n\nUsage:\thdiutil segment -o <outfile> -segmentCount <num> [options] <image> (deprecated)\n\thdiutil segment -o <outfile> -segmentSize <size> [options] <image> (deprecated)\n\thdiutil segment -help\n\nhdiutil: WARNING: 'hdiutil pmap ...' is deprecated. Please use 'diskutil image info ...' instead.\nUsage: hdiutil pmap [options] <image|device>\n\thdiutil pmap -help\n\nUsage:\thdiutil udifderez [options] <image>\n\thdiutil udifderez -help\n\nUsage:\thdiutil udifrez [options] <image>\n\thdiutil udifrez -help",
+      "sha256": "f57ca111e2bebffbaa937453c1fc503f964eefe33a5d71ec0cd141618cc1e38e"
+    },
+    "notarization": {
+      "status": "Accepted",
+      "submission_id": "5a65050b-910d-432d-887a-99bc44dd8e4d",
+      "ticket_stapled": true
+    }
+  },
+  "setup": {
+    "target": "setup",
+    "version": "0.1",
+    "source_sha256": "f9975295457efbb5f16919bce62032477ddf2e1d7cfd7cb7410fe8743a0bf909",
+    "dependencies": {
+      "windows": {
+        "build/windows/BitSkim.exe": "0b3c7161152a5d29f12c72c660ed4926f96b950cecb9ccd58d761f3533e610a3",
+        "build/windows/BitSkim-CoreCheck.exe": "92daf9361b1d88daea8e54ee0b284f625d97d6328ff65d348f9541e6a93dcd5b"
+      }
+    },
+    "artifacts": {
+      "outputs/BitSkim-0.1-Windows10-x64-Setup.exe": "54586624a583d1f78bd1d927aed48d6094b58720a13102ed1698c4742ccda95d"
+    },
+    "toolchain": {
+      "executable": "makensis",
+      "version": "v3.13",
+      "sha256": "d573ab819c249037e5a2851b621e768b81c132f591a8f2e0b96533ba1d1b0d0d"
+    }
+  }
+}

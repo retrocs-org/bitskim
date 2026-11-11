@@ -1,0 +1,22 @@
+.DS_Store
+build/
+work/
+outputs/
+*.o
+*.dSYM/
+public-web/downloads/
+
+__pycache__/
+*.pyc
+
+# Local credentials and release settings belong outside the checkout.
+.env
+.env.*
+release-config.json
+/bitskim.json
+*.p12
+*.pfx
+*.key
+*.pem
+id_rsa
+id_ed25519
