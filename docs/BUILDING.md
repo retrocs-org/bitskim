@@ -10,6 +10,7 @@ These are standalone compilation instructions. Run commands from the BitSkim sou
 - Run `.sh` scripts in a POSIX shell. On Windows use a suitable POSIX shell for those scripts; the native DOS command below uses Windows Python instead.
 - macOS and modern Windows builds need Perl, make, curl and download access on the first build. Their scripts build pinned OpenSSL 3.5.9 locally under `work/`.
 - Generated icons, themes and sprites are included. Ordinary app compilation does not require Node, npm, Cargo, Pillow or asset regeneration. The legacy RISC OS SDK may have its own host dependencies.
+- Standalone commands do not load the external release configuration. Export the tool variables shown below in your shell; settings used by `scripts/release.py` do not automatically apply to a separate command.
 - Keep installed compilers outside disposable source folders. Use environment variables to select them; never copy a machine-specific settings file into the public source tree.
 
 Get the source by extracting the source archive or cloning:
@@ -31,11 +32,10 @@ Output: `build/macos/BitSkim.app`. A local build defaults to ad-hoc signing. An 
 
 ## Windows — x64
 
-Provide MinGW-w64 GCC and windres targeting x86_64 Windows in PATH, or set both paths explicitly:
+Provide MinGW-w64 GCC and windres targeting x86_64 Windows. On the first build, the OpenSSL dependency also invokes `x86_64-w64-mingw32-*` tools directly, so the complete MinGW bin directory must be in PATH even when `WINDOWS_CC` and `WINDOWS_RC` are set. For example:
 
 ```sh
-WINDOWS_CC=/path/to/x86_64-w64-mingw32-gcc \
-WINDOWS_RC=/path/to/x86_64-w64-mingw32-windres \
+export PATH="/path/to/mingw/bin:$PATH"
 ./scripts/build-windows.sh
 ```
 
@@ -106,7 +106,7 @@ Output: `build/dos/BITSKIM.EXE`. Networking on the target needs a packet driver;
 
 ## Windows Classic — x86 (experimental)
 
-Provide i686 MinGW-w64 GCC and windres:
+Provide i686 MinGW-w64 GCC and windres, including the `libmsvcrt-os.a` import library required by the legacy link. A toolchain lacking that library will not link this client:
 
 ```sh
 LEGACY_WINDOWS_CC=/path/to/i686-w64-mingw32-gcc \
@@ -128,7 +128,7 @@ python3 -m unittest discover -s tests -b
 
 ## Create local installers and archives
 
-Build the corresponding application first and complete source edits before compiling. Packaging checks that build records match the current source.
+Build the corresponding application first and complete source edits before compiling. Packaging checks that build records match the current source. The fingerprint includes scripts, tests, documentation and website files, not only client code. Finish those edits before building; if they change afterward, rebuild every target you intend to package. Committing unchanged file contents does not require a rebuild.
 
 ### Windows installer
 
