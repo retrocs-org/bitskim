@@ -1,5 +1,7 @@
 # Build BitSkim from source
 
+[Website](https://bitskim.retrocs.org) · [Source](https://github.com/retrocs-org/bitskim)
+
 These are standalone compilation instructions. Run commands from the BitSkim source root; no release coordinator, repository tokens or 1Password configuration is needed. Version 0.1 remains the current application version.
 
 ## Before you start
@@ -164,7 +166,7 @@ Standalone Atari and Windows Classic packagers are `python3 scripts/package-atar
 
 ## Website and edited artwork
 
-The website is PHP 8+, needs no database or JavaScript build, and lives in `public-web/`. For a local preview:
+The website is PHP 8+, needs no database or JavaScript build, and lives in `public-web/`. Automatic GitHub download links require PHP cURL or OpenSSL-enabled HTTPS streams with `allow_url_fopen`; no API token is used. For a local preview:
 
 ```sh
 php -S 127.0.0.1:8765 -t public-web

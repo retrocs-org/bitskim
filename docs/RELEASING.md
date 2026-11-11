@@ -1,5 +1,7 @@
 # Releasing BitSkim
 
+[Website](https://bitskim.retrocs.org) · [Source](https://github.com/retrocs-org/bitskim)
+
 Run `python3 scripts/release.py` from the BitSkim project root. A separate universal release-tools checkout is not required. Python 3.9+ and the platform toolchains are required; see [BUILDING.md](BUILDING.md).
 
 ## External settings

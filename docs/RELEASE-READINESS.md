@@ -1,7 +1,8 @@
 # BitSkim 0.1 release status
 
-Updated 11 November 2026. Website: https://bitskim.retrocs.org. Public source:
-https://github.com/retrocs-org/bitskim.
+Updated 11 November 2026.
+
+[Website](https://bitskim.retrocs.org) · [Source](https://github.com/retrocs-org/bitskim)
 
 ## Validation
 
@@ -20,7 +21,7 @@ checksums, includes required source/relink material and prepares a tagged releas
 manifest. Repository and Aminet publication require the explicit publish action.
 The PHP website bundle is prepared for manual upload.
 
-The gallery contains ten application-window captures. Appearance previews are
+The gallery contains eight application-window captures. Appearance previews are
 labelled within the application. Screenshots illustrate the UI and do not certify
 untested platforms. See [RELEASING.md](RELEASING.md) for the release procedure and
 [VALIDATION.md](VALIDATION.md) for the validation overview.

@@ -23,3 +23,5 @@
 .faq-disclosure>summary{font-size:15px;color:var(--accent)}.faq-disclosure>.faq-answers{margin-top:24px}.faq-answers details:last-child{padding-bottom:0}
 
 .manual-retro{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}.manual-retro>summary{font-size:13px;color:var(--accent)}
+
+.download-status{font-size:12px;color:var(--muted);margin:-12px 0 25px}.download-status a{color:var(--ink);text-decoration:underline}.client-links>span{display:inline-flex;align-items:center;gap:9px;flex-wrap:wrap}.client-links .checksum-link{font-size:9px;color:var(--muted);border-color:var(--line)}

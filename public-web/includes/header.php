@@ -4,6 +4,9 @@ if (!isset($pageTitle, $pageDescription, $canonicalPath, $isHome)) {
     exit;
 }
 $site = require __DIR__ . '/config.php';
+require_once __DIR__ . '/releases.php';
+$releaseCatalog = bitskim_load_releases();
+if ($releaseCatalog['release_version'] !== null) $site['version'] = $releaseCatalog['release_version'];
 function site_escape(string $value): string {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }

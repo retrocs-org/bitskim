@@ -23,7 +23,7 @@ def validate(root):
   if not shutil.which(php):raise RuntimeError('PHP CLI is required to validate the PHP website; set PHP to its executable')
   subprocess.run([php,'-l',str(include)],check=True,capture_output=True,text=True)
  for path in sorted(list(root.glob('*.html'))+list(root.glob('*.php'))):
-  text=subprocess.run([os.environ.get('PHP','php'),str(path.resolve())],check=True,capture_output=True,text=True,cwd=root).stdout if path.suffix=='.php' else path.read_text()
+  text=subprocess.run([os.environ.get('PHP','php'),str(path.resolve())],check=True,capture_output=True,text=True,cwd=root,env=dict(os.environ,BITSKIM_RELEASES_OFFLINE='1')).stdout if path.suffix=='.php' else path.read_text()
   if '<?php' in text or 'Warning:' in text or 'Fatal error:' in text:raise RuntimeError('Invalid PHP rendering: '+path.name)
   page=Page();page.feed(text);pages[path.resolve()]=page
   expected=DOMAIN+('/' if path.name in ('index.html','index.php') else '/'+path.name)

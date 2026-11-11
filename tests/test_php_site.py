@@ -13,7 +13,7 @@ class PHPSite(unittest.TestCase):
     def test_entry_points_render_shared_layout_and_current_links(self):
         for name in ('index.php', 'release-notes.php'):
             result = subprocess.run([PHP, str(ROOT / 'public-web' / name)], check=True,
-                                    capture_output=True, text=True)
+                                    capture_output=True, text=True, env=dict(os.environ, BITSKIM_RELEASES_OFFLINE="1"))
             self.assertEqual(result.stderr, '')
             self.assertEqual(result.stdout.count('<html lang="en">'), 1)
             self.assertEqual(result.stdout.count('<footer'), 1)
