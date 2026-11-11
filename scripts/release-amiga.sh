@@ -21,6 +21,15 @@ if [ -z "${AMIGA_CC:-}" ] && [ -x work/toolchain/m68k-amigaos-gcc-16.2/bin/m68k-
     AMIGA_CC="$PWD/work/toolchain/m68k-amigaos-gcc-16.2/bin/m68k-amigaos-gcc"
     export AMIGA_CC
 fi
+# Reuse the standard shared toolchain when it is installed outside the checkout.
+if [ -z "${AMIGA_CC:-}" ] && [ -x "$HOME/Development/tools/amiga/m68k-amigaos-gcc-16.2/bin/m68k-amigaos-gcc" ]; then
+    AMIGA_CC="$HOME/Development/tools/amiga/m68k-amigaos-gcc-16.2/bin/m68k-amigaos-gcc"
+    export AMIGA_CC
+fi
+if [ -z "${LHA:-}" ] && [ -n "${AMIGA_CC:-}" ] && [ -x "$(dirname "$AMIGA_CC")/lha" ]; then
+    LHA="$(dirname "$AMIGA_CC")/lha"
+    export LHA
+fi
 command -v "${AMIGA_CC:-m68k-amigaos-gcc}" >/dev/null || { echo 'Set AMIGA_CC to your Amiga cross-compiler.' >&2; exit 1; }
 if ! python3 scripts/amiga_release.py --check-writer; then
     [ -z "${LHA:-}" ] || { echo 'The configured LHA writer is invalid.' >&2; exit 1; }

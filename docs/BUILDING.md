@@ -51,6 +51,8 @@ AMIGA_CC=/path/to/m68k-amigaos-gcc ./scripts/build-amiga.sh
 
 Outputs under `build/amiga/` include `BitSkim`, `BitSkimPrefs`, the Workbench installer and icons. Target: AmigaOS 3.x, Workbench and an AmiTCP-compatible stack. See [AMIGA.md](AMIGA.md).
 
+For LHA packaging, `./scripts/release-amiga.sh` reuses the installed compiler and writer. Standalone packaging and Aminet commands also discover the writer in `~/Development/tools/amiga/lha/bin/lha` or alongside the shared Amiga compiler. If needed, run `./scripts/bootstrap-lha.sh` to download and build the pinned writer under `~/Development/tools/amiga/lha/`, outside the checkout. Set `LHA_PREFIX` to change that installation directory, or `LHA` to select an existing executable. Lhasa is extraction-only.
+
 ## Atari — TOS/STinG and MiNTNet (experimental)
 
 Use a compatible m68k-atari-mint GCC SDK with MiNTLib and GEMlib, plus the STinG SDK headers:

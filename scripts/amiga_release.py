@@ -21,7 +21,7 @@ def payload(root=ROOT):
     return dict(sorted(files.items()))
 
 def writer():
-    candidates=[os.environ['LHA']] if os.environ.get('LHA') else [str(ROOT/'work/lha-tool/src/lha'),'lha']
+    candidates=[os.environ['LHA']] if os.environ.get('LHA') else [str(Path(os.environ.get('LHA_PREFIX', str(Path.home()/'Development/tools/amiga/lha')))/'bin/lha'), str(Path.home()/'Development/tools/amiga/m68k-amigaos-gcc-16.2/bin/lha'), str(ROOT/'work/lha-tool/src/lha'), 'lha']
     for candidate in candidates:
         executable=shutil.which(candidate)
         if not executable:continue
