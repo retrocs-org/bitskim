@@ -107,4 +107,20 @@ class Tools(CoreTests):
   for expected in (b'Folders supported',b'Written-file verification',b'Plaintext only',b'names 12 bytes',b'Discovery hints'):
    self.assertIn(expected,out.value)
 
+ def test_disk_full_does_not_replace_existing_file_or_report_success(self):
+  self.lib.bs_test_write_limit.argtypes=[C.c_long]
+  for remaining in (0,8192):
+   with self.subTest(bytes_before_full=remaining):
+    self.lib.bs_test_write_limit(-1);dest=self.root/('full-'+str(remaining));dest.write_bytes(b'original')
+    self.start(b'data'*32768);self.lib.bs_conflict_policy(self.b,2);self.assertEqual(self.lib.bs_accept_conflict(self.b,os.fsencode(dest)),1)
+    self.lib.bs_test_write_limit(remaining);self.done();self.lib.bs_test_write_limit(-1)
+    self.assertEqual(dest.read_bytes(),b'original');self.assertNotEqual(self.lib.bs_transfer_result(self.a),1);self.assertNotEqual(self.lib.bs_transfer_result(self.b),1)
+    self.assertFalse(list(self.root.glob('BS*.part')));self.assertIn(b'free disk space',self.status(self.b).message)
+ def test_final_close_failure_is_not_delivered(self):
+  self.lib.bs_test_fail_close.argtypes=[C.c_int]
+  self.start(b'final buffered write');dest=self.root/'close-failed';self.assertEqual(self.lib.bs_accept(self.b,os.fsencode(dest)),1)
+  self.lib.bs_test_fail_close(1);self.done()
+  self.assertFalse(dest.exists());self.assertNotEqual(self.lib.bs_transfer_result(self.a),1);self.assertNotEqual(self.lib.bs_transfer_result(self.b),1)
+  self.assertIn(b'finish writing',self.status(self.b).message)
+
 def load_tests(loader,tests,pattern):return unittest.TestSuite(Tools(n) for n in Tools.__dict__ if n.startswith('test_'))

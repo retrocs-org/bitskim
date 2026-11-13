@@ -595,7 +595,7 @@ struct PeerTile: View {
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $tile.targeted) { model.drop($0, on: peer) }
         .help("Click or drop a file or directory to send to \(peer.name)\n\(peer.transferFeatures)")
         .accessibilityLabel("\(peer.name), \(peer.platform), \(peer.address)")
-        .accessibilityHint("Choose a file to send, or drop a file onto this computer")
+        .accessibilityHint("Choose a file to send, or drop a file onto this computer. \(peer.receiverLimits)")
     }
 }
 struct MainView: View {
@@ -797,6 +797,15 @@ struct TransferToolsView: View {
                     Divider(); Text("Network status").font(.headline)
                     HStack { TextField("IPv4 address or IPv4:port", text: $model.testAddress); Button("Test connection") { model.testConnection() } }
                     Text(model.diagnostics()).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                    if !model.peers.isEmpty {
+                        Divider(); Text("Nearby computer compatibility").font(.headline)
+                        ForEach(model.peers) { peer in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(peer.name).font(.subheadline.bold())
+                                Text(peer.receiverLimits).font(.caption).textSelection(.enabled)
+                            }
+                        }
+                    }
                     Divider(); Text("Recent transfers (this session)").font(.headline)
                     if model.historyCount == 0 { Text("No transfers yet.") }
                     ForEach(0..<model.historyCount, id: \.self) { index in

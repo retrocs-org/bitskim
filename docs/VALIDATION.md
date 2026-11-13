@@ -10,3 +10,12 @@ Version 0.2 is checked through host regression tests, memory sanitizers, target 
 - RISC OS: ARM2 and StrongARM compile/link checks. Application startup and transfers remain unverified.
 
 Run `python3 -m unittest discover -s tests` for the host suite. Build and packaging checks are described in [RELEASING.md](RELEASING.md). Passing builds do not establish compatibility with untested operating-system or hardware configurations.
+
+
+## 0.2 cross-release and failure checks
+
+`python3 -m unittest discover -s tests -p test_release_interoperability.py -v` compiles the actual tagged `0.1` core and current core separately and connects them over loopback sockets. It checks both transfer directions with plaintext, automatic TLS and paired TLS, empty files, 32 MiB binary files, nested folders/empty directories and cancellation from either endpoint. It requires a Git checkout retaining tag `0.1` and OpenSSL development files; an extracted source tree without that history reports a skip. Set `BITSKIM_BASELINE_REF` for another explicitly chosen baseline.
+
+`test_transfer_tools.py` injects ENOSPC-style short writes and final-close errors on the receiver's temporary file. Existing destinations must remain unchanged, partial files must be removed and neither endpoint may report successful delivery. Existing readback-corruption checks exercise CRC verification failures. This is deterministic fault injection, not a claim that every filesystem or full target machine has been tested.
+
+The Mac and Windows Transfer tools present nearby compatibility details directly, including unknown profiles, rather than requiring hover tooltips. These are discovery hints and do not replace live negotiation. Native and target-system checks remain distinct from the host engine tests above.

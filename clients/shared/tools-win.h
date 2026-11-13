@@ -12,9 +12,17 @@ static void bs_tools_convert(const char *source,TCHAR *target,int count){
 }
 static int bs_tools_find(void){int i;BSHistoryItem h;for(i=0;i<bs_history_count(bs_tools_client);i++)if(bs_history_item(bs_tools_client,i,&h) && h.serial==bs_tools_serial)return i;return -1;}
 static void bs_tools_pick(int index){BSHistoryItem h;if(bs_history_item(bs_tools_client,index,&h))bs_tools_serial=h.serial;}
-static void bs_tools_refresh(void){char report[4096],history[2048],code[20],normalized[4096];TCHAR native[4096],old[4096];size_t used,i,j=0;
+static void bs_tools_refresh(void){char report[4096],history[2048],code[20],normalized[4096];TCHAR native[4096],old[4096];size_t used,i,j=0;int peer_index;char compatibility[512];const BSPeer *peer;
     bs_diagnostics(bs_tools_client,report,sizeof report);used=strlen(report);bs_tools_index=bs_tools_find();
-    if(bs_tools_index>=0 && bs_history_text(bs_tools_client,bs_tools_index,history,sizeof history)){strcat(report,"\n\nRECENT TRANSFER\n");strcat(report,history);}else if(!used)strcpy(report,"No transfer history.");
+    if(bs_tools_index>=0 && bs_history_text(bs_tools_client,bs_tools_index,history,sizeof history)){strncat(report,"\n\nRECENT TRANSFER\n",sizeof report-strlen(report)-1);strncat(report,history,sizeof report-strlen(report)-1);}else if(!used)strcpy(report,"No transfer history.");
+    if(bs_peer_count(bs_tools_client))strncat(report,"\n\nNEARBY COMPATIBILITY (DISCOVERY HINTS)\n",sizeof report-strlen(report)-1);
+    for(peer_index=0;peer_index<bs_peer_count(bs_tools_client);peer_index++){
+        if(sizeof report-strlen(report)<650){strncat(report,"Additional computers omitted from this report.\n",sizeof report-strlen(report)-1);break;}
+        peer=bs_peer(bs_tools_client,peer_index);if(!peer)continue;
+        bs_peer_summary(bs_tools_client,peer->id,compatibility,sizeof compatibility);
+        strncat(report,peer->name,sizeof report-strlen(report)-1);strncat(report,": ",sizeof report-strlen(report)-1);
+        strncat(report,compatibility,sizeof report-strlen(report)-1);strncat(report,"\n",sizeof report-strlen(report)-1);
+    }
     for(i=0;report[i] && j<sizeof normalized-2;i++){if(report[i]=='\n' && (!i || report[i-1]!='\r'))normalized[j++]='\r';normalized[j++]=report[i];}normalized[j]=0;
     bs_tools_convert(normalized,native,4096);GetWindowText(bs_tools_report,old,4096);if(_tcscmp(native,old))SetWindowText(bs_tools_report,native);
     if(bs_pairing_code(bs_tools_client,code)){char label[160];sprintf(label,"Compare both screens: %s   %s",code,bs_trust_status(bs_tools_client)==1?"(trusted identity matches)":"(not yet trusted)");bs_tools_convert(label,native,4096);SetWindowText(bs_tools_code,native);}else SetWindowText(bs_tools_code,TEXT("Pair during an unpaired TLS connection. Shared-key mode uses its saved key."));
