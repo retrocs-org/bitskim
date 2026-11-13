@@ -1,4 +1,4 @@
-# Windows Classic 0.1 (experimental)
+# Windows Classic 0.2 (experimental)
 
 Target: 32-bit Windows 95, 98, Me and XP. Cross-compilation and executable
 inspection pass; none of these operating systems has been runtime tested.
@@ -75,7 +75,7 @@ Website: https://bitskim.retrocs.org
 Build the application first, then run
 `./scripts/build-windows-legacy-installer.sh` (requires NSIS 3 with ANSI stubs;
 set MAKENSIS to override the compiler). Output:
-`outputs/BitSkim-0.1-Windows-Classic-x86-Setup.exe`.
+`outputs/BitSkim-0.2-Windows-Classic-x86-Setup.exe`.
 
 The installer uses ANSI x86 output because [NSIS Unicode installers cannot run
 on Windows 95/98/Me](https://nsis.sourceforge.io/Docs/Chapter1.html).

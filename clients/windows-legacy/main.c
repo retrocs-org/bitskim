@@ -244,7 +244,7 @@ int WINAPI WinMain(HINSTANCE h,HINSTANCE old,LPSTR cmd,int show) {
     }
     bs_limits_configure(client,send_limit,receive_limit);bs_batch_enable(client,1);
     memset(&wc,0,sizeof wc); wc.hInstance=h; wc.hCursor=LoadCursor(NULL,IDC_ARROW); wc.hIcon=LoadIconA(h,MAKEINTRESOURCEA(1)); wc.hbrBackground=(HBRUSH)(COLOR_BTNFACE+1); wc.lpfnWndProc=procedure; wc.lpszClassName="BitSkimLegacy"; RegisterClassA(&wc); wc.lpfnWndProc=prefproc; wc.lpszClassName="BitSkimLegacyPrefs"; RegisterClassA(&wc);wc.lpfnWndProc=network_proc;wc.lpszClassName="BitSkimLegacyNetwork";RegisterClassA(&wc);
-    window=CreateWindowA("BitSkimLegacy","BitSkim 0.1 - Windows Classic",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,CW_USEDEFAULT,CW_USEDEFAULT,600,500,NULL,NULL,h,NULL); if(!window) { bs_destroy(client); bs_platform_cleanup(); return 1; }
+    window=CreateWindowA("BitSkimLegacy","BitSkim 0.2 - Windows Classic",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,CW_USEDEFAULT,CW_USEDEFAULT,600,500,NULL,NULL,h,NULL); if(!window) { bs_destroy(client); bs_platform_cleanup(); return 1; }
     add_tray(); if(start_tray && tray_present) ShowWindow(window,SW_HIDE); else ShowWindow(window,show);
     while(GetMessageA(&msg,NULL,0,0)>0) { if(bs_tools_window && IsDialogMessageA(bs_tools_window,&msg))continue; if(!IsDialogMessageA(network_window?network_window:prefs?prefs:window,&msg)) { TranslateMessage(&msg); DispatchMessageA(&msg); } }
     bs_destroy(client); bs_platform_cleanup(); DeleteObject(base_brush); DeleteObject(surface_brush); return 0;

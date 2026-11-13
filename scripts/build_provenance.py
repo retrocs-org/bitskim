@@ -10,9 +10,9 @@ ARTIFACTS={
  'amiga':['build/amiga/'+x for x in ('BitSkim','BitSkimPrefs','BitSkim.info','BitSkimPrefs.info','BitSkimDrawer.info','StartInstaller','StartBitSkim','StopBitSkim','BitSkim.guide','BitSkim.guide.info','Install-BitSkim','Install-BitSkim.info','InstallAssets/SettingsDrawer.info','InstallAssets/BitSkim.prefs.info','InstallAssets/Startup.info')],
  'windows-legacy':['build/windows-legacy/BitSkim.exe'],
  'windows':['build/windows/BitSkim.exe','build/windows/BitSkim-CoreCheck.exe'],
- 'dmg':['outputs/BitSkim-0.1-macOS-arm64.dmg'],
- 'setup-legacy':['outputs/BitSkim-0.1-Windows-Classic-x86-Setup.exe'],
- 'setup':['outputs/BitSkim-0.1-Windows10-x64-Setup.exe'],
+ 'dmg':['outputs/BitSkim-0.2-macOS-arm64.dmg'],
+ 'setup-legacy':['outputs/BitSkim-0.2-Windows-Classic-x86-Setup.exe'],
+ 'setup':['outputs/BitSkim-0.2-Windows10-x64-Setup.exe'],
 }
 for cpu in ('arm2','strongarm'):
  ARTIFACTS['riscos-'+cpu]=['build/riscos/'+cpu+'/'+p for p in ('!BitSkim','main.o','bitskim.o','platform.o','riscos-file.o')]
@@ -57,7 +57,7 @@ def verify(target,root=ROOT):
  path=record_path(root,target)
  if not path.is_file():raise StaleBuild(target+': no build fingerprint; rebuild this target')
  data=json.loads(path.read_text())
- if data.get('version')!='0.1' or data.get('target')!=target or data.get('source_sha256')!=source_hash(root):raise StaleBuild(target+': source changed since build; rebuild this target')
+ if data.get('version')!='0.2' or data.get('target')!=target or data.get('source_sha256')!=source_hash(root):raise StaleBuild(target+': source changed since build; rebuild this target')
  if set(data.get('artifacts',{}))!=set(ARTIFACTS[target]):raise StaleBuild(target+': incomplete artifact inventory; rebuild')
  for rel,digest in data['artifacts'].items():
   if tree_hash(root/rel)!=digest:raise StaleBuild(target+': artifact changed: '+rel+'; rebuild')
@@ -67,11 +67,11 @@ def verify(target,root=ROOT):
  return data
 
 def begin(target,root=ROOT):
- if (root/'VERSION').read_text().strip()!='0.1':raise StaleBuild('Version must remain 0.1')
+ if (root/'VERSION').read_text().strip()!='0.2':raise StaleBuild('Version must remain 0.2')
  dependencies={dep:verify(dep,root)['artifacts'] for dep in DEPENDENCIES.get(target,[])}
  path=record_path(root,target)
  if path.exists():path.unlink()
- write_json(record_path(root,target,True),dict(target=target,version='0.1',source_sha256=source_hash(root),dependencies=dependencies))
+ write_json(record_path(root,target,True),dict(target=target,version='0.2',source_sha256=source_hash(root),dependencies=dependencies))
 
 def finish(target,root=ROOT,tool=None,version_arg='--version'):
  path=record_path(root,target,True)

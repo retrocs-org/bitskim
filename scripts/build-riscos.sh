@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
-[ "$(cat VERSION)" = "0.1" ] || { echo 'Version must remain 0.1.' >&2; exit 1; }
+[ "$(cat VERSION)" = "0.2" ] || { echo 'Version must remain 0.2.' >&2; exit 1; }
 RISCOS_CC=${RISCOS_CC:-arm-riscos-aof-gcc}
 for target in arm2 strongarm; do
     python3 scripts/build_provenance.py begin "riscos-$target"

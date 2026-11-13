@@ -1,4 +1,4 @@
-BitSkim 0.1 - RISC OS 3.x development port
+BitSkim 0.2 - RISC OS 3.x development port
 
 Experimental build. No native RISC OS runtime or hardware validation yet.
 See README in the distribution for exact requirements and limitations.

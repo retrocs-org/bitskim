@@ -86,18 +86,18 @@ Finish source/doc/website changes before compiling: provenance records cover rel
 ## 3. Prepare and publish a release
 
 ```sh
-python3 scripts/release.py prepare --tag 0.1
+python3 scripts/release.py prepare --tag 0.2
 # Review outputs/release/manifest.json and its prepared asset copies.
-python3 scripts/release.py publish --tag 0.1 --to gitlab,github --confirm-publish
+python3 scripts/release.py publish --tag 0.2 --to gitlab,github --confirm-publish
 ```
 
 Or prepare and publish the current verified build in one explicit operation:
 
 ```sh
-python3 scripts/release.py release --tag 0.1 --to gitlab,github --confirm-publish
+python3 scripts/release.py release --tag 0.2 --to gitlab,github --confirm-publish
 ```
 
-`--tag 0.1` means the exact tag/title `0.1`; omitting it defaults to `v0.1`. The application version remains 0.1. Changing a tag does not change embedded versions or package filenames. Existing tags at another commit are never moved.
+`--tag 0.2` means the exact tag/title `0.2`; omitting it defaults to `v0.2`. The application version remains 0.2. Changing a tag does not change embedded versions or package filenames. Existing tags at another commit are never moved.
 
 Publication requires a clean, committed Git checkout and current builds. Preparation from an extracted archive is allowed, but publication is blocked without a commit. Source/commit, current settings destinations, archive contents, notarization and hashes are checked again before upload.
 
@@ -114,7 +114,7 @@ Exact copies for upload are staged in `outputs/release/publish/outputs`, bound t
 Set a real `uploader` contact in the external config before preparing an Aminet submission. Review `outputs/aminet/bitskim.readme` and the LHA, then:
 
 ```sh
-python3 scripts/release.py publish --tag 0.1 --to aminet --confirm-publish
+python3 scripts/release.py publish --tag 0.2 --to aminet --confirm-publish
 ```
 
 Use `--to gitlab,github,aminet` to select all three. Aminet uses its separate verified adapter and anonymous FTP incoming submission. Successful transfer means awaiting moderator review, not public publication.
@@ -129,20 +129,20 @@ Publication does not create repositories, push source branches automatically or 
 
 ## Commit message, tag name and tag annotation
 
-These are three different values. A GitHub commit link displaying "Import BitSkim 0.1" shows the source commit message, not the release tag.
+These are three different values. A GitHub commit link displaying "Import BitSkim 0.2" shows the source commit message, not the release tag.
 
 For the first commit in a new repository:
 
 ```sh
-python3 scripts/release.py source --init --commit-message "BitSkim 0.1 source release" --to gitlab,github --dry-run
+python3 scripts/release.py source --init --commit-message "BitSkim 0.2 source release" --to gitlab,github --dry-run
 ```
 
 For a new annotated release tag:
 
 ```sh
-python3 scripts/release.py release --tag 0.1 --tag-message "BitSkim 0.1 release" --to gitlab,github --confirm-publish
+python3 scripts/release.py release --tag 0.2 --tag-message "BitSkim 0.2 release" --to gitlab,github --confirm-publish
 ```
 
-The tag name and release title are `0.1`; the tag annotation is `BitSkim 0.1 release`. Neither changes the existing source commit message. With separate prepare/publish, supply the annotation during prepare; publish uses that prepared value. Existing commits and tags are never amended or force-pushed. An existing Git repository gets no extra initial commit from --init. To change an already published commit message would require rewriting history, which this tool does not do.
+The tag name and release title are `0.2`; the tag annotation is `BitSkim 0.2 release`. Neither changes the existing source commit message. With separate prepare/publish, supply the annotation during prepare; publish uses that prepared value. Existing commits and tags are never amended or force-pushed. An existing Git repository gets no extra initial commit from --init. To change an already published commit message would require rewriting history, which this tool does not do.
 
 Build tools should live under a persistent tools directory rather than a temporary source checkout. Configure `MAKENSIS` and `NSISDIR` for the Windows installer compiler; `BITSKIM_RELEASE_PYTHON`, `PHP`, `RISCOS_CC`, `RISCOS_SDK_SOURCE`, `DOS_RUNNER`, `ATARI_CC` and `STING_INCLUDE` likewise accept external locations. Keep these machine-specific paths in the external JSON.

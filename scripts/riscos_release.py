@@ -24,7 +24,7 @@ def write_riscos(out,sourcezip,root):
         image=(folder/'!BitSkim/!RunImage').read_bytes()
         if len(image)<128 or struct.unpack_from('<I',image,48)[0]!=26:
             raise SystemExit('Expected APCS-26 AIF image for '+cpu)
-        archive=out/('BitSkim-0.1-RISCOS3-'+label+'.zip')
+        archive=out/('BitSkim-0.2-RISCOS3-'+label+'.zip')
         with ZipFile(archive,'w',ZIP_DEFLATED) as z:
             acorn_add(z,root/'build/provenance'/('riscos-'+cpu+'.json'),'BuildInfo',0xfff)
             for path in sorted((folder/'!BitSkim').iterdir()):

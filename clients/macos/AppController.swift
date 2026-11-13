@@ -87,7 +87,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
         updateStatus()
     }
     private func updateStatus() {
-        statusItem?.button?.toolTip = "BitSkim 0.1 — \(model.status)"
+        statusItem?.button?.toolTip = "BitSkim 0.2 — \(model.status)"
         statusItem?.button?.image = menuBarIcon
     }
     func menuWillOpen(_ menu: NSMenu) {

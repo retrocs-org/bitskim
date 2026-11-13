@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
-[ "$(cat VERSION)" = "0.1" ] || { echo 'Version must remain 0.1.' >&2; exit 1; }
+[ "$(cat VERSION)" = "0.2" ] || { echo 'Version must remain 0.2.' >&2; exit 1; }
 WINDOWS_CC=${WINDOWS_CC:-x86_64-w64-mingw32-gcc}
 WINDOWS_RC=${WINDOWS_RC:-x86_64-w64-mingw32-windres}
 [ -f work/openssl-windows/lib/libssl.a ] || scripts/build-openssl.sh windows

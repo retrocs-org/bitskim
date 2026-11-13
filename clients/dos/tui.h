@@ -127,7 +127,7 @@ static void ui_draw(void) {
     if(ui_file_selected<ui_file_top)ui_file_top=ui_file_selected;
     if(ui_file_selected>=ui_file_top+UI_ROWS)ui_file_top=ui_file_selected-UI_ROWS+1;
     for(i=0;i<25;i++)ui_put(0,i,80,"",0x07);
-    ui_put(3,1,4,"[>]",0x0b);ui_put(8,1,32,"BitSkim  0.1",0x0f);
+    ui_put(3,1,4,"[>]",0x0b);ui_put(8,1,32,"BitSkim  0.2",0x0f);
     ui_put(56,1,21,"DOS / mTCP   ONLINE",0x0b);
     ui_put(8,2,36,"Different generations. Same network.",0x08);ui_put(49,2,28,config.name,0x08);
     ui_put(3,4,18,"NEARBY COMPUTERS",0x0f);

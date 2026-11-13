@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
-[ "$(cat VERSION)" = "0.1" ] || { echo 'Version must remain 0.1.' >&2; exit 1; }
+[ "$(cat VERSION)" = "0.2" ] || { echo 'Version must remain 0.2.' >&2; exit 1; }
 AMIGA_CC=${AMIGA_CC:-m68k-amigaos-gcc}
 python3 scripts/build-amiga-guide.py
 python3 scripts/build_provenance.py begin amiga

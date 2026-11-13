@@ -102,6 +102,7 @@ struct BSClient {
     char check_result[160],check_local[48];
     BSConfig config; BSCallback callback; void *context;
     BSSocket listener,udp,sock; int state,got_hello,discovery_paused;
+    unsigned long discovery_sent,discovery_received,discovery_last;
     char expected_id[33],remote_id[33]; unsigned short remote_port;
     BSPeer peers[BS_MAX_PEERS]; int peer_count;
     unsigned peer_features[BS_MAX_PEERS],remote_features;
@@ -462,7 +463,7 @@ void bs_refresh(BSClient *c) {
     if(!c->config.visible || !c->config.receiving) { memset(p+6,0,16); p[24]=7; p[25]=0; memcpy(p+26,"BitSkim",7); n=27; }
     memset(p+n+6,0,sizeof(p)-(size_t)n-6);
     if(c->config.visible && c->config.receiving)cap_encode(c,p+n+6);
-    bsp_broadcast(c->udp,p,sizeof(p),c->config.discovery_port); c->last_probe=bsp_seconds();
+    bsp_broadcast(c->udp,p,sizeof(p),c->config.discovery_port); c->last_probe=bsp_seconds();c->discovery_sent++;
 }
 void bs_discovery_search(BSClient *c,int enabled) {
     int paused=!enabled;
@@ -490,6 +491,7 @@ static void discovery(BSClient *c) {
         if(n<26 || n>512 || memcmp(p,"BSKD",4) || p[4]!=1 || (p[5]!=1 && p[5]!=2)) continue;
         memset(&peer,0,sizeof(peer)); if(!parse_greeting(p+6,n-6,&peer)) continue;
         if(!strcmp(peer.id,c->config.id)) continue;
+        c->discovery_received++;c->discovery_last=now;
         kind=p[5];
         if(kind==1 && c->config.visible && c->config.receiving && reply_allowed(c,(unsigned long)from.sin_addr.s_addr,now)) {
             memcpy(reply,"BSKD",4); reply[4]=1; reply[5]=2; i=greeting(c,reply+6);
@@ -693,7 +695,7 @@ static void receive_verified(BSClient *c) {
 #ifdef BS_OPENSSL
         if(c->resume_cache){bsp_remove_file(c->resume_meta);c->resume_meta[0]=0;c->resume_cache=0;}
 #endif
-        frame(c,COMPLETE,NULL,0); c->state=CLOSING; message(c,"File received successfully"); notify(c,BS_EVENT_COMPLETE); return;
+        frame(c,COMPLETE,NULL,0); c->state=CLOSING; message(c,"File received; written file verified (CRC32)"); notify(c,BS_EVENT_COMPLETE); return;
 }
 static void handle_frame(BSClient *c,int type,const unsigned char *p,int n) {
     BSPeer peer; unsigned long size; char filename[256]; int len;
@@ -778,14 +780,13 @@ static void handle_frame(BSClient *c,int type,const unsigned char *p,int n) {
     if(type==END && c->state==RECEIVING && n==4 && c->status.transferred==c->status.total) {
         if(get32(p)!=c->crc) { finish_error(c,FRAME_ERROR,"Checksum mismatch; file not delivered"); return; }
         { int r=fclose(c->file); c->file=NULL; if(r) { finish_error(c,FRAME_ERROR,"Could not finish writing file"); return; } }
-        if(!(c->remote_features&BS_CAP_DISK_VERIFY)){receive_verified(c);return;}
         c->file=bsp_open_file(c->temp,"rb");
         if(!c->file){finish_error(c,FRAME_ERROR,"Cannot reopen received file for verification");return;}
         c->disk_crc=c->disk_bytes=0;c->last_verify=bsp_seconds();c->state=VERIFY_DISK;message(c,"Checking written file...");return;
     }
 
     if(type==COMPLETE && (c->state==FINISHING || (c->state==DECISION && c->out_batch && c->out_batch->tree && c->status.filename[0] && c->status.filename[strlen(c->status.filename)-1]=='/')) && n==0) {
-        c->verified=(c->remote_features&BS_CAP_DISK_VERIFY)!=0;c->transfer_result=BS_RESULT_COMPLETE; cleanup_transfer(c); message(c,"File delivered successfully"); notify(c,BS_EVENT_COMPLETE); return;
+        c->verified=(c->remote_features&BS_CAP_DISK_VERIFY)!=0 && !(c->status.filename[0] && c->status.filename[strlen(c->status.filename)-1]=='/');c->transfer_result=BS_RESULT_COMPLETE; cleanup_transfer(c); message(c,c->verified?"File delivered successfully; receiver verified written file (CRC32)":"File delivered successfully; receiver disk verification not confirmed"); notify(c,BS_EVENT_COMPLETE); return;
     }
     fail(c,"Unexpected or malformed protocol message");
 }

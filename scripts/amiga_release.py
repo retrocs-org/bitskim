@@ -62,16 +62,16 @@ def write_lha(output,root=ROOT):
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--check-writer',action='store_true');args=parser.parse_args()
     if args.check_writer:writer();return
-    if (ROOT/'VERSION').read_text().strip()!='0.1':raise RuntimeError('Version must remain 0.1')
-    out=ROOT/'outputs';lha=write_lha(out/'BitSkim-0.1.lha');zipfile=write_zip(out/'BitSkim-0.1-AmigaOS.zip')
+    if (ROOT/'VERSION').read_text().strip()!='0.2':raise RuntimeError('Version must remain 0.2')
+    out=ROOT/'outputs';lha=write_lha(out/'BitSkim-0.2.lha');zipfile=write_zip(out/'BitSkim-0.2-AmigaOS.zip')
     digest=hashlib.sha256(lha.read_bytes()).hexdigest()
-    (out/'BitSkim-0.1.lha.sha256').write_text(digest+'  '+lha.name+'\n')
+    (out/'BitSkim-0.2.lha.sha256').write_text(digest+'  '+lha.name+'\n')
     sums=out/'SHA256SUMS';lines=sums.read_text().splitlines() if sums.exists() else []
     lines=[line for line in lines if line.split() and line.split()[-1].lstrip('*') not in (lha.name,zipfile.name)]
     lines += [hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name for p in (lha,zipfile)]
     sums.write_text('\n'.join(lines)+'\n')
     (ROOT/'public-web/downloads').mkdir(parents=True,exist_ok=True)
-    for p in (lha,zipfile,out/'BitSkim-0.1.lha.sha256'):
+    for p in (lha,zipfile,out/'BitSkim-0.2.lha.sha256'):
         shutil.copy2(p,ROOT/'public-web/downloads'/p.name)
     print('Built and extraction-verified '+str(lha)+' ('+str(lha.stat().st_size)+' bytes)')
     print('Matching ZIP: '+str(zipfile))

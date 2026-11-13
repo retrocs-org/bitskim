@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
-[ "$(cat VERSION)" = "0.1" ] || exit 1
+[ "$(cat VERSION)" = "0.2" ] || exit 1
 if [ -z "${MAKENSIS:-}" ] && ! command -v makensis >/dev/null 2>&1; then
  MAKENSIS="$PWD/work/nsis-toolchain/makensis/3.13/bin/makensis"
  NSISDIR="$PWD/work/nsis-toolchain/makensis/3.13/share/nsis"

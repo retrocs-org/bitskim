@@ -10,13 +10,13 @@ ROOT=Path(__file__).resolve().parents[1]
 def sync(destination,root=ROOT):
     verify('amiga',root);destination=Path(destination).expanduser().resolve()
     if not destination.is_dir():raise ValueError('Bin destination must already exist: '+str(destination))
-    out=root/'outputs';names=('BitSkim-0.1.lha','BitSkim-src.tar.gz')
+    out=root/'outputs';names=('BitSkim-0.2.lha','BitSkim-src.tar.gz')
     sums={line.split()[-1].lstrip('*'):line.split()[0] for line in (out/'SHA256SUMS').read_text().splitlines() if line.split()}
     for name in names:
         if hashlib.sha256((out/name).read_bytes()).hexdigest()!=sums.get(name):raise ValueError('Missing/mismatched release checksum: '+name)
     expected=payload(root)
     updates={};modes={}
-    with ZipFile(out/'BitSkim-0.1-AmigaOS.zip') as z:
+    with ZipFile(out/'BitSkim-0.2-AmigaOS.zip') as z:
         if set(z.namelist())!=set(expected):raise ValueError('Stale Amiga ZIP inventory')
         for name,path in expected.items():
             data=z.read(name)
@@ -24,7 +24,7 @@ def sync(destination,root=ROOT):
             updates[name]=data
             modes[name]=(z.getinfo(name).external_attr>>16)&0o777 or 0o644
     reader=shutil.which(os.environ.get('LHA_READER','lha')) or writer()
-    record=subprocess.run([reader,'pq2',str(out/'BitSkim-0.1.lha'),'BitSkim/BUILD-PROVENANCE.json'],capture_output=True,check=True).stdout
+    record=subprocess.run([reader,'pq2',str(out/'BitSkim-0.2.lha'),'BitSkim/BUILD-PROVENANCE.json'],capture_output=True,check=True).stdout
     if record!=(root/'build/provenance/amiga.json').read_bytes():raise ValueError('LHA belongs to a different build')
     # Source archive must also describe the current source build.
     with tarfile.open(out/'BitSkim-src.tar.gz','r:gz') as t:

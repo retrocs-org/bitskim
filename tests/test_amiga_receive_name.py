@@ -16,8 +16,8 @@ static int bs_to_local(const char *s,char *o,unsigned n){if(strchr(s,'@'))return
 #include "receive_name.h"
 int main(void){char o[256];
 assert(!receive_name("short.zip",o));assert(!strcmp(o,"short.zip"));
-assert(receive_name("BitSkim-0.1-macOS-arm64.dmg.zip",o));assert(strlen(o)==30);
-assert(receive_name("BitSkim-0.1-Windows10-x64-Setup.exe.zip",o));assert(strlen(o)==30);assert(!strcmp(o+26,".zip"));
+assert(receive_name("BitSkim-0.2-macOS-arm64.dmg.zip",o));assert(strlen(o)==30);
+assert(receive_name("BitSkim-0.2-Windows10-x64-Setup.exe.zip",o));assert(strlen(o)==30);assert(!strcmp(o+26,".zip"));
 assert(receive_name("abcdefghijklmnopqrstuvwxyz123456789",o));assert(strlen(o)==30);
 assert(receive_name("@unicode",o));assert(!strcmp(o,"@unicode"));return 0;}
 '''

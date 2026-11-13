@@ -9,7 +9,7 @@ def prepare(run,exe,driver,port):
     shutil.copy2(exe,run/'BITSKIM.EXE');shutil.copy2(driver,run/'NE2000.COM')
     for folder in ('FILES','INBOX'):(run/folder).mkdir(exist_ok=True)
     demo=run/'FILES/HELLO.TXT'
-    if not demo.exists():demo.write_bytes(b'Hello from BitSkim 0.1 for DOS!\r\n')
+    if not demo.exists():demo.write_bytes(b'Hello from BitSkim 0.2 for DOS!\r\n')
     (run/'BSNET.CFG').write_bytes(b'PACKETINT 0x60\r\nHOSTNAME BitSkim-DOS\r\nIPADDR 10.0.2.15\r\nNETMASK 255.255.255.0\r\nGATEWAY 10.0.2.2\r\nMTU 1500\r\n')
     boot=['@echo off','NE2000 0x60 3 0x300','if errorlevel 1 goto failed','set MTCPCFG=C:\\BSNET.CFG','set BITSKIM_NAT_HOST=10.0.2.2','set BITSKIM_PORT='+str(port),'BITSKIM','echo.','echo BitSkim has stopped. Type EXIT to close DOS runtime.','goto done',':failed','echo The NE2000 packet driver could not start. Check runner.log.',':done']
     (run/'BSSTART.BAT').write_bytes(('\r\n'.join(boot)+'\r\n').encode('ascii'))

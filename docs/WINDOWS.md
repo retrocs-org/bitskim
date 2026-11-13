@@ -1,4 +1,4 @@
-# BitSkim 0.1 for Windows
+# BitSkim 0.2 for Windows
 
 Project repository: [retrocs-org/bitskim](https://github.com/retrocs-org/bitskim). Website: [bitskim.retrocs.org](https://bitskim.retrocs.org).
 
@@ -65,7 +65,7 @@ For an isolated NSIS installation:
 NSISDIR=/path/to/nsis/share/nsis MAKENSIS=/path/to/makensis ./scripts/build-windows-installer.sh
 ```
 
-Set NSISDIR only when your makensis installation needs that data-directory override. Output: `outputs/BitSkim-0.1-Windows10-x64-Setup.exe`. Setup installs in Program Files for all users, unsigned and has an uninstaller; it does not install a login item or firewall rule. NSIS 3.13 is the recorded packaging tool, not a promise that every NSIS version has been tested.
+Set NSISDIR only when your makensis installation needs that data-directory override. Output: `outputs/BitSkim-0.2-Windows10-x64-Setup.exe`. Setup installs in Program Files for all users, unsigned and has an uninstaller; it does not install a login item or firewall rule. NSIS 3.13 is the recorded packaging tool, not a promise that every NSIS version has been tested.
 
 Portable ZIP creation is part of `python3 scripts/package.py`, which currently requires all primary platform builds, not only Windows. See [BUILDING.md](BUILDING.md) for source fingerprints and existing setup/DMG dependencies.
 

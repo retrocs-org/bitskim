@@ -9,26 +9,26 @@ Unicode true
 !endif
 !define KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT}"
 !ifndef APP_MUTEX
-!define APP_MUTEX "Local\BitSkim0.1"
+!define APP_MUTEX "Local\BitSkim0.2"
 !endif
 !ifndef OUTPUT
-!define OUTPUT "${ROOT}/outputs/BitSkim-0.1-Windows10-x64-Setup.exe"
+!define OUTPUT "${ROOT}/outputs/BitSkim-0.2-Windows10-x64-Setup.exe"
 !endif
-Name "${PRODUCT} 0.1"
+Name "${PRODUCT} 0.2"
 OutFile "${OUTPUT}"
 InstallDir "$PROGRAMFILES64\${PRODUCT}"
 RequestExecutionLevel admin
 SetCompressor /SOLID zlib
-VIProductVersion "0.1.0.0"
+VIProductVersion "0.2.0.0"
 VIAddVersionKey "ProductName" "BitSkim"
-VIAddVersionKey "ProductVersion" "0.1"
-VIAddVersionKey "FileVersion" "0.1"
-VIAddVersionKey "FileDescription" "BitSkim 0.1 all-users installer"
+VIAddVersionKey "ProductVersion" "0.2"
+VIAddVersionKey "FileVersion" "0.2"
+VIAddVersionKey "FileDescription" "BitSkim 0.2 all-users installer"
 VIAddVersionKey "LegalCopyright" "BitSkim contributors; see included licenses"
 !define MUI_ICON "${ROOT}/assets/icons/BitSkim.ico"
 !define MUI_UNICON "${ROOT}/assets/icons/BitSkim.ico"
 !define MUI_ABORTWARNING
-!define MUI_WELCOMEPAGE_TEXT "Install BitSkim 0.1 in Program Files for all users.$\r$\n$\r$\nClose BitSkim, including its tray icon, before updating.$\r$\n$\r$\nYour preferences and received files are preserved. Administrator approval is required for program files; each user keeps their own AppData settings."
+!define MUI_WELCOMEPAGE_TEXT "Install BitSkim 0.2 in Program Files for all users.$\r$\n$\r$\nClose BitSkim, including its tray icon, before updating.$\r$\n$\r$\nYour preferences and received files are preserved. Administrator approval is required for program files; each user keeps their own AppData settings."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "${ROOT}/LICENSE"
 !insertmacro MUI_PAGE_COMPONENTS
@@ -96,7 +96,7 @@ Section "BitSkim (required)" SEC_MAIN
  SetOutPath "$INSTDIR"
  WriteUninstaller "$INSTDIR\Uninstall.exe"
  WriteRegStr HKLM "${KEY}" "DisplayName" "${PRODUCT}"
- WriteRegStr HKLM "${KEY}" "DisplayVersion" "0.1"
+ WriteRegStr HKLM "${KEY}" "DisplayVersion" "0.2"
  WriteRegStr HKLM "${KEY}" "Publisher" "BitSkim contributors"
  WriteRegStr HKLM "${KEY}" "InstallLocation" "$INSTDIR"
  WriteRegStr HKLM "${KEY}" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'

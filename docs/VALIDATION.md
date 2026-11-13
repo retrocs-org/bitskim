@@ -1,6 +1,6 @@
 # Validation
 
-Version 0.1 is checked through host regression tests, memory sanitizers, target builds and application startup checks. See [RELEASE-READINESS.md](RELEASE-READINESS.md) for the current release status.
+Version 0.2 is checked through host regression tests, memory sanitizers, target builds and application startup checks. See [RELEASE-READINESS.md](RELEASE-READINESS.md) for the current release status.
 
 - Mac: application startup, preferences, transfer tools and receive-decision lifetime checks.
 - Windows: x64 build and startup/engine checks. Interactive setup and Windows 10 GUI coverage remain pending.

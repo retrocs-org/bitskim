@@ -1,5 +1,5 @@
 #!/bin/sh
-# Compile and package BitSkim 0.1 without building other platforms or publishing.
+# Compile and package BitSkim 0.2 without building other platforms or publishing.
 set -eu
 cd "$(dirname "$0")/.."
 mode=build
@@ -16,7 +16,7 @@ case "${1:-}" in
     "") ;;
     *) echo 'Unknown option. Use --help.' >&2; exit 1 ;;
 esac
-[ "$(cat VERSION)" = "0.1" ] || { echo 'Version must remain 0.1.' >&2; exit 1; }
+[ "$(cat VERSION)" = "0.2" ] || { echo 'Version must remain 0.2.' >&2; exit 1; }
 if [ -z "${AMIGA_CC:-}" ] && [ -x work/toolchain/m68k-amigaos-gcc-16.2/bin/m68k-amigaos-gcc ]; then
     AMIGA_CC="$PWD/work/toolchain/m68k-amigaos-gcc-16.2/bin/m68k-amigaos-gcc"
     export AMIGA_CC

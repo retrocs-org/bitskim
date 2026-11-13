@@ -24,6 +24,7 @@ static SSL_SESSION *tls_session(SSL *ssl) {
     if(!SSL_SESSION_set1_master_key(session,t->key,32) || !SSL_SESSION_set_cipher(session,SSL_CIPHER_find(ssl,cipher_id)) || !SSL_SESSION_set_protocol_version(session,TLS1_3_VERSION)) {SSL_SESSION_free(session);return NULL;}
     SSL_SESSION_set_max_early_data(session,0);return session;
 }
+/* Stable PSK protocol identifier: independent of the application version. */
 static int tls_client_psk(SSL *ssl,const EVP_MD *md,const unsigned char **id,size_t *length,SSL_SESSION **session) {
     static const unsigned char identity[]="BitSkim-0.1";
     if(md && !EVP_MD_is_a(md,"SHA256")){*session=NULL;return 1;}

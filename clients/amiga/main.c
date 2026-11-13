@@ -1,4 +1,4 @@
-/* BitSkim 0.1 - native Workbench client. Requires OS 3.x and bsdsocket.library v4. */
+/* BitSkim 0.2 - native Workbench client. Requires OS 3.x and bsdsocket.library v4. */
 #include "bitskim.h"
 #include "../shared/single-send.h"
 #include "themes.h"
@@ -29,9 +29,9 @@
    the icon's; libnix swaps to this size at startup when the current one is smaller. */
 long __stack=32768;
 #ifdef BITSKIM_PREFS
-const char bitskim_version_tag[] = "$VER: BitSkimPrefs 0.1 (01.11.2026)";
+const char bitskim_version_tag[] = "$VER: BitSkimPrefs 0.2 (01.11.2026)";
 #else
-const char bitskim_version_tag[] = "$VER: BitSkim 0.1 (01.11.2026)";
+const char bitskim_version_tag[] = "$VER: BitSkim 0.2 (01.11.2026)";
 #endif
 struct IntuitionBase *IntuitionBase;
 struct GfxBase *GfxBase;
@@ -90,7 +90,7 @@ static void select_peer(int index) {
 }
 static void copy(char *d,const char *s,size_t n) { strncpy(d,s,n-1); d[n-1]=0; }
 static void alert(const char *s) {
-    struct EasyStruct e={sizeof(e),0,(STRPTR)"BitSkim 0.1",(STRPTR)"%s",(STRPTR)"OK"};
+    struct EasyStruct e={sizeof(e),0,(STRPTR)"BitSkim 0.2",(STRPTR)"%s",(STRPTR)"OK"};
     if(async_ready && client) { client_notice(s); return; }
     EasyRequest(window,&e,NULL,s);
 }
@@ -271,7 +271,7 @@ static int open_ui(void) {
     if(!g) return 0;
     g=add(g,BUTTON_KIND,12,502,163-main_shift,82,22,"Quit",TAG_IGNORE,0);
     if(!g) return 0;
-    window=OpenWindowTags(NULL,WA_PubScreen,screen,WA_Left,(screen->Width-600)/2,WA_Top,screen->BarHeight+1,WA_Title,"BitSkim 0.1 - local file sharing",WA_Width,600,WA_Height,260-main_shift,WA_DragBar,TRUE,WA_DepthGadget,TRUE,WA_CloseGadget,TRUE,
+    window=OpenWindowTags(NULL,WA_PubScreen,screen,WA_Left,(screen->Width-600)/2,WA_Top,screen->BarHeight+1,WA_Title,"BitSkim 0.2 - local file sharing",WA_Width,600,WA_Height,260-main_shift,WA_DragBar,TRUE,WA_DepthGadget,TRUE,WA_CloseGadget,TRUE,
         WA_Activate,TRUE,WA_IDCMP,IDCMP_CLOSEWINDOW|IDCMP_GADGETUP|IDCMP_REFRESHWINDOW|LISTVIEWIDCMP|STRINGIDCMP|IDCMP_MENUPICK,TAG_DONE);
     if(!window) return 0;
     if(!queue_menu_open())return 0;

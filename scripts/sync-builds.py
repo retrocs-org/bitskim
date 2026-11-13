@@ -10,7 +10,7 @@ if destination:
     packages=[]
     for p in sorted((ROOT/'outputs').glob('BitSkim-*')):
         if not p.is_file():continue
-        if p.name=='BitSkim-0.1.lha' or (p.suffix in ('.zip','.dmg','.exe') and any(x in p.name for x in ('AmigaOS','Atari-','DOS-mTCP','RISCOS3','Windows','macOS'))):
+        if p.name=='BitSkim-0.2.lha' or (p.suffix in ('.zip','.dmg','.exe') and any(x in p.name for x in ('AmigaOS','Atari-','DOS-mTCP','RISCOS3','Windows','macOS'))):
             packages.append(p)
     lines=[]
     for p in packages:

@@ -12,7 +12,7 @@ class AminetRelease(unittest.TestCase):
   fields=dict(line.split(':',1) for line in text.split('\n\n')[0].splitlines())
   for name in ('Short','Uploader','Type','Architecture'):self.assertIn(name,fields)
   self.assertLessEqual(len(fields['Short'].strip()),40)
-  self.assertEqual(fields['Version'].strip(),'0.1');self.assertEqual(fields['Type'].strip(),'comm/tcp')
+  self.assertEqual(fields['Version'].strip(),'0.2');self.assertEqual(fields['Type'].strip(),'comm/tcp')
   self.assertNotIn('Distribution:',text)
  def test_missing_contact_and_header_injection_are_rejected(self):
   for value in (None,'','not-an-email','a@example.org\nType: bad','a@example.org\x00'):
@@ -21,7 +21,7 @@ class AminetRelease(unittest.TestCase):
  def bundle(self,folder):
   (folder/a.ARCHIVE).write_bytes(b'archive fixture')
   (folder/a.README).write_text(a.readme('sender@example.org'),encoding='ascii')
-  manifest={'version':'0.1','host':a.HOST,'directory':'/new','uploader':'sender@example.org','category':a.CATEGORY,'source_sha256':'source','files':{name:a.digest(folder/name) for name in (a.ARCHIVE,a.README)}}
+  manifest={'version':'0.2','host':a.HOST,'directory':'/new','uploader':'sender@example.org','category':a.CATEGORY,'source_sha256':'source','files':{name:a.digest(folder/name) for name in (a.ARCHIVE,a.README)}}
   (folder/'submission.json').write_text(json.dumps(manifest))
  def test_confirmation_required_before_any_connection(self):
   def forbidden():self.fail('Unexpected FTP connection')
@@ -70,9 +70,9 @@ class AminetRelease(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d,patch.object(a,'verify',return_value={'source_sha256':'source'}):
    root=Path(d);out=root/'outputs';out.mkdir();stage=root/'stage';(stage/'BitSkim').mkdir(parents=True)
    file=stage/'BitSkim/demo';file.write_bytes(b'fixture payload')
-   archive=out/'BitSkim-0.1.lha'
+   archive=out/'BitSkim-0.2.lha'
    subprocess.run([tool,'ao5g0q2',str(archive),'BitSkim/demo'],cwd=stage,check=True)
-   (out/'BitSkim-0.1.lha.sha256').write_text(a.digest(archive)+'  '+archive.name+'\n')
+   (out/'BitSkim-0.2.lha.sha256').write_text(a.digest(archive)+'  '+archive.name+'\n')
    with patch.object(amiga_release,'payload',return_value={'BitSkim/demo':file}):
     folder=a.prepare('sender@example.org',root=root)
     self.assertEqual((folder/a.ARCHIVE).read_bytes(),archive.read_bytes())

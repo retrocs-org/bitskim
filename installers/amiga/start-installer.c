@@ -15,7 +15,7 @@
 #include <string.h>
 #include <stdio.h>
 #ifndef BS_INSTALLER_TEST
-const char bitskim_installer_version[]="$VER: StartInstaller 0.1 (02.11.2026)";
+const char bitskim_installer_version[]="$VER: StartInstaller 0.2 (02.11.2026)";
 long __stack=32768;
 struct IntuitionBase *IntuitionBase=NULL;
 static void problem(const char *text)

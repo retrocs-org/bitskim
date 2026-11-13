@@ -25,7 +25,7 @@ def build(root=ROOT):
     revision=struct.unpack_from('>I',header,44)[0]
     struct.pack_into('>I',header,44,(revision&~255)|1)
     # OldDrawerData: ordinary resizable Workbench drawer, no private screen.
-    drawer=struct.pack('>hhhhBBIIIIIIIhhHHHii',40,30,480,180,0,1,0,0x240027,0,0,0,0,0,200,100,65535,65535,1,0,0)
+    drawer=struct.pack('>hhhhBBIIIIIIIhhHHHii',40,30,480,180,0,2,0,0x240027,0,0,0,0,0,200,100,65535,65535,1,0,0)
     (art/'BitSkimDrawer.info').write_bytes(header+drawer+payload+struct.pack('>IH',1,1))
     src=(templates/'Install.info').read_bytes();payload,_=images(src)
     header=bytearray(src[:78]);header[48]=4

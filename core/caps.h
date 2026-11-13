@@ -62,3 +62,18 @@ int bs_transfer_capabilities(const BSClient *c,BSCapabilities *out) {
     memset(out,0,sizeof *out);if(!c || !c->cap_ready)return 0;
     *out=c->remote_caps;return 1;
 }
+
+int bs_peer_summary(const BSClient *c,const char *id,char *out,size_t capacity) {
+    BSCapabilities caps;char text[512];
+    if(!out || !capacity)return 0;
+    if(!bs_peer_capabilities(c,id,&caps)) {
+        copystr(out,"Compatibility unknown; checked when connecting",capacity);return 1;
+    }
+    sprintf(text,"%s; %s; %s; %s; max %lu bytes; names %u bytes%s. Discovery hints; checked when connecting.",
+        caps.receive_features?"Receiving enabled":"Receiving disabled",
+        caps.receive_features&BS_CAP_DIRECTORIES?"Folders supported":"Files only",
+        caps.receive_features&BS_CAP_DISK_VERIFY?"Written-file verification":"Legacy checksum receipt",
+        caps.receive_features&BS_CAP_TLS?(caps.security_mode==2?"Encryption required":caps.security_mode==1?"Encryption preferred":"TLS available; encryption disabled"):"Plaintext only",
+        caps.max_receive_file,caps.local_name_bytes,caps.name_policy?" (mapping may apply)":"");
+    copystr(out,text,capacity);return strlen(text)<capacity;
+}

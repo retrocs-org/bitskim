@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
-[ "$(cat VERSION)" = "0.1" ] || { echo 'Version must remain 0.1 until explicitly changed.' >&2; exit 1; }
+[ "$(cat VERSION)" = "0.2" ] || { echo 'Version must remain 0.2 until explicitly changed.' >&2; exit 1; }
 [ -f work/openssl-macos/lib/libssl.a ] || scripts/build-openssl.sh macos
 python3 scripts/build_provenance.py begin macos
 mkdir -p build/macos/BitSkim.app/Contents/MacOS build/macos/BitSkim.app/Contents/Resources build/module-cache

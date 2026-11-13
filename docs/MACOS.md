@@ -1,4 +1,4 @@
-# macOS build — BitSkim 0.1
+# macOS build — BitSkim 0.2
 
 ## Target and host
 
@@ -34,7 +34,7 @@ work/dmg-venv/bin/python scripts/build-macos-dmg.py
 
 Or run `python3 scripts/build-macos-dmg.py` with an interpreter where ds_store is already installed. The image layout comes from installers/macos/settings.py; it is not a dmgbuild configuration requiring the dmgbuild package.
 
-Output: `outputs/BitSkim-0.1-macOS-arm64.dmg`. It contains BitSkim.app, an Applications shortcut and local documentation/licenses. The script creates the HFS image without mounting it, compresses it to UDZO and runs hdiutil verification. It never copies the app into /Applications.
+Output: `outputs/BitSkim-0.2-macOS-arm64.dmg`. It contains BitSkim.app, an Applications shortcut and local documentation/licenses. The script creates the HFS image without mounting it, compresses it to UDZO and runs hdiutil verification. It never copies the app into /Applications.
 
 For a portable ZIP, build all three primary clients and run `python3 scripts/package.py`; see [BUILDING.md](BUILDING.md) for its optional-target/provenance requirements.
 

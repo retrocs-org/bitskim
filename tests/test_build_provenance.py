@@ -6,7 +6,7 @@ spec=importlib.util.spec_from_file_location('provenance',ROOT/'scripts/build_pro
 class BuildProvenance(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name)
-  (self.root/'VERSION').write_text('0.1\n');(self.root/'core').mkdir();(self.root/'core/engine.c').write_text('original')
+  (self.root/'VERSION').write_text('0.2\n');(self.root/'core').mkdir();(self.root/'core/engine.c').write_text('original')
   for name in p.ARTIFACTS['windows']+p.ARTIFACTS['setup']:
    path=self.root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('payload')
  def tearDown(self):self.tmp.cleanup()

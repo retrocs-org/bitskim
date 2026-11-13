@@ -18,7 +18,7 @@ static int redraw=1,offer_seen,files_changed;
 static char settings_path[BS_PATH_MAX+1]="BITSKIM.CFG"; static char input[192]; static unsigned used;
 static void event(void *context,BSEvent what) { (void)context; redraw=1;if(what==BS_EVENT_COMPLETE)files_changed=1; }
 static void help(void) {
-    puts("BitSkim 0.1 DOS / mTCP - unencrypted local file sharing");
+    puts("BitSkim 0.2 DOS / mTCP - unencrypted local file sharing");
     puts("LIST | SEND <number> <8.3 path> | SENDIP <IPv4[:port]> <8.3 path>");
     puts("ACCEPT <new 8.3 path> | ACCEPTALL <folder> | DECLINE | CANCEL | STATUS");
     puts("TEST <IPv4[:port]> | DIAGNOSTICS | HISTORY | RETRY <number> | CONFLICT RENAME/SKIP/REPLACE");

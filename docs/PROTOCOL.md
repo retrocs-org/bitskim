@@ -1,4 +1,4 @@
-# BitSkim protocol 1 (application release 0.1)
+# BitSkim protocol 1 (application release 0.2)
 
 Implemented by `core/bitskim.c`. All multibyte wire integers are unsigned, big-endian. Do not serialize native C structures. TCP is a byte stream: reads and writes may be partial. One connection carries one offer and one file, then closes.
 
@@ -6,9 +6,9 @@ Implemented by `core/bitskim.c`. All multibyte wire integers are unsigned, big-e
 
 Default UDP destination port: **46440**, experimental/private-use choice, not a registered service assignment. TCP listening port defaults to 46440 and is advertised independently. A development client sharing a host can listen on 46441 and bind an ephemeral UDP socket if the discovery port is occupied.
 
-Discovery packets emitted by 0.1 are 160 bytes. Prefix: ASCII `BSKD`, byte version `1`, byte kind (`1` probe, `2` reply), followed by the greeting below, an optional 36-byte BXC1 capability profile, and zero padding. Input is bounded to 512 bytes and must contain the complete greeting. Replies go to the probe's source address and UDP source port. Use packet source IP plus advertised TCP port as the peer endpoint. Names and installation IDs are unverified.
+Discovery packets emitted by 0.2 are 160 bytes. Prefix: ASCII `BSKD`, byte version `1`, byte kind (`1` probe, `2` reply), followed by the greeting below, an optional 36-byte BXC1 capability profile, and zero padding. Input is bounded to 512 bytes and must contain the complete greeting. Replies go to the probe's source address and UDP source port. Use packet source IP plus advertised TCP port as the peer endpoint. Names and installation IDs are unverified.
 
-Visible, receiving-enabled probes advertise their greeting; receivers may add those peers as well as replies. Hidden or receive-disabled probes use a zero installation ID and anonymous name; do not add them as visible peers. Respond only while visible and receiving-enabled. The core limits responses to one per second per source address (eight tracked sources) and handles at most eight UDP packets per tick. Probe around every 30 seconds and expire peers after 90 seconds. Modern hosts send per-interface subnet broadcasts plus limited broadcast; the classic adapter currently sends limited broadcast only. No mDNS or nonce negotiation in 0.1.
+Visible, receiving-enabled probes advertise their greeting; receivers may add those peers as well as replies. Hidden or receive-disabled probes use a zero installation ID and anonymous name; do not add them as visible peers. Respond only while visible and receiving-enabled. The core limits responses to one per second per source address (eight tracked sources) and handles at most eight UDP packets per tick. Probe around every 30 seconds and expire peers after 90 seconds. Modern hosts send per-interface subnet broadcasts plus limited broadcast; the classic adapter currently sends limited broadcast only. No mDNS or nonce negotiation in 0.2.
 
 ## Greeting payload
 
@@ -45,7 +45,7 @@ UTF-8 must be well formed and free of ASCII/C1 controls. IDs are correlation ide
 | 8 | CANCEL | Optional bounded explanation |
 | 9 | ERROR | Optional bounded explanation |
 
-Application release 0.1 supports lengths through **0x7fffffff**. Reject a nonzero high word or larger low word in OFFER. This does not certify each filesystem's maximum capacity. Filenames must be 1–255 UTF-8 bytes, a single basename, and contain no controls or `/\:*?"<>|`; reject `.` / `..` and trailing dot/space. The Amiga UI imposes its narrower Latin-1/30-character receiving limit. The sender converts Latin-1 local names to UTF-8; modern names remain UTF-8. File contents are never converted.
+Application release 0.2 supports lengths through **0x7fffffff**. Reject a nonzero high word or larger low word in OFFER. This does not certify each filesystem's maximum capacity. Filenames must be 1–255 UTF-8 bytes, a single basename, and contain no controls or `/\:*?"<>|`; reject `.` / `..` and trailing dot/space. The Amiga UI imposes its narrower Latin-1/30-character receiving limit. The sender converts Latin-1 local names to UTF-8; modern names remain UTF-8. File contents are never converted.
 
 ## Sequence
 
@@ -65,7 +65,7 @@ The base sequence remains plaintext and unauthenticated. Capable builds implemen
 
 ## Windows implementation
 
-The Windows client uses the same 0.1 wire format. Winsock handles retain their native pointer-sized SOCKET type. Local UTF-8 paths convert to UTF-16 for filesystem access. Windows receivers reject DOS device names and invalid Windows filenames before writing; this is a local filesystem constraint, not a protocol change. Temporary files use exclusive creation, and finalization refuses to replace an existing destination. On macOS and Linux finalization uses an atomic no-replace rename (`renamex_np(RENAME_EXCL)`, `renameat2(RENAME_NOREPLACE)`), then a same-directory hard link, if neither operation is available, finalization fails without creating, replacing or deleting the destination. No placeholder-and-replace fallback is used.
+The Windows client uses the same 0.2 wire format. Winsock handles retain their native pointer-sized SOCKET type. Local UTF-8 paths convert to UTF-16 for filesystem access. Windows receivers reject DOS device names and invalid Windows filenames before writing; this is a local filesystem constraint, not a protocol change. Temporary files use exclusive creation, and finalization refuses to replace an existing destination. On macOS and Linux finalization uses an atomic no-replace rename (`renamex_np(RENAME_EXCL)`, `renameat2(RENAME_NOREPLACE)`), then a same-directory hard link, if neither operation is available, finalization fails without creating, replacing or deleting the destination. No placeholder-and-replace fallback is used.
 
 A local connection failure, unexpected TCP closure after the greeting stage, or transfer inactivity timeout removes the matching discovery entry immediately (address, listening port and negotiated installation ID when known). Other services on that address remain listed. A closure before any HELLO arrives, a busy/not-receiving ERROR, local or remote cancellation, remote decline and recipient-decision timeout do not evict the peer, because the host answered. A subsequent valid discovery advertisement can add it again; otherwise passive discovery expiry remains 90 seconds.
 
@@ -109,7 +109,7 @@ peer entry (loopback plus advertised 46442), while DOS can use its host entry
 unchanged. Native DOS UI interoperability tests assert both resolved endpoints
 and send in both directions using discovered IDs.
 
-## Optional modern extensions (0.1, BX capability revision 1)
+## Optional modern extensions (0.2, BX capability revision 1)
 
 Disk-backed queues stream one file per connection. Capability 8 negotiates a
 streamed complete collection and one consent; capability 4 alone retains the
@@ -216,7 +216,7 @@ intermediary. Force prevents plaintext, not impersonation. Prefer permits
 unauthenticated downgrade to retain retro interoperability.
 
 With a configured 64-hex key, use the existing TLS 1.3 external PSK identity
-BitSkim-0.1 and 32 key bytes. No certificate fallback is allowed for a paired
+BitSkim-0.2 and 32 key bytes. No certificate fallback is allowed for a paired
 connection. Matching keys authenticate group membership, not names/IDs. Key
 creation uses RAND_bytes. No early data, tickets or session cache are enabled.
 The custom BIO retains native socket width and nonblocking I/O. Old TLS peers
@@ -350,7 +350,7 @@ Feature bit 1024 negotiates written-file readback verification. After END CRC/si
 
 Feature bit 2048 indicates configured persistent certificate/device trust in unpaired TLS mode. Pairing uses the existing TLS connection, not a new public network command. Both computers can compare 6 bytes (48 bits) from SSL_export_keying_material with label `EXPORTER-BitSkim-Pairing-v1`, no context, rendered XXXX-XXXX-XXXX uppercase hex. Explicit local approval stores the peer X509 public-key SHA-256 digest against its installation ID. New certificate-mode clients request and supply certificates in both TLS roles. Unknown self-signed certificates require code comparison for trust; a remembered pin is checked before offers. See TRANSFER-TOOLS.md for storage, compatibility and security limits. The shared-key PSK mode is unchanged. Discovery carries capabilities, never private keys or trust pins.
 
-Wire/app version remains 0.1. ARexx STATUS retains its existing decimal key=value fields; terminal detail/event RESULT may now be 5 for a negotiated skipped file. The new local history APIs are separate from the existing ARexx event ring.
+Wire/app version remains 0.2. ARexx STATUS retains its existing decimal key=value fields; terminal detail/event RESULT may now be 5 for a negotiated skipped file. The new local history APIs are separate from the existing ARexx event ring.
 
 ## Negotiated directory collections (capability 64)
 

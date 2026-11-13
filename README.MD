@@ -4,11 +4,11 @@
 
 Send files and folders directly between modern desktops and classic computers. BitSkim uses native interfaces, discovers nearby computers through local-network broadcasts, and needs no account or cloud service.
 
-[Website and downloads](https://bitskim.retrocs.org) · [Public repository](https://github.com/retrocs-org/bitskim) · [What's new in 0.1](CHANGELOG.MD)
+[Website and downloads](https://bitskim.retrocs.org) · [Public repository](https://github.com/retrocs-org/bitskim) · [What's new in 0.2](CHANGELOG.MD)
 
 ## Clients
 
-| Client | Version 0.1 |
+| Client | Version 0.2 |
 | --- | --- |
 | macOS | Apple silicon, macOS 13+; public downloads signed and notarized |
 | Windows | Windows 10/11 x64 target; unsigned; Windows 10 GUI validation pending |

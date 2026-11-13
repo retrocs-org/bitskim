@@ -11,7 +11,7 @@
 #define BS_LOCATIONS_TEST
 #include "../../clients/amiga/locations.h"
 long __stack=32768;
-const char bitskim_start_version[]="$VER: BitSkimStart 0.1 (02.11.2026)";
+const char bitskim_start_version[]="$VER: BitSkimStart 0.2 (02.11.2026)";
 int main(void) {
     char path[1024],command[2100]; BPTR lock,input,output; int running;
     Forbid(); running=FindPort((STRPTR)"BITSKIM")!=NULL; Permit();

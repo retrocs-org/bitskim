@@ -178,7 +178,7 @@ static int rexx_dispatch(char *line,char *result,size_t capacity) {
         return 0;
     }
     if(*cursor) return 10;
-    if(!strcmp(cmd,"VERSION")) strcpy(result,"0.1");
+    if(!strcmp(cmd,"VERSION")) strcpy(result,"0.2");
     else if(!strcmp(cmd,"CAPABILITIES")) snprintf(result,capacity,"AREXX=2 STATUS=1 BPS=1 SESSION=1 DETAILS=1 LAST=1 EVENTDETAILS=1 PEERS=1 PEERINFO=1 SENDID=1 ENQUEUEID=1 QUEUE=1 NETWORKCAPS=1 ERROR=1 FORMAT=PCTBYTES MAXCOMMAND=1199 MAXRESULT=4095 HISTORY=32");
     else if(!strcmp(cmd,"NETWORKCAPS")) {BSCapabilities caps;bs_local_capabilities(client,&caps);snprintf(result,capacity,"VERSION=1 TX=%lu RX=%lu MAXSEND=%lu MAXRECEIVE=%lu WIRENAME=%u LOCALNAME=%u PATH=%u NAMEPOLICY=%u CODEPAGE=%u COLLECTION=%lu SECURITY=%u PAIRED=%u",caps.send_features,caps.receive_features,caps.max_send_file,caps.max_receive_file,caps.wire_name_bytes,caps.local_name_bytes,caps.path_bytes,caps.name_policy,caps.code_page,caps.collection_files,caps.security_mode,caps.paired);}
     else if(!strcmp(cmd,"SESSION")) snprintf(result,capacity,"SESSION=%s",session_id);

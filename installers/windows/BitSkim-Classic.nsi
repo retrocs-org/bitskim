@@ -3,18 +3,18 @@ Unicode false
 !include "LogicLib.nsh"
 !define ROOT "../.."
 !define KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\BitSkimClassic"
-Name "BitSkim Classic 0.1"
-OutFile "${ROOT}/outputs/BitSkim-0.1-Windows-Classic-x86-Setup.exe"
+Name "BitSkim Classic 0.2"
+OutFile "${ROOT}/outputs/BitSkim-0.2-Windows-Classic-x86-Setup.exe"
 InstallDir "$PROGRAMFILES\BitSkim Classic"
 RequestExecutionLevel admin
 SetCompressor /SOLID zlib
 Icon "${ROOT}/assets/icons/BitSkim-Windows-Classic.ico"
 UninstallIcon "${ROOT}/assets/icons/BitSkim-Windows-Classic.ico"
-VIProductVersion "0.1.0.0"
+VIProductVersion "0.2.0.0"
 VIAddVersionKey /LANG=1033 "ProductName" "BitSkim Classic"
-VIAddVersionKey /LANG=1033 "FileVersion" "0.1"
-VIAddVersionKey /LANG=1033 "ProductVersion" "0.1"
-VIAddVersionKey /LANG=1033 "FileDescription" "BitSkim Classic 0.1 experimental x86 installer"
+VIAddVersionKey /LANG=1033 "FileVersion" "0.2"
+VIAddVersionKey /LANG=1033 "ProductVersion" "0.2"
+VIAddVersionKey /LANG=1033 "FileDescription" "BitSkim Classic 0.2 experimental x86 installer"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "BitSkim contributors; see included licenses"
 LicenseText "Experimental Windows 95/98/Me/XP client. Native runtime testing is pending. Close BitSkim before installing or updating."
 Page license
@@ -69,7 +69,7 @@ Section "BitSkim Classic (required)"
  ${EndIf}
  ; Per-user AppData preferences.ini is never installed or removed.
  WriteRegStr HKLM "${KEY}" "DisplayName" "BitSkim Classic"
- WriteRegStr HKLM "${KEY}" "DisplayVersion" "0.1"
+ WriteRegStr HKLM "${KEY}" "DisplayVersion" "0.2"
  WriteRegStr HKLM "${KEY}" "InstallLocation" "$INSTDIR"
  WriteRegStr HKLM "${KEY}" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'
  WriteRegStr HKLM "${KEY}" "DisplayIcon" "$INSTDIR\BitSkim.exe,0"

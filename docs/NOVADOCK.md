@@ -1,8 +1,8 @@
-# NovaDock integration — BitSkim 0.1 / ARexx protocol 2
+# NovaDock integration — BitSkim 0.2 / ARexx protocol 2
 
 Project repository: [retrocs-org/bitskim](https://github.com/retrocs-org/bitskim). Website: [bitskim.retrocs.org](https://bitskim.retrocs.org).
 
-Implemented in BitSkim, not a NovaDock plugin binary. NovaDock's existing STATUS/SHOW/REFRESH/RECEIVING/PREFS/CANCEL integration can remain unchanged. All old commands remain available. VERSION still returns **0.1**; the independent ARexx extension version is **AREXX=2** from CAPABILITIES. Hosts predating these extensions return RC 10 for CAPABILITIES; keep the old polling behavior in that case.
+Implemented in BitSkim, not a NovaDock plugin binary. NovaDock's existing STATUS/SHOW/REFRESH/RECEIVING/PREFS/CANCEL integration can remain unchanged. All old commands remain available. VERSION still returns **0.2**; the independent ARexx extension version is **AREXX=2** from CAPABILITIES. Hosts predating these extensions return RC 10 for CAPABILITIES; keep the old polling behavior in that case.
 
 The host is BITSKIM or BITSKIM.1 through BITSKIM.99. This is local ARexx only; no network management endpoint is added. Use asynchronous requests, at most one in flight per plugin, and request RXFF_RESULT for success responses. Do not release a timed-out RexxMsg or its arguments until its reply has arrived. A five-second plugin deadline indicates an unresponsive/busy UI, not proof that a transfer failed. The running client uses modeless offer, save-path, send-path and notice windows. Its main loop continues bs_tick and rexx_poll while they are open. STATUS/DETAILS/LAST/CANCEL/SHOW/HIDE remain serviceable. The offer is tied to its transfer serial and is closed on cancellation/timeout, preventing late acceptance. Startup errors before the ARexx host exists and the independent preferences editor are separate from this event loop.
 

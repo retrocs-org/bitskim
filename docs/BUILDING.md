@@ -2,7 +2,7 @@
 
 [Website](https://bitskim.retrocs.org) · [Source](https://github.com/retrocs-org/bitskim)
 
-These are standalone compilation instructions. Run commands from the BitSkim source root; no release coordinator, repository tokens or 1Password configuration is needed. Version 0.1 remains the current application version.
+These are standalone compilation instructions. Run commands from the BitSkim source root; no release coordinator, repository tokens or 1Password configuration is needed. Version 0.2 remains the current application version.
 
 ## Before you start
 
@@ -140,7 +140,7 @@ NSISDIR=/path/to/nsis/share/nsis \
 ./scripts/build-windows-installer.sh
 ```
 
-Output: `outputs/BitSkim-0.1-Windows10-x64-Setup.exe`. The optional classic installer uses the same NSIS settings with `./scripts/build-windows-legacy-installer.sh`; see its platform guide for ANSI-output requirements. A bare compiler binary without its Stubs/Include/Plugins data is insufficient.
+Output: `outputs/BitSkim-0.2-Windows10-x64-Setup.exe`. The optional classic installer uses the same NSIS settings with `./scripts/build-windows-legacy-installer.sh`; see its platform guide for ANSI-output requirements. A bare compiler binary without its Stubs/Include/Plugins data is insufficient.
 
 ### Mac disk image
 
@@ -150,7 +150,7 @@ The disk image builder needs Python's `ds-store` package. Use a Python environme
 python3 scripts/build-macos-dmg.py
 ```
 
-Output: `outputs/BitSkim-0.1-macOS-arm64.dmg`. See [MACOS.md](MACOS.md) for signing/notarization prerequisites; building a DMG does not publish it.
+Output: `outputs/BitSkim-0.2-macOS-arm64.dmg`. See [MACOS.md](MACOS.md) for signing/notarization prerequisites; building a DMG does not publish it.
 
 ### Combined client, source and website archives
 

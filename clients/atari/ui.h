@@ -26,7 +26,7 @@ static int apply_preferences(int persist){unsigned long up,down;char wire[64];if
 static void paint_preferences(void){static const char *sections[]={"General","Network","About"};int i;for(i=0;i<3;i++)control(1,2+i*2,12,sections[i],pref_section==i);
  if(pref_section==0){pref_field(2,"Client name",draft.name,2);pref_field(4,"Download folder",draft.folder,3);pref_check(7,"Auto-accept",draft.automatic,7);pref_check(8,"Ask save path",draft.ask,8);pref_check(9,"Completion sound",draft.bell,14);}
  else if(pref_section==1){pref_check(2,"Visible on LAN",draft.visible,11);pref_check(3,"Allow incoming",draft.receiving,12);pref_field(5,"Send KiB/s (0=unlimited)",rate_fields[0],5);pref_field(8,"Receive KiB/s",rate_fields[1],6);text(15,11,"Plaintext transfers");}
- else {text(15,2,"BitSkim 0.1 / " STACK);text(15,4,"github.com/retrocs-org/");text(15,5,"bitskim");text(15,7,"bitskim.retrocs.org");text(15,9,"Native palette; no desktop");text(15,10,"colour changes. Experimental.");}
+ else {text(15,2,"BitSkim 0.2 / " STACK);text(15,4,"github.com/retrocs-org/");text(15,5,"bitskim");text(15,7,"bitskim.retrocs.org");text(15,9,"Native palette; no desktop");text(15,10,"colour changes. Experimental.");}
  button(1,12,"Save");button(11,12,"Use");button(20,12,"Revert");button(32,12,"Cancel");
 }
 static void preferences_click(int col,int row){if(col<14 && row>=2 && row<=6 && !(row&1)){pref_section=(row-2)/2;focus=pref_section==0?2:pref_section==1?11:13;dirty=1;return;}if(row==12){if(col<11)apply_preferences(1);else if(col<20)apply_preferences(0);else if(col<32){draft=prefs;sprintf(rate_fields[0],"%lu",draft.send_limit/1024UL);sprintf(rate_fields[1],"%lu",draft.receive_limit/1024UL);}else{page=MAIN;}dirty=1;return;}if(col<15)return;

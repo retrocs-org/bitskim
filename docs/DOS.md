@@ -1,4 +1,4 @@
-# BitSkim 0.1 for DOS / mTCP
+# BitSkim 0.2 for DOS / mTCP
 
 Experimental 16-bit DOS client using Michael B. Brutman's mTCP library and the
 same BitSkim transfer engine/wire protocol as the other clients. This is a

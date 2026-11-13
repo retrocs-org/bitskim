@@ -119,7 +119,7 @@ static unsigned long percent(unsigned long done,unsigned long total){unsigned lo
 #include "ui.h"
 static void paint(const short clip[4]){char line[256];const BSStatus *s=bs_status(engine);int i;
  memcpy(paint_clip,clip,sizeof paint_clip);palette_select();vsf_interior(vhandle,FIS_SOLID);vsf_color(vhandle,ui_bg);v_bar(vhandle,(short *)clip);vst_color(vhandle,ui_fg);
- if(clip[1]<work[1]+char_h){vst_color(vhandle,accent());text(1,0,"BitSkim 0.1 / " STACK " / F1 Tools");vst_color(vhandle,ui_fg);}
+ if(clip[1]<work[1]+char_h){vst_color(vhandle,accent());text(1,0,"BitSkim 0.2 / " STACK " / F1 Tools");vst_color(vhandle,ui_fg);}
  if(clip[1]<work[1]+13*char_h){
  if(page==TOOLS){int row;char report[81];int columns=width()-2;const char *policy=bs_conflict_get(engine)==2?"REPLACE":bs_conflict_get(engine)==1?"SKIP":"RENAME";if(columns>80)columns=80;if(columns<10)columns=10;
     if(tools_record>=0 && tools_serial){tools_record=bs_history_find(engine,tools_serial);if(tools_record<0)tools_record=-2;}
@@ -292,7 +292,7 @@ int main(int argc,char **argv){short input[11],output[57],msg[8],mx,my,buttons,m
  load();
  if(!bs_to_utf8(prefs.name,wire,sizeof wire))copy(wire,"Atari",64);engine=bs_create_app(wire,PLATFORM,prefs.id,prefs.visible,prefs.receiving);if(!engine){form_alert(1,"[1][Cannot listen on TCP/UDP 46440.][OK]");bs_platform_cleanup();v_clsvwk(vhandle);appl_exit();return 1;}
  {char store[CAP],*slash;copy(store,config_path,CAP);slash=strrchr(store,92);if(slash)copy(slash+1,"BSFOLD.DAT",(size_t)(store+CAP-slash-1));else copy(store,"BSFOLD.DAT",CAP);bs_folders_configure(engine,store);}
- save();window=wind_create(NAME|CLOSER|MOVER,desktop[0],desktop[1],desktop[2],desktop[3]);if(window<0){bs_destroy(engine);bs_platform_cleanup();v_clsvwk(vhandle);appl_exit();return 1;}wind_set_str(window,WF_NAME,"BitSkim 0.1 / " STACK);
+ save();window=wind_create(NAME|CLOSER|MOVER,desktop[0],desktop[1],desktop[2],desktop[3]);if(window<0){bs_destroy(engine);bs_platform_cleanup();v_clsvwk(vhandle);appl_exit();return 1;}wind_set_str(window,WF_NAME,"BitSkim 0.2 / " STACK);
  bs_limits_configure(engine,prefs.send_limit,prefs.receive_limit);bs_batch_enable(engine,1);
  bw2=desktop[2]>620?620:desktop[2];bh2=17*char_h+24;if(bh2>desktop[3])bh2=desktop[3];bx=desktop[0]+(desktop[2]-bw2)/2;by=desktop[1]+(desktop[3]-bh2)/2;wind_open(window,bx,by,bw2,bh2);wind_get(window,WF_WORKXYWH,&work[0],&work[1],&work[2],&work[3]);graf_mouse(ARROW,NULL);palette_read();drop_launch(argc,argv);
  while(running){const BSStatus *s;unsigned long now;drop_tick();drop_queue_tick();bs_tick(engine);if(bs_completion_notice(engine,&bell_serial) && prefs.bell){fputc(7,stderr);fflush(stderr);}s=bs_status(engine);now=bs_transfer_serial(engine);

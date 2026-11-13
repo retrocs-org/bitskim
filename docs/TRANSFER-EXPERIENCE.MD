@@ -1,4 +1,4 @@
-# Transfer folders, progress and network checks (0.1)
+# Transfer folders, progress and network checks (0.2)
 
 The clients remember separate last-used send and receive folders. File selection starts in the last send folder; incoming save dialogs start in the last receive folder, falling back to the configured default when it no longer exists. Directory acceptance remembers the selected destination once for the whole transfer. Completed files remain at that destination. Automatic reception still follows the client's configured approval policy.
 

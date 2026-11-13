@@ -7,7 +7,7 @@ from build_provenance import ROOT,ARTIFACTS,verify,source_hash,tree_hash,record_
 def main():
  parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('target',choices=('macos','dmg'));parser.add_argument('--profile',default='bitskim');args=parser.parse_args()
  record=verify(args.target)
- path=ROOT/('build/macos/BitSkim.app' if args.target=='macos' else 'outputs/BitSkim-0.1-macOS-arm64.dmg')
+ path=ROOT/('build/macos/BitSkim.app' if args.target=='macos' else 'outputs/BitSkim-0.2-macOS-arm64.dmg')
  subprocess.run(['codesign','--verify','--deep','--strict',str(path)],check=True)
  signature=subprocess.run(['codesign','-dvv',str(path)],capture_output=True,text=True,check=True)
  if 'Authority=Developer ID Application:' not in signature.stderr:raise RuntimeError('Developer ID signing is required before notarization')

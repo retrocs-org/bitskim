@@ -1,10 +1,10 @@
 @database BitSkim.guide
 @author "BitSkim contributors"
-@(c) "BitSkim 0.1 - MIT license; see LICENSE and third-party notices"
+@(c) "BitSkim 0.2 - MIT license; see LICENSE and third-party notices"
 @toc MAIN
-@node MAIN "BitSkim 0.1 - AmigaOS manual"
+@node MAIN "BitSkim 0.2 - AmigaOS manual"
 
-                         @{b}BitSkim 0.1@{ub}
+                         @{b}BitSkim 0.2@{ub}
                  Different generations. Same network.
 
  Disk-backed queues send one file at a time. Browse the whole list
@@ -386,7 +386,7 @@
    RX Bin:BitSkim/ARexx/DockStatus.rexx
 
  Queries:
-   VERSION       application version (0.1)
+   VERSION       application version (0.2)
    CAPABILITIES  independent ARexx extension version and feature flags
    STATUS        decimal KEY=VALUE progress/policy fields, including BPS
    SESSION       session-generation token
@@ -541,7 +541,7 @@
 
 @node SAFETY "Limits and safety"
 
- BitSkim 0.1 transfers are unencrypted. Names, IPs and installation IDs
+ BitSkim 0.2 transfers are unencrypted. Names, IPs and installation IDs
  are not authenticated. Stable-ID checks prevent accidental recipient
  changes; they do not provide cryptographic pairing. Use a trusted LAN
  and do not forward the listening port to the public Internet.
@@ -626,7 +626,7 @@
  location metadata. Keep the installer/launcher package for maintenance.
  Avoid replacing files while a transfer is active.
 
- Version stays 0.1 until the owner requests a version change. New packages
+ Version stays 0.2 until the owner requests a version change. New packages
  carry source and payload fingerprints to avoid mixing old binaries with
  new source. Build records are not publisher signatures or authentication.
 
@@ -635,7 +635,7 @@
 
 @node ABOUT "About BitSkim"
 
- BitSkim 0.1 - first public release in preparation.
+ BitSkim 0.2 - first public release in preparation.
  Native interfaces share a small, bounded, nonblocking C transfer engine.
 
  Source repository:

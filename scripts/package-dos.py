@@ -5,7 +5,7 @@ from build_provenance import ROOT
 from dos_release import write_dos
 
 def main():
-    output=write_dos(ROOT/'outputs/BitSkim-0.1-DOS-mTCP.zip',ROOT/'outputs/BitSkim-0.1-source.zip')
+    output=write_dos(ROOT/'outputs/BitSkim-0.2-DOS-mTCP.zip',ROOT/'outputs/BitSkim-0.2-source.zip')
     line=hashlib.sha256(output.read_bytes()).hexdigest()+'  '+output.name+'\n'
     output.with_suffix('.zip.sha256').write_text(line)
     sums=ROOT/'outputs/SHA256SUMS'

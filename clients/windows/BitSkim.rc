@@ -2,8 +2,8 @@
 1 ICON "assets/icons/BitSkim.ico"
 1 RT_MANIFEST "clients/windows/BitSkim.manifest"
 1 VERSIONINFO
- FILEVERSION 0,1,0,0
- PRODUCTVERSION 0,1,0,0
+ FILEVERSION 0,2,0,0
+ PRODUCTVERSION 0,2,0,0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0
  FILEOS VOS_NT_WINDOWS32
@@ -14,9 +14,9 @@ BEGIN
   BLOCK "040904b0"
   BEGIN
    VALUE "FileDescription", "BitSkim local file sharing\0"
-   VALUE "FileVersion", "0.1\0"
+   VALUE "FileVersion", "0.2\0"
    VALUE "ProductName", "BitSkim\0"
-   VALUE "ProductVersion", "0.1\0"
+   VALUE "ProductVersion", "0.2\0"
    VALUE "OriginalFilename", "BitSkim.exe\0"
   END
  END

@@ -74,5 +74,37 @@ class Tools(CoreTests):
   self.until(lambda:self.status(self.b).awaiting_decision)
   dest=self.root/'legacy.txt';self.lib.bs_accept(self.b,os.fsencode(dest))
   s.sendall(frame(5,data)+frame(6,struct.pack('>I',self.lib.bs_crc32(0,data,len(data)))))
-  self.until(lambda:dest.exists());self.assertEqual(dest.read_bytes(),data);self.assertNotIn(b'written file verified',self.report(self.b))
+  self.until(lambda:dest.exists());self.assertEqual(dest.read_bytes(),data);self.assertIn(b'written file verified (CRC32)',self.report(self.b))
+ def test_legacy_sender_readback_detects_disk_corruption(self):
+  import struct
+  data=b'legacy data'*1000;s=self.raw_peer();s.sendall(frame(1,hello())+frame(2,offer(b'legacy.dat',len(data))))
+  self.until(lambda:self.status(self.b).awaiting_decision)
+  dest=self.root/'legacy.dat';self.lib.bs_accept(self.b,os.fsencode(dest))
+  s.sendall(frame(5,data[:4096])+frame(5,data[4096:8192])+frame(5,data[8192:])+frame(6,struct.pack('>I',self.lib.bs_crc32(0,data,len(data)))))
+  self.until(lambda:b'Checking written' in self.status(self.b).message)
+  parts=list(self.root.glob('BS*.part'));self.assertEqual(len(parts),1);parts[0].write_bytes(b'corrupt')
+  self.until(lambda:not self.status(self.b).active)
+  self.assertFalse(dest.exists());self.assertIn(b'not verified (transfer incomplete)',self.report(self.b))
+ def test_discovery_diagnostics_show_activity_and_pause(self):
+  out=C.create_string_buffer(2048);self.advertise(b'd'*32,self.pb)
+  self.until(lambda:self.lib.bs_peer_count(self.a)>0)
+  self.lib.bs_diagnostics(self.a,out,len(out));self.assertIn(b'valid peer packets received',out.value);self.assertIn(b'Last peer packet:',out.value)
+  self.lib.bs_discovery_search(self.a,0);self.lib.bs_diagnostics(self.a,out,len(out));self.assertIn(b'Discovery: paused',out.value)
+ def test_unknown_compatibility_is_not_claimed_as_supported(self):
+  self.lib.bs_peer_summary.argtypes=[C.c_void_p,C.c_char_p,C.c_char_p,C.c_size_t]
+  out=C.create_string_buffer(512);self.lib.bs_peer_summary(self.a,b'unknown',out,len(out))
+  self.assertIn(b'Compatibility unknown',out.value)
+
+ def test_discovery_compatibility_summary_uses_actual_peer_profile(self):
+  import socket,struct
+  self.lib.bs_peer_summary.argtypes=[C.c_void_p,C.c_char_p,C.c_char_p,C.c_size_t]
+  greeting=bytes.fromhex('d'*32)+struct.pack('>HBB',self.pb,4,4)+b'TestTest'
+  profile=struct.pack('>4sBBBBIIIIHHHHI',b'BXC1',1,0,2,0,16,16|64|1024,2147483647,2147483647,255,12,127,0,1)
+  with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as udp:
+   udp.sendto((b'BSKD\x01\x02'+greeting+profile).ljust(160,b'\0'),('127.0.0.1',self.pa))
+  self.until(lambda:self.lib.bs_peer_count(self.a)>0)
+  out=C.create_string_buffer(512);self.assertEqual(self.lib.bs_peer_summary(self.a,b'd'*32,out,len(out)),1)
+  for expected in (b'Folders supported',b'Written-file verification',b'Plaintext only',b'names 12 bytes',b'Discovery hints'):
+   self.assertIn(expected,out.value)
+
 def load_tests(loader,tests,pattern):return unittest.TestSuite(Tools(n) for n in Tools.__dict__ if n.startswith('test_'))

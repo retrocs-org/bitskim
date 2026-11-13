@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
-[ "$(cat VERSION)" = 0.1 ] || exit 1
+[ "$(cat VERSION)" = 0.2 ] || exit 1
 ATARI_CC=${ATARI_CC:-"$PWD/work/atari/sdk/opt/cross-mint/bin/m68k-atari-mint-gcc"}
 STING_INCLUDE=${STING_INCLUDE:-"$PWD/work/atari/sting-include"}
 command -v "$ATARI_CC" >/dev/null || { echo 'Run python3 scripts/bootstrap-atari.py or set ATARI_CC and STING_INCLUDE.' >&2; exit 1; }

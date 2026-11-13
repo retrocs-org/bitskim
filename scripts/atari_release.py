@@ -17,7 +17,7 @@ def write_atari(out, source, root=ROOT):
  for name in ('mintlib-0.60.1.tar.xz','gemlib-0.44.0.tar.xz','mintlib-0.60.1-20240718-build.sh','gemlib-0.44.0-20240425-build.sh'):
   bootstrap.fetch('https://tho-otto.m68k.eu/download/mint/'+name,work/name,bootstrap.FILES[name])
  for variant,label in [('sting','TOS-STinG-68000'),('mintnet','MiNTNet-68000'),('mintnet060','MiNTNet-68060')]:
-  build=ROOT/'build/atari'/variant;archive=out/('BitSkim-0.1-Atari-'+label+'.zip')
+  build=ROOT/'build/atari'/variant;archive=out/('BitSkim-0.2-Atari-'+label+'.zip')
   with ZipFile(archive,'w',ZIP_DEFLATED) as z:
    z.write(build/'BITSKIM.PRG','BITSKIM/BITSKIM.PRG')
    for path,name in [(ROOT/'docs/TRANSFER-TOOLS.md','TOOLS.TXT'),(ROOT/'docs/ATARI.md','README.TXT'),(ROOT/'LICENSE','MIT.TXT'),(ROOT/'THIRD-PARTY-NOTICES.MD','NOTICES.TXT'),(ROOT/'build/provenance'/('atari-'+variant+'.json'),'BUILD.JSN')]:z.write(path,'BITSKIM/'+name)

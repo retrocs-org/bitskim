@@ -136,7 +136,7 @@ class InstallerDiscovery(unittest.TestCase):
   with self.assertRaisesRegex(Stop,'unowned'):
    Flow({'SYS:WBStartup/BitSkimStart':'foreign'},novice=True).run(self.flow)
  def test_owned_startup_is_retained_for_updates(self):
-  files=self.recorded();files['ENVARC:BitSkim/startup-owned']='BitSkimStart 0.1';files['SYS:WBStartup/BitSkimStart']='owned'
+  files=self.recorded();files['ENVARC:BitSkim/startup-owned']='BitSkimStart 0.2';files['SYS:WBStartup/BitSkimStart']='owned'
   f=Flow(files);f.run(self.flow);self.assertTrue(f.vars['#startup-owned'])
  def test_intermediate_only_asks_two_paths_and_both_start_questions(self):
   f=Flow({},boot=False,launch=True);f.run(self.flow)

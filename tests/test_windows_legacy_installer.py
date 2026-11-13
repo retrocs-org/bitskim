@@ -12,7 +12,7 @@ class ClassicInstaller(unittest.TestCase):
   self.assertNotIn('File "${ROOT}/build/windows/BitSkim.exe"',source)
   self.assertIn('FindWindow $0 "BitSkimLegacy"',source)
  def test_real_payload(self):
-  setup=ROOT/'outputs/BitSkim-0.1-Windows-Classic-x86-Setup.exe'
+  setup=ROOT/'outputs/BitSkim-0.2-Windows-Classic-x86-Setup.exe'
   if not setup.exists() or not shutil.which('7z'): self.skipTest('Build setup and install 7z first')
   with tempfile.TemporaryDirectory() as d:
    subprocess.run(['7z','x','-y','-o'+d,str(setup)],check=True,stdout=subprocess.DEVNULL)

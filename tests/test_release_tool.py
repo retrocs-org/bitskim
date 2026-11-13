@@ -26,7 +26,7 @@ class FakeGitHub:
             result = {'name': file.name, 'digest': 'sha256:' + release.digest(file)}
             self.assets[file.name] = result; return result
         if method == 'POST':
-            self.release = dict(body, id=42, html_url='https://github.com/team/app/releases/tag/v0.1',
+            self.release = dict(body, id=42, html_url='https://github.com/team/app/releases/tag/v0.2',
                                 upload_url='https://uploads.github.com/repos/team/app/releases/42/assets{?name,label}')
             return self.release
         if method == 'PATCH': self.release.update(body); return self.release
@@ -51,7 +51,7 @@ class ReleaseTool(unittest.TestCase):
     def setup_release(self, folder):
         root = Path(folder); (root / 'outputs').mkdir()
         for name in ('first.zip', 'second.zip'): (root / 'outputs' / name).write_bytes(name.encode())
-        return root, {'version': '0.1', 'tag': 'v0.1', 'commit': 'c' * 40,
+        return root, {'version': '0.2', 'tag': 'v0.2', 'commit': 'c' * 40,
                       'github': 'https://github.com/team/app', 'gitlab': 'https://gitlab.example.com/group/nested/app',
                       'notes': 'Reviewed release notes',
                       'files': {p.name: release.digest(p) for p in (root / 'outputs').iterdir()}}
@@ -109,17 +109,17 @@ class ReleaseTool(unittest.TestCase):
             def git(*args):
                 return subprocess.run(['git', *args], cwd=root, check=True, capture_output=True, text=True).stdout.strip()
             git('init', '-q'); git('config', 'user.email', 'test@example.invalid'); git('config', 'user.name', 'Release Test')
-            (root / 'VERSION').write_text('0.1\n'); (root / '.gitignore').write_text('core/private.c\n')
+            (root / 'VERSION').write_text('0.2\n'); (root / '.gitignore').write_text('core/private.c\n')
             git('add', '.'); git('commit', '-qm', 'source')
             self.assertEqual(release.clean_commit(root), git('rev-parse', 'HEAD'))
-            (root / 'VERSION').write_text('0.2\n')
+            (root / 'VERSION').write_text('0.3\n')
             with self.assertRaisesRegex(ValueError, 'Commit all'): release.clean_commit(root)
             git('checkout', '--', 'VERSION'); (root / 'core').mkdir(); (root / 'core/private.c').write_text('uncommitted input')
             with self.assertRaisesRegex(ValueError, 'not committed'): release.clean_commit(root)
 
     def test_remote_annotated_tag_uses_peeled_commit(self):
-        with patch.object(release, 'run', return_value='object refs/tags/v0.1\ncommit refs/tags/v0.1^{}'):
-            self.assertEqual(release.remote_tag('https://gitlab.example.com/a/b', 'v0.1'), 'commit')
+        with patch.object(release, 'run', return_value='object refs/tags/v0.2\ncommit refs/tags/v0.2^{}'):
+            self.assertEqual(release.remote_tag('https://gitlab.example.com/a/b', 'v0.2'), 'commit')
 
     def test_plan_has_no_build_or_upload_side_effects(self):
         config = dict(release.DEFAULTS, env={'BITSKIM_SIGN_IDENTITY': 'Test Identity'})
@@ -169,17 +169,17 @@ class IntegratedSettings(unittest.TestCase):
             root=Path(tmp)/'repo';root.mkdir();alias=Path(tmp)/'alias';alias.symlink_to(root,target_is_directory=True)
             def git(*args):subprocess.run(['git',*args],cwd=root,check=True,capture_output=True)
             git('init','-q');git('config','user.email','test@example.invalid');git('config','user.name','Test')
-            (root/'VERSION').write_text('0.1');git('add','.');git('commit','-qm','test')
+            (root/'VERSION').write_text('0.2');git('add','.');git('commit','-qm','test')
             self.assertEqual(release.clean_commit(alias),release.clean_commit(root))
     def test_source_confirmation_before_git(self):
         with patch.object(release,'clean_commit') as clean:
             with self.assertRaisesRegex(ValueError,'confirm-push'):release.push_source({},['gitlab'])
             clean.assert_not_called()
-    def test_manual_tag_exact(self):self.assertEqual(release.release_tag('0.1'),'0.1')
+    def test_manual_tag_exact(self):self.assertEqual(release.release_tag('0.2'),'0.2')
     def test_publication_standard_excludes_source_and_website(self):
-        files,sidecars=release.publication_assets(Path('.'),{'BitSkim-0.1-macOS-arm64.dmg':'a'*64,'BitSkim-0.1-source.zip':'b'*64,'BitSkim-0.1-website.zip':'c'*64,'SHA256SUMS':'d'*64})
-        self.assertEqual(set(files),{'BitSkim-0.1-macOS-arm64.dmg','BitSkim-0.1-macOS-arm64.dmg.sha256'})
-        self.assertEqual(sidecars['BitSkim-0.1-macOS-arm64.dmg.sha256'],('a'*64+'  BitSkim-0.1-macOS-arm64.dmg\n').encode())
+        files,sidecars=release.publication_assets(Path('.'),{'BitSkim-0.2-macOS-arm64.dmg':'a'*64,'BitSkim-0.2-source.zip':'b'*64,'BitSkim-0.2-website.zip':'c'*64,'SHA256SUMS':'d'*64})
+        self.assertEqual(set(files),{'BitSkim-0.2-macOS-arm64.dmg','BitSkim-0.2-macOS-arm64.dmg.sha256'})
+        self.assertEqual(sidecars['BitSkim-0.2-macOS-arm64.dmg.sha256'],('a'*64+'  BitSkim-0.2-macOS-arm64.dmg\n').encode())
 
 class SourceOnlyWorkflow(unittest.TestCase):
     def test_source_dry_run_does_not_push_or_resolve_tokens(self):
@@ -201,7 +201,7 @@ class InitialSourceCommit(unittest.TestCase):
             root=Path(tmp)/'source';root.mkdir();remote=Path(tmp)/'remote.git'
             subprocess.run(['git','init','--bare','-q',str(remote)],check=True)
             (root/'.gitignore').write_text('private.txt\n')
-            (root/'VERSION').write_text('0.1')
+            (root/'VERSION').write_text('0.2')
             (root/'private.txt').write_text('not-for-git')
             identity={'GIT_AUTHOR_NAME':'Release Test','GIT_AUTHOR_EMAIL':'test@example.invalid','GIT_COMMITTER_NAME':'Release Test','GIT_COMMITTER_EMAIL':'test@example.invalid'}
             with patch.dict('os.environ',identity),patch.object(release,'git_destination',return_value=str(remote)):
@@ -222,7 +222,7 @@ class InitialSourceCommit(unittest.TestCase):
     def test_second_nonempty_remote_prevents_first_local_commit(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);(root/'.gitignore').write_text('work/\n')
-            with patch.object(release,'git_destination',return_value='destination'),patch.object(release,'run',side_effect=['','commit refs/tags/0.1']):
+            with patch.object(release,'git_destination',return_value='destination'),patch.object(release,'run',side_effect=['','commit refs/tags/0.2']):
                 with self.assertRaisesRegex(ValueError,'already has Git history'):release.initialize_source({},['gitlab','github'],root)
             self.assertFalse((root/'.git').exists())
     def test_inaccessible_remote_does_not_initialize(self):
@@ -235,20 +235,20 @@ class InitialSourceCommit(unittest.TestCase):
 class ReleaseMessages(unittest.TestCase):
     def test_custom_initial_commit_message(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp);(root/'.gitignore').write_text('work/\n');(root/'VERSION').write_text('0.1')
+            root=Path(tmp);(root/'.gitignore').write_text('work/\n');(root/'VERSION').write_text('0.2')
             identity={'GIT_AUTHOR_NAME':'Test','GIT_AUTHOR_EMAIL':'test@example.invalid','GIT_COMMITTER_NAME':'Test','GIT_COMMITTER_EMAIL':'test@example.invalid'}
             original=release.run
             def commands(args,*a,**kw):
                 if args[1:3]==['ls-remote','--refs']:return ''
                 return original(args,*a,**kw)
             with patch.dict('os.environ',identity),patch.object(release,'run',side_effect=commands),patch.object(release,'git_destination',return_value='not-used'):
-                release.initialize_source({},['gitlab'],root,commit_message='BitSkim 0.1 source release')
+                release.initialize_source({},['gitlab'],root,commit_message='BitSkim 0.2 source release')
             message=original(['git','log','-1','--format=%s'],root,True)
-            self.assertEqual(message,'BitSkim 0.1 source release')
+            self.assertEqual(message,'BitSkim 0.2 source release')
     def test_publish_rejects_message_not_in_prepared_manifest(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);path=root/'outputs/release/manifest.json';path.parent.mkdir(parents=True)
-            path.write_text(json.dumps({'tag':'0.1','tag_message':'Original'}))
+            path.write_text(json.dumps({'tag':'0.2','tag_message':'Original'}))
             with self.assertRaisesRegex(ValueError,'Tag message differs'):release.publish(['gitlab'],True,root,tag_message='Different')
 
 class PrivateFiles(unittest.TestCase):

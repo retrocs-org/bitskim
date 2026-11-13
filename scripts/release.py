@@ -77,7 +77,7 @@ def credential(service, config):
 
 
 def release_tag(tag=None):
-    tag = 'v0.1' if tag is None else tag
+    tag = 'v0.2' if tag is None else tag
     if not tag or tag.startswith('-'):
         raise ValueError('Invalid Git release tag')
     check = subprocess.run(['git', 'check-ref-format', 'refs/tags/' + tag], capture_output=True)
@@ -192,14 +192,14 @@ def inventory(root=ROOT):
         if not path.is_file() or path.is_symlink() or digest(path) != match[1]:
             raise ValueError('Missing or changed release asset: ' + match[2])
         files[match[2]] = match[1]
-    required = {'BitSkim-0.1-source.zip', 'BitSkim-src.tar.gz', 'BitSkim-0.1.lha',
-                'BitSkim-0.1-macOS-arm64.zip', 'BitSkim-0.1-macOS-arm64.dmg',
-                'BitSkim-0.1-Windows10-x64.zip', 'BitSkim-0.1-Windows10-x64-Setup.exe',
-                'BitSkim-0.1-AmigaOS.zip', 'BitSkim-0.1-DOS-mTCP.zip',
-                'BitSkim-0.1-RISCOS3-ARM2.zip', 'BitSkim-0.1-RISCOS3-StrongARM.zip',
-                'BitSkim-0.1-website.zip', 'BitSkim-0.1-Windows-Classic-x86.zip',
-                'BitSkim-0.1-Atari-TOS-STinG-68000.zip', 'BitSkim-0.1-Atari-MiNTNet-68000.zip',
-                'BitSkim-0.1-Atari-MiNTNet-68060.zip'}
+    required = {'BitSkim-0.2-source.zip', 'BitSkim-src.tar.gz', 'BitSkim-0.2.lha',
+                'BitSkim-0.2-macOS-arm64.zip', 'BitSkim-0.2-macOS-arm64.dmg',
+                'BitSkim-0.2-Windows10-x64.zip', 'BitSkim-0.2-Windows10-x64-Setup.exe',
+                'BitSkim-0.2-AmigaOS.zip', 'BitSkim-0.2-DOS-mTCP.zip',
+                'BitSkim-0.2-RISCOS3-ARM2.zip', 'BitSkim-0.2-RISCOS3-StrongARM.zip',
+                'BitSkim-0.2-website.zip', 'BitSkim-0.2-Windows-Classic-x86.zip',
+                'BitSkim-0.2-Atari-TOS-STinG-68000.zip', 'BitSkim-0.2-Atari-MiNTNet-68000.zip',
+                'BitSkim-0.2-Atari-MiNTNet-68060.zip'}
     if required != files.keys():
         raise ValueError('Incomplete release; build/package every release target first')
     files['SHA256SUMS'] = digest(root / 'outputs/SHA256SUMS')
@@ -240,7 +240,7 @@ def check_builds(root=ROOT):
 
 
 def check_source_archive(root=ROOT):
-    with ZipFile(root / 'outputs/BitSkim-0.1-source.zip') as archive:
+    with ZipFile(root / 'outputs/BitSkim-0.2-source.zip') as archive:
         records = json.loads(archive.read('BitSkim/BUILD-PROVENANCE.json'))
         for target in TARGETS:
             if records.get(target) != verify(target, root):
@@ -261,7 +261,7 @@ def publication_assets(root, full_inventory):
     files = {}
     payloads = {}
     for name, sha in full_inventory.items():
-        if name in ('SHA256SUMS', 'BitSkim-0.1-source.zip', 'BitSkim-src.tar.gz', 'BitSkim-0.1-website.zip'):
+        if name in ('SHA256SUMS', 'BitSkim-0.2-source.zip', 'BitSkim-src.tar.gz', 'BitSkim-0.2-website.zip'):
             continue
         files[name] = sha
         content = (sha + '  ' + name + '\n').encode()
@@ -295,7 +295,7 @@ def prepare(config, notes, root=ROOT, tag=None, tag_message=None):
         commit = clean_commit(root)
     except (ValueError, subprocess.CalledProcessError):
         commit = None
-    manifest = {'version': '0.1', 'tag': tag, 'tag_message': tag_message or 'BitSkim ' + tag, 'source_sha256': source_hash(root),
+    manifest = {'version': '0.2', 'tag': tag, 'tag_message': tag_message or 'BitSkim ' + tag, 'source_sha256': source_hash(root),
                 'commit': commit, 'github': config['github'], 'gitlab': config['gitlab'],
                 'github_git': git_destination(config, 'github'), 'gitlab_git': git_destination(config, 'gitlab'),
                 'notes': text, 'files': files, 'inventory': full_inventory}
@@ -328,7 +328,7 @@ class API:
         host = host or self.host
         if host not in (self.host, 'uploads.github.com' if self.github else self.host):
             raise ValueError('Untrusted API upload host')
-        headers = {'User-Agent': 'BitSkim-release/0.1', 'Accept': 'application/json'}
+        headers = {'User-Agent': 'BitSkim-release/0.2', 'Accept': 'application/json'}
         headers['Authorization' if self.github else 'PRIVATE-TOKEN'] = ('Bearer ' if self.github else '') + self.token
         data = json.dumps(body).encode() if body is not None else None
         if data is not None:
@@ -434,7 +434,7 @@ def publish(services, confirmed=False, root=ROOT, config=None, tag=None, tag_mes
     manifest = json.loads(path.read_text())
     if tag_message is not None and tag_message != manifest.get('tag_message', 'BitSkim ' + manifest['tag']):
         raise ValueError('Tag message differs from the prepared manifest; prepare again with --tag-message')
-    if release_tag(manifest['tag']) != manifest['tag'] or manifest['version'] != '0.1' or (tag is not None and release_tag(tag) != manifest['tag']):
+    if release_tag(manifest['tag']) != manifest['tag'] or manifest['version'] != '0.2' or (tag is not None and release_tag(tag) != manifest['tag']):
         raise ValueError('Version/tag mismatch')
     if clean_commit(root) != manifest['commit'] or source_hash(root) != manifest['source_sha256']:
         raise ValueError('Source/commit changed; build and prepare again')
@@ -529,7 +529,7 @@ def main():
     p.add_argument('--dry-run', action='store_true')
     p.add_argument('--commit-message', help='Message for the first local commit with source --init')
     p.add_argument('--tag-message', help='Annotation for a newly created release tag')
-    p.add_argument('--tag', help='Exact release tag, e.g. 0.1; default v0.1')
+    p.add_argument('--tag', help='Exact release tag, e.g. 0.2; default v0.2')
     a = p.parse_args(); config = configuration(a.config)
     if a.commit_message is not None and not (a.action == 'source' and a.initialize): p.error('--commit-message requires source --init')
     if a.tag_message is not None and a.action not in ('prepare', 'publish', 'release'): p.error('--tag-message is for prepare/publish/release')

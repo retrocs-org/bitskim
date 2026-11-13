@@ -110,7 +110,7 @@ void peer_name(const char *s) {snprintf(peers[0].name,sizeof(peers[0].name),"%s"
         self.assertEqual(fields['VERSION'],'1');self.assertEqual(fields['LOCALNAME'],'30')
         self.assertEqual(fields['MAXRECEIVE'],'2147483647');self.assertEqual(fields['SECURITY'],'0')
     def test_status_and_version(self):
-        self.assertEqual(self.command('version'), (0, '0.1'))
+        self.assertEqual(self.command('version'), (0, '0.2'))
         self.assertIn('PORT=46440', self.command('STATUS')[1])
         self.assertEqual(self.command('VERSION extra')[0], 10)
 

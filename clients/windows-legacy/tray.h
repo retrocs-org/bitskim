@@ -12,7 +12,7 @@ static int add_tray(void) {
     memset(&tray_data,0,sizeof tray_data); tray_data.cbSize=NOTIFYICONDATAA_V1_SIZE;
     tray_data.hWnd=window; tray_data.uID=1; tray_data.uFlags=NIF_MESSAGE|NIF_ICON|NIF_TIP;
     tray_data.uCallbackMessage=TRAY_MESSAGE; tray_data.hIcon=LoadIconA(instance,MAKEINTRESOURCEA(1));
-    lstrcpynA(tray_data.szTip,"BitSkim 0.1 - local file sharing",64);
+    lstrcpynA(tray_data.szTip,"BitSkim 0.2 - local file sharing",64);
     tray_present=Shell_NotifyIconA(NIM_ADD,&tray_data)!=0; return tray_present;
 }
 static void show_main(void) { ShowWindow(window,SW_RESTORE); SetForegroundWindow(prefs?prefs:window); }

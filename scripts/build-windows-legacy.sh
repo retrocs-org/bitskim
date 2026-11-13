@@ -3,7 +3,7 @@ set -eu
 cd "$(dirname "$0")/.."
 CC=${LEGACY_WINDOWS_CC:-i686-w64-mingw32-gcc}
 RC=${LEGACY_WINDOWS_RC:-i686-w64-mingw32-windres}
-[ "$(cat VERSION)" = "0.1" ] || exit 1
+[ "$(cat VERSION)" = "0.2" ] || exit 1
 python3 scripts/build_provenance.py begin windows-legacy
 mkdir -p build/windows-legacy
 "$RC" -I. clients/windows-legacy/BitSkim.rc -O coff -o build/windows-legacy/resources.o

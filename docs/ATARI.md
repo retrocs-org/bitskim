@@ -1,4 +1,4 @@
-# BitSkim 0.1 — experimental Atari GEM clients
+# BitSkim 0.2 — experimental Atari GEM clients
 
 **Compiled, not Atari-runtime tested.** No Atari hardware or configured test system
 is currently available for this project. Native GEM rendering, real STiNG /
@@ -139,7 +139,7 @@ Use compatible MiNTLib/GEMlib archives and standard 32-bit int ABI; do not add
 The shared engine remains conservative C. Output directories:
 `build/atari/sting/`, `mintnet/`, `mintnet060/`, each with BITSKIM.PRG and relink
 objects. Packaging verifies source/artifact provenance and TOS PRG magic, and
-creates three `outputs/BitSkim-0.1-Atari-*.zip` files with checksums.
+creates three `outputs/BitSkim-0.2-Atari-*.zip` files with checksums.
 
 The `RELINK` directory contains own-code objects, full BitSkim source, library
 source snapshots, original library build recipes, notices and a relink script.

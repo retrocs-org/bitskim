@@ -1,4 +1,4 @@
-# Amiga preferences and ARexx — BitSkim 0.1
+# Amiga preferences and ARexx — BitSkim 0.2
 
 Project repository: [retrocs-org/bitskim](https://github.com/retrocs-org/bitskim). Website: [bitskim.retrocs.org](https://bitskim.retrocs.org).
 
@@ -20,7 +20,7 @@ Use `OPTIONS RESULTS` and `ADDRESS BITSKIM` in a script. Return codes: 0 success
 
 | Command | Result or action |
 |---|---|
-| `VERSION` | `0.1` |
+| `VERSION` | `0.2` |
 | `STATUS` | Space-separated numeric KEY=VALUE fields: ACTIVE, INCOMING, AWAITING, ICONIFIED, RECEIVING, VISIBLE, PORT, PEERS, BYTES, TOTAL, RELOAD, BPS (bytes/second; zero inactive/unmeasured) |
 | `PEER index` | Zero-based peer: `IPv4:port name`; name is the remainder and may contain spaces |
 | `SHOW` / `HIDE` | Restore window / iconify with Workbench AppIcon |

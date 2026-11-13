@@ -7,7 +7,7 @@ $dir = Join-Path ([IO.Path]::GetTempPath()) ('BitSkimInstaller-' + [guid]::NewGu
 $p = Start-Process -FilePath $Setup -ArgumentList ('/S /D=' + $dir) -PassThru -Wait
 if ($p.ExitCode -ne 0) { throw "Installation failed: $($p.ExitCode)" }
 if (!(Test-Path "$dir\BitSkim.exe") -or !(Test-Path "$dir\Uninstall.exe")) { throw 'Missing installed files' }
-if ((Get-ItemProperty $key).DisplayVersion -ne '0.1') { throw 'Wrong registered version' }
+if ((Get-ItemProperty $key).DisplayVersion -ne '0.2') { throw 'Wrong registered version' }
 $sentinel = Join-Path $dir 'Keep-me.txt'
 Set-Content $sentinel 'Preserve unknown files'
 $p = Start-Process -FilePath $Setup -ArgumentList ('/S /D=' + $dir) -PassThru -Wait
@@ -20,4 +20,4 @@ $menu = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::Pro
 if (Test-Path $menu) { throw 'Uninstaller left the test Start Menu folder' }
 # Only this generated, disposable test directory is cleaned up.
 Remove-Item -LiteralPath $dir -Recurse -Force
-Write-Output 'PASS: per-user install, 0.1 registration, update, uninstall, shortcuts and unknown-file preservation; live BitSkim untouched.'
+Write-Output 'PASS: per-user install, 0.2 registration, update, uninstall, shortcuts and unknown-file preservation; live BitSkim untouched.'

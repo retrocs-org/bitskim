@@ -1,4 +1,4 @@
-# AmigaOS build and release — BitSkim 0.1
+# AmigaOS build and release — BitSkim 0.2
 
 ## Target and toolchain
 
@@ -34,12 +34,12 @@ make amiga-release
 
 The release script can also recognize this development workspace's local toolchain path; that is a convenience, not a dependency shipped in source. It builds only Amiga, verifies the payload and creates:
 
-- outputs/BitSkim-0.1.lha
-- outputs/BitSkim-0.1-AmigaOS.zip
-- outputs/BitSkim-0.1.lha.sha256 and updated SHA256SUMS
+- outputs/BitSkim-0.2.lha
+- outputs/BitSkim-0.2-AmigaOS.zip
+- outputs/BitSkim-0.2.lha.sha256 and updated SHA256SUMS
 - outputs/aminet/bitskim.readme.template, a non-submittable draft
 
-The ZIP and LHA share one manifest in scripts/amiga_release.py. Both contain the complete distribution, including installer, manual, licenses, ARexx examples, InstallAssets and the outer drawer icon. The LHA uses generic level-0 headers and LH5 compression (LH0 for files that do not compress). CRC testing, extraction and a full path/hash comparison run before accepting the output. Version remains 0.1.
+The ZIP and LHA share one manifest in scripts/amiga_release.py. Both contain the complete distribution, including installer, manual, licenses, ARexx examples, InstallAssets and the outer drawer icon. The LHA uses generic level-0 headers and LH5 compression (LH0 for files that do not compress). CRC testing, extraction and a full path/hash comparison run before accepting the output. Version remains 0.2.
 
 ### LHA tool requirements
 
@@ -69,7 +69,7 @@ Installer levels: Novice uses default paths and enables boot/immediate startup a
 
 ## Development Bin synchronization
 
-The release script also creates the complete source ZIP and `BitSkim-src.tar.gz`. Set `AMIGA_DEV_BIN` to the host directory mounted as Bin: to automatically refresh `Bin:BitSkim/`, `Bin:BitSkim.info`, `Bin:BitSkim-0.1.lha` and `Bin:BitSkim-src.tar.gz` after a release. A workspace-local `work/amiga-dev-bin.txt` can store the same path without committing a personal host path. This workspace uses that setting as the owner's requested after-each-change workflow.
+The release script also creates the complete source ZIP and `BitSkim-src.tar.gz`. Set `AMIGA_DEV_BIN` to the host directory mounted as Bin: to automatically refresh `Bin:BitSkim/`, `Bin:BitSkim.info`, `Bin:BitSkim-0.2.lha` and `Bin:BitSkim-src.tar.gz` after a release. A workspace-local `work/amiga-dev-bin.txt` can store the same path without committing a personal host path. This workspace uses that setting as the owner's requested after-each-change workflow.
 
 To sync already-current releases independently, run `python3 scripts/sync-amiga-bin.py --bin-dir '/path/to/AMIGA_DEV_BIN'`. It checks source/build provenance, archive checksums, ZIP contents and the LHA's embedded build record before copying, verifies written bytes and backs up replaced files under work/bin-sync-backups/. Existing application/drawer icon positions are retained while artwork and view flags update. Unknown Bin files/projects and system configuration are untouched. This updates the development distribution only; it does not install into the guest's SYS: directories or change WBStartup.
 

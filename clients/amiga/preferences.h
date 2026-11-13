@@ -62,7 +62,7 @@ static void pref_background(PrefEditor *e) {
 static void pref_draw(PrefEditor *e) {
     struct RastPort *rp=e->w->RPort; UWORD *p=e->pens,muted=e->editor_pens[3],text=e->editor_pens[2];
     SetAPen(rp,e->editor_pens[6]); Move(rp,148,27); Draw(rp,148,204);
-    pref_text(rp,16,203,muted,"BitSkim 0.1");
+    pref_text(rp,16,203,muted,"BitSkim 0.2");
     pref_text(rp,168,37,e->editor_pens[4],pref_sections[e->section]);
     if(e->section==0) {
         pref_text(rp,202,63,text,"Name");
@@ -77,7 +77,7 @@ static void pref_draw(PrefEditor *e) {
         pref_fill(rp,172,83,598,194,p[6]);
         pref_fill(rp,174,85,596,192,p[0]);
         pref_fill(rp,182,93,588,111,p[1]);
-        pref_text(rp,190,105,p[4],"BitSkim 0.1 - Preview");
+        pref_text(rp,190,105,p[4],"BitSkim 0.2 - Preview");
         pref_fill(rp,184,118,586,137,p[1]);
         pref_text(rp,192,130,p[2],"Amiga     Mac     PC");
         pref_text(rp,184,150,p[3],"example.txt    64 KiB / 128 KiB");
@@ -94,7 +94,7 @@ static void pref_draw(PrefEditor *e) {
         pref_text(rp,172,187,text,"Receive");
         pref_text(rp,172,209,muted,"Limits apply starting with the next file.");
     } else {
-        pref_text(rp,172,65,text,"BitSkim 0.1");
+        pref_text(rp,172,65,text,"BitSkim 0.2");
         pref_text(rp,172,86,muted,"Source repository:");
         pref_text(rp,172,104,text,"https://github.com/retrocs-org/bitskim");
         pref_text(rp,172,126,muted,"Website:");

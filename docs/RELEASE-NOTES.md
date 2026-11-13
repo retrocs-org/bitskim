@@ -1,4 +1,4 @@
-# BitSkim 0.1
+# BitSkim 0.2
 
 Direct local-network file sharing for macOS, Windows and AmigaOS, with experimental DOS, Atari TOS/MiNTNet, RISC OS and Windows Classic downloads.
 

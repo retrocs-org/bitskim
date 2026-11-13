@@ -9,7 +9,7 @@ guide_files=['BitSkim.guide','BitSkim.guide.info']
 shared_files=['BUILD-PROVENANCE.json','README.MD','LICENSE','CATPPUCCIN-LICENSE','THIRD-PARTY-NOTICES.MD','NOVADOCK-LICENSE','INSTALLATION.md','ARexx/README.MD','ARexx/NOVADOCK.md']
 shared_files+=['ARexx/'+p.name for p in sorted((ROOT/'examples/arexx').glob('*.rexx'))]
 legacy=['BitSkim.prefs-path','BitSkimPrefs.guide-path']
-script=r'''; BitSkim 0.1 - Commodore Installer V42+ (AmigaOS 3.x).
+script=r'''; BitSkim 0.2 - Commodore Installer V42+ (AmigaOS 3.x).
 ; Keep this script and StartInstaller in the unpacked distribution only.
 (set @app-name "BitSkim")
 (set @default-dest "SYS:Utilities")
@@ -284,7 +284,7 @@ script+=r''' ))
    (prompt "Enabling background boot launch") (help "Workbench does not wait for BitSkim to exit."))
   (if (= (exists "ENVARC:BitSkim/startup-owned") 0)
    (textfile (dest "ENVARC:BitSkim/startup-owned") (prompt "Recording startup ownership")
-    (help "Only this owned entry is removed by Uninstall.") (append "BitSkimStart 0.1")))
+    (help "Only this owned entry is removed by Uninstall.") (append "BitSkimStart 0.2")))
  ))
  (if (and (not #install-boot) #startup-owned)
  (

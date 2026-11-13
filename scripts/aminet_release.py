@@ -20,7 +20,7 @@ def contact(value):
 def readme(uploader,author='BitSkim contributors'):
     contact(uploader)
     if not author or len(author)>64 or any(ord(c)<32 or ord(c)>126 for c in author):raise ValueError('Author must be a short ASCII name')
-    headers=[('Short','Local network file sharing'),('Author',author),('Uploader',uploader),('Type',CATEGORY),('Version','0.1'),('Architecture','m68k-amigaos >= 3.0.0')]
+    headers=[('Short','Local network file sharing'),('Author',author),('Uploader',uploader),('Type',CATEGORY),('Version','0.2'),('Architecture','m68k-amigaos >= 3.0.0')]
     lines=[f'{key+":":14}{value}' for key,value in headers]
     paragraphs=[
       'BitSkim shares individual files between classic AmigaOS and modern computers on an IPv4 local network. This package contains the Amiga client, standalone Preferences, AmigaGuide documentation, Workbench icons and Installer script.',
@@ -31,7 +31,7 @@ def readme(uploader,author='BitSkim contributors'):
       'License: MIT, with separately attributed third-party components. See LICENSE and THIRD-PARTY-NOTICES.MD in the archive.',
       'Source: https://github.com/retrocs-org/bitskim',
       'Website: https://bitskim.retrocs.org',
-      'Version 0.1 is the initial public release. Review the included validation notes in the source repository for build versus runtime coverage.'
+      'Version 0.2 is the initial public release. Review the included validation notes in the source repository for build versus runtime coverage.'
     ]
     for paragraph in paragraphs:lines+=['']+textwrap.wrap(paragraph,78,break_long_words=False,break_on_hyphens=False)
     if any(len(line)>78 for line in lines):raise ValueError('Uploader/metadata line exceeds Aminet 78-column limit; shorten the uploader name')
@@ -39,8 +39,8 @@ def readme(uploader,author='BitSkim contributors'):
 
 def prepare(uploader,author='BitSkim contributors',root=ROOT):
     record=verify('amiga',root)
-    archive=root/'outputs/BitSkim-0.1.lha'
-    checksum=root/'outputs/BitSkim-0.1.lha.sha256'
+    archive=root/'outputs/BitSkim-0.2.lha'
+    checksum=root/'outputs/BitSkim-0.2.lha.sha256'
     checksum_words=checksum.read_text().split() if checksum.is_file() else []
     if not archive.is_file() or not checksum_words or checksum_words[0]!=digest(archive):
         raise ValueError('Build the verified LHA first with scripts/release-amiga.sh')
@@ -58,7 +58,7 @@ def prepare(uploader,author='BitSkim contributors',root=ROOT):
     if (folder/'upload-receipt.json').exists():raise ValueError('An upload receipt already exists. Review it before preparing another submission; archive that receipt manually first.')
     (folder/ARCHIVE).write_bytes(archive.read_bytes())
     with (folder/README).open('w',encoding='ascii',newline='\n') as stream:stream.write(text)
-    manifest={'version':'0.1','host':HOST,'directory':'/new','uploader':uploader,'category':CATEGORY,'source_sha256':record['source_sha256'],
+    manifest={'version':'0.2','host':HOST,'directory':'/new','uploader':uploader,'category':CATEGORY,'source_sha256':record['source_sha256'],
               'files':{name:digest(folder/name) for name in (ARCHIVE,README)}}
     (folder/'submission.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print('Prepared '+str(folder)+'; review bitskim.readme before an explicit upload.')
@@ -66,7 +66,7 @@ def prepare(uploader,author='BitSkim contributors',root=ROOT):
 
 def check(folder,root=ROOT):
     manifest=json.loads((folder/'submission.json').read_text())
-    if manifest['version']!='0.1' or manifest['host']!=HOST or manifest['directory']!='/new' or manifest['category']!=CATEGORY:raise ValueError('Unexpected Aminet destination or release metadata')
+    if manifest['version']!='0.2' or manifest['host']!=HOST or manifest['directory']!='/new' or manifest['category']!=CATEGORY:raise ValueError('Unexpected Aminet destination or release metadata')
     if set(manifest['files'])!={ARCHIVE,README}:raise ValueError('Unexpected upload file list')
     record=verify('amiga',root)
     if record['source_sha256']!=manifest['source_sha256']:raise ValueError('Submission belongs to a different source build')

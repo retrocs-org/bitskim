@@ -1,4 +1,4 @@
-/* BitSkim 0.1 - conservative RISC OS 3.1 Wimp client, APCS-26. */
+/* BitSkim 0.2 - conservative RISC OS 3.1 Wimp client, APCS-26. */
 #include "bitskim.h"
 #include <kernel.h>
 #include <swis.h>
@@ -51,7 +51,7 @@ static void copy(char *d,const char *s,size_t n) { strncpy(d,s?s:"",n-1); d[n-1]
 static int call(int swi,_kernel_swi_regs *r) { return _kernel_swi(swi,r,r)==NULL; }
 static void report(const char *s) {
     _kernel_oserror e; _kernel_swi_regs r;
-    e.errnum=0; copy(e.errmess,s,sizeof(e.errmess)); memset(&r,0,sizeof(r)); r.r[0]=PTR(&e); r.r[1]=1; r.r[2]=PTR("BitSkim 0.1"); call(Wimp_ReportError,&r);
+    e.errnum=0; copy(e.errmess,s,sizeof(e.errmess)); memset(&r,0,sizeof(r)); r.r[0]=PTR(&e); r.r[1]=1; r.r[2]=PTR("BitSkim 0.2"); call(Wimp_ReportError,&r);
 }
 static unsigned long ticks(void) { _kernel_swi_regs r; memset(&r,0,sizeof(r)); if(!call(OS_ReadMonotonicTime,&r)) return 0; return (unsigned long)r.r[0]; }
 static int native_to_unix(const char *s,char *out,size_t cap) { return __unixify_std(s,out,cap,-1)!=NULL; }
@@ -132,7 +132,7 @@ static int preferences_write(void) {
     if(fclose(f)) ok=0; return ok;
 }
 static void main_create(void) {
-    int i; make_window(&main_view,"BitSkim 0.1 - local file sharing",WIDTH,HEIGHT);
+    int i; make_window(&main_view,"BitSkim 0.2 - local file sharing",WIDTH,HEIGHT);
     make_icon(&main_view,20,12,1140,36,"NEARBY COMPUTERS - select a peer, then drop a Filer file",0);
     for(i=0;i<5;i++) peer_icons[i]=make_icon(&main_view,20,56+i*46,1060,40,"",BUTTON);
     make_icon(&main_view,1090,56,80,100,"Up",BUTTON); make_icon(&main_view,1090,176,80,100,"Down",BUTTON);

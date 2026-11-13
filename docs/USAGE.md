@@ -1,6 +1,6 @@
 # Using BitSkim
 
-Detailed controls and preferences for BitSkim 0.1. For installation and platform requirements, see [INSTALLATION.md](INSTALLATION.md).
+Detailed controls and preferences for BitSkim 0.2. For installation and platform requirements, see [INSTALLATION.md](INSTALLATION.md).
 
 ## Get started on a Mac
 

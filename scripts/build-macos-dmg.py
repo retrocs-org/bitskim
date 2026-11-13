@@ -5,7 +5,7 @@ import importlib.util,os,shutil,subprocess
 from ds_store import DSStore
 from build_provenance import begin,finish
 ROOT=Path(__file__).resolve().parents[1]
-assert (ROOT/'VERSION').read_text().strip()=='0.1'
+assert (ROOT/'VERSION').read_text().strip()=='0.2'
 begin('dmg',ROOT)
 app=ROOT/'build/macos/BitSkim.app'
 subprocess.run(['codesign','--verify','--deep','--strict',str(app)],check=True)
@@ -28,7 +28,7 @@ with DSStore.open(str(stage/'.DS_Store'),'w+') as d:
  d['.']['icvp']={'viewOptionsVersion':1,'backgroundType':1,'backgroundColorRed':layout.BACKGROUND[0],'backgroundColorGreen':layout.BACKGROUND[1],'backgroundColorBlue':layout.BACKGROUND[2],'iconSize':96.0,'textSize':13.0,'gridOffsetX':0.0,'gridOffsetY':0.0,'gridSpacing':100.0,'arrangeBy':'none','showIconPreview':False,'showItemInfo':False,'labelOnBottom':True,'scrollPositionX':0.0,'scrollPositionY':0.0}
  for name,location in layout.LOCATIONS.items():d[name]['Iloc']=location
 # makehybrid creates HFS metadata in user space; no virtual device mount is needed.
-raw=ROOT/'build/BitSkim-0.1-macOS-uncompressed.dmg';out=ROOT/'outputs/BitSkim-0.1-macOS-arm64.dmg';out.parent.mkdir(exist_ok=True)
+raw=ROOT/'build/BitSkim-0.2-macOS-uncompressed.dmg';out=ROOT/'outputs/BitSkim-0.2-macOS-arm64.dmg';out.parent.mkdir(exist_ok=True)
 subprocess.run(['hdiutil','makehybrid','-hfs','-hfs-volume-name',layout.VOLUME,'-hfs-openfolder',str(stage),'-ov','-o',str(raw),str(stage)],check=True)
 subprocess.run(['hdiutil','convert',str(raw),'-format','UDZO','-ov','-o',str(out)],check=True)
 subprocess.run(['hdiutil','verify',str(out)],check=True)

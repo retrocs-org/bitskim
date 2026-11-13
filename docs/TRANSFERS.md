@@ -1,4 +1,4 @@
-# Queues, optional encryption and resume — BitSkim 0.1
+# Queues, optional encryption and resume — BitSkim 0.2
 
 ## File queues
 
@@ -153,3 +153,14 @@ Each client provides separate send and receive limits in its Network preferences
 See [Transfer tools](TRANSFER-TOOLS.md) for destination-name adaptation, Rename/Skip/Replace decisions, negotiated disk verification, diagnostics, session history and verified device pairing.
 
 See [remembered folders, overall progress, cancellation and connection checks](TRANSFER-EXPERIENCE.MD) for current client behavior.
+
+
+## Version 0.2 verification and diagnostics
+
+Incoming files are checked against the sender's streaming CRC32, closed, reopened and read back before the temporary file is committed. This readback also applies to legacy senders; legacy peers receive the same completion frames as before. Readback work is bounded per event-loop tick. CRC32 detects accidental corruption; it does not authenticate a sender or protect plaintext transfers from deliberate modification.
+
+History distinguishes written-file verification from unconfirmed receiver disk verification and incomplete transfers. A new sender cannot claim that an older receiver performed readback unless that receiver advertises the disk-verification capability. Folder entries are not reported as verified file contents.
+
+Transfer tools show whether discovery searches are paused, probe attempts, valid peer packets and the age of the last peer packet. Probe counts record attempts, not confirmed network delivery. The existing connection test shows a local route address when available. Guest-network isolation, VPN routing and broadcast filtering can prevent discovery while a direct IPv4 connection still works.
+
+Modern peer details show receiving state, folder support, filename limits/mapping, written-file verification and encryption policy. These are discovery hints; capabilities are checked again on connection. Unknown profiles remain explicitly unknown. Retro transfer-tools diagnostics report negotiated compatibility where available.

@@ -1,4 +1,4 @@
-# RISC OS 3.x experimental port — BitSkim 0.1
+# RISC OS 3.x experimental port — BitSkim 0.2
 
 Project repository: [retrocs-org/bitskim](https://github.com/retrocs-org/bitskim). Website: [bitskim.retrocs.org](https://bitskim.retrocs.org).
 
@@ -44,7 +44,7 @@ For a configured SDK, the normal sequence is configure, make setup, build the C 
 
 The script builds both CPU variants on every invocation. Outputs are `build/riscos/arm2/!BitSkim/` and `build/riscos/strongarm/!BitSkim/`, with `main.o`, `bitskim.o`, `platform.o` and `riscos-file.o` alongside each application. It preserves the committed !Run/!Boot/!Sprites files and normalizes a compiler-produced !RunImage,ff8 filename to !RunImage.
 
-Building an AIF image does not attach the native filetype to an ordinary host filesystem file. Use the project's ZIP packaging to add Acorn filetype metadata. After building both RISC OS variants and refreshing the Amiga/source release, run `python3 scripts/package-riscos.py` with `RISCOS_SDK_SOURCE=/path/to/gccsdk295.tar.gz` if needed. This standalone packager does not require rebuilding unrelated clients. The combined `scripts/package.py` also uses the same RISC OS writer. It produces `outputs/BitSkim-0.1-RISCOS3-ARM2.zip` and `outputs/BitSkim-0.1-RISCOS3-StrongARM.zip`, including notices, source/relink material and build records. See [BUILDING.md](BUILDING.md) for optional-target freshness checks.
+Building an AIF image does not attach the native filetype to an ordinary host filesystem file. Use the project's ZIP packaging to add Acorn filetype metadata. After building both RISC OS variants and refreshing the Amiga/source release, run `python3 scripts/package-riscos.py` with `RISCOS_SDK_SOURCE=/path/to/gccsdk295.tar.gz` if needed. This standalone packager does not require rebuilding unrelated clients. The combined `scripts/package.py` also uses the same RISC OS writer. It produces `outputs/BitSkim-0.2-RISCOS3-ARM2.zip` and `outputs/BitSkim-0.2-RISCOS3-StrongARM.zip`, including notices, source/relink material and build records. See [BUILDING.md](BUILDING.md) for optional-target freshness checks.
 
 ### Source and relinking contents
 

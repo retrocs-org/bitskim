@@ -24,7 +24,7 @@ def write_source(out,targets=('amiga',),root=ROOT):
             if path.is_file() and not any(p in ('downloads','__pycache__','.DS_Store') for p in path.relative_to(root/folder).parts):
                 files['BitSkim/'+str(path.relative_to(root))]=path
     out=Path(out);out.mkdir(parents=True,exist_ok=True)
-    zipfile=out/'BitSkim-0.1-source.zip';tarfile_path=out/'BitSkim-src.tar.gz'
+    zipfile=out/'BitSkim-0.2-source.zip';tarfile_path=out/'BitSkim-src.tar.gz'
     with tempfile.TemporaryDirectory(dir=out) as temp:
         temp=Path(temp);zpath=temp/zipfile.name;tpath=temp/tarfile_path.name
         with ZipFile(zpath,'w',ZIP_DEFLATED) as z:

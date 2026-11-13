@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2 — In development
+
+- Written-file CRC32 readback verification for incoming files from legacy peers, without changing their receipt protocol.
+- Clearer verification results distinguishing successful readback, unconfirmed receiver verification and incomplete transfers.
+- Discovery activity counters, search state, last peer-packet age and network troubleshooting guidance.
+- Consistent peer compatibility hints for folders, filename limits, receiving state, verification and encryption.
+
 ## 0.1 — Initial release
 
 - Direct file sharing between native macOS, Windows and AmigaOS clients, with experimental DOS, Atari TOS/MiNTNet, RISC OS and Windows Classic clients.

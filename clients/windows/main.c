@@ -1,4 +1,4 @@
-/* BitSkim 0.1: native Windows 10 x64 desktop client. */
+/* BitSkim 0.2: native Windows 10 x64 desktop client. */
 #ifndef UNICODE
 #define UNICODE
 #endif
@@ -89,7 +89,7 @@ static int S(int n) { return MulDiv(n,dpi,96); }
 static void text(HWND w,const wchar_t *s) { SetWindowTextW(w,s); }
 static int utf8(const wchar_t *s,char *out,int cap) { return WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,s,-1,out,cap,NULL,NULL)!=0; }
 static void utf16(const char *s,wchar_t *out,int cap) { if(!MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s,-1,out,cap)) lstrcpynW(out,L"Unrepresentable text",cap); }
-static void error_box(HWND owner,const wchar_t *message) { MessageBoxW(owner,message,L"BitSkim 0.1",MB_OK|MB_ICONEXCLAMATION); }
+static void error_box(HWND owner,const wchar_t *message) { MessageBoxW(owner,message,L"BitSkim 0.2",MB_OK|MB_ICONEXCLAMATION); }
 static void core_error(void) { wchar_t message[512]; utf16(bs_last_error(client),message,512); error_box(main_window,message); }
 static int theme_for(HWND owner) { return (prefs_window && (owner==prefs_window || GetParent(owner)==prefs_window))?draft.theme:prefs.theme; }
 static HWND control(HWND parent,const wchar_t *cls,const wchar_t *label,DWORD style,int id) {
@@ -158,7 +158,7 @@ static void update_tray(void) {
     if(prefs.tray && !tray_added) {
         ZeroMemory(&tray_data,sizeof tray_data); tray_data.cbSize=sizeof tray_data; tray_data.hWnd=main_window; tray_data.uID=1;
         tray_data.uFlags=NIF_ICON|NIF_MESSAGE|NIF_TIP; tray_data.uCallbackMessage=WM_TRAY; tray_data.hIcon=app_icon;
-        lstrcpynW(tray_data.szTip,L"BitSkim 0.1 - local file sharing",128); tray_added=Shell_NotifyIconW(NIM_ADD,&tray_data)!=FALSE;
+        lstrcpynW(tray_data.szTip,L"BitSkim 0.2 - local file sharing",128); tray_added=Shell_NotifyIconW(NIM_ADD,&tray_data)!=FALSE;
     } else if(!prefs.tray && tray_added) { Shell_NotifyIconW(NIM_DELETE,&tray_data); tray_added=0; }
 }
 static void show_main(void) { ShowWindow(main_window,SW_RESTORE); SetForegroundWindow(main_window); }
@@ -588,7 +588,7 @@ static void build_page(void) {
         w=page_control(L"EDIT",number,WS_TABSTOP|WS_BORDER|ES_NUMBER,PREF_RECEIVE_LIMIT,330,144,180,28);SendMessageW(w,EM_SETLIMITTEXT,7,0);
         page_control(L"STATIC",L"0 = Unlimited. File contents only; limits start with the next file. Receive caps require an updated sender.",0,0,170,198,370,86);
     } else {
-        page_control(L"STATIC",L"BitSkim 0.1\r\n\r\nLocal file sharing for modern and retro computers.\r\n\r\nTCP/UDP 46440 - optional TLS",0,0,170,68,370,108);
+        page_control(L"STATIC",L"BitSkim 0.2\r\n\r\nLocal file sharing for modern and retro computers.\r\n\r\nTCP/UDP 46440 - optional TLS",0,0,170,68,370,108);
         page_control(L"BUTTON",L"github.com/retrocs-org/bitskim",WS_TABSTOP|BS_OWNERDRAW,PREF_GITHUB,170,188,370,28);
         page_control(L"BUTTON",L"bitskim.retrocs.org",WS_TABSTOP|BS_OWNERDRAW,PREF_WEBSITE,170,224,370,28);
         page_control(L"STATIC",L"Website planned for a future launch.\r\nMIT license; Catppuccin MIT notices included.",0,0,170,264,370,48);
@@ -739,12 +739,13 @@ static LRESULT CALLBACK main_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
         if(header->idFrom==ID_PEERS) {
             if(header->code==NM_CUSTOMDRAW) return draw_peer_tile((NMLVCUSTOMDRAW *)lp);
             if(header->code==LVN_GETINFOTIPW) {
-                NMLVGETINFOTIPW *tip=(NMLVGETINFOTIPW *)lp;BSCapabilities caps;
-                if(tip->iItem>=0 && tip->iItem<displayed_count && bs_peer_capabilities(client,displayed_peers[tip->iItem].id,&caps)) {
-                    swprintf(tip->pszText,tip->cchTextMax,L"%ls · max file %lu bytes · wire name %u UTF-8 bytes · local name %u bytes · collection %lu files\n%ls · %ls · %ls",
-                      caps.security_mode==2?L"Force encryption":caps.security_mode==1?L"Prefer encryption":L"Encryption disabled",caps.max_receive_file,caps.wire_name_bytes,caps.local_name_bytes,caps.collection_files,
-                      caps.receive_features&BS_CAP_COLLECTION?L"Multiple files":L"Single-file approval",caps.receive_features&BS_CAP_RESUME?L"Resume available":L"No resume",L"No active-file pause or folders");
-                } else lstrcpynW(tip->pszText,L"Capabilities are checked when connecting.",tip->cchTextMax);
+                NMLVGETINFOTIPW *tip=(NMLVGETINFOTIPW *)lp;char summary[512];wchar_t detail[512];
+                if(tip->iItem>=0 && tip->iItem<displayed_count) {
+                    bs_peer_summary(client,displayed_peers[tip->iItem].id,summary,sizeof summary);
+                    utf16(summary,detail,512);
+                    lstrcpynW(tip->pszText,detail,tip->cchTextMax);
+                }
+
             }
             if(header->code==LVN_ITEMCHANGED) { NMLISTVIEW *change=(NMLISTVIEW *)lp; if((change->uNewState&LVIS_SELECTED) && !(change->uOldState&LVIS_SELECTED)) text(ip_edit,L""); }
             if(header->code==NM_DBLCLK) { if(ListView_GetNextItem(peer_list,-1,LVNI_SELECTED)>=0) send_file(NULL); }
@@ -761,7 +762,7 @@ static LRESULT CALLBACK main_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
         PAINTSTRUCT paint; RECT r,heading,sub; HDC dc=BeginPaint(w,&paint); const WinTheme *t=&win_themes[prefs.theme]; int h;
         GetClientRect(w,&r); FillRect(dc,&r,base_brush[prefs.theme]); h=MulDiv(r.bottom,96,dpi);
         DrawIconEx(dc,S(20),S(18),app_icon,S(32),S(32),0,NULL,DI_NORMAL);
-        heading=(RECT){S(64),S(12),r.right-S(124),S(56)}; SelectObject(dc,title_font); draw_text(dc,L"BitSkim 0.1",heading,t->text,DT_SINGLELINE|DT_VCENTER);
+        heading=(RECT){S(64),S(12),r.right-S(124),S(56)}; SelectObject(dc,title_font); draw_text(dc,L"BitSkim 0.2",heading,t->text,DT_SINGLELINE|DT_VCENTER);
         SelectObject(dc,font); sub=(RECT){S(20),S(62),r.right-S(20),S(88)}; draw_text(dc,L"Nearby computers   /   Drop a file onto a computer",sub,t->muted,DT_SINGLELINE|DT_VCENTER|DT_END_ELLIPSIS);
         sub=(RECT){S(20),S(h-224),r.right-S(20),S(h-202)}; draw_text(dc,L"Or connect by IP address",sub,t->muted,DT_SINGLELINE|DT_VCENTER|DT_END_ELLIPSIS);
         sub=(RECT){S(20),S(h-28),r.right-S(20),S(h-8)};
@@ -786,7 +787,7 @@ int WINAPI wWinMain(HINSTANCE h,HINSTANCE previous,PWSTR command,int show) {
         if(ok) { bs_platform_cleanup(); ok=check_peer_view(); }
         return ok?0:1;
     }
-    mutex=CreateMutexW(NULL,FALSE,L"Local\\BitSkim0.1"); if(mutex && GetLastError()==ERROR_ALREADY_EXISTS) { error_box(NULL,L"BitSkim is already running. Check the notification area."); CloseHandle(mutex); return 1; }
+    mutex=CreateMutexW(NULL,FALSE,L"Local\\BitSkim0.2"); if(mutex && GetLastError()==ERROR_ALREADY_EXISTS) { error_box(NULL,L"BitSkim is already running. Check the notification area."); CloseHandle(mutex); return 1; }
     OleInitialize(NULL); InitCommonControlsEx(&common);
     if(!bs_platform_init()) { error_box(NULL,L"Windows networking could not be initialized."); return 1; }
     load_preferences();

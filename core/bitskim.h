@@ -1,7 +1,7 @@
 #ifndef BITSKIM_H
 #define BITSKIM_H
 #include <stddef.h>
-#define BS_VERSION "0.1"
+#define BS_VERSION "0.2"
 #define BS_PORT 46440
 #define BS_NAME_MAX 63
 #define BS_PATH_MAX 1023
@@ -164,6 +164,8 @@ unsigned bs_peer_features(const BSClient *,const char *id);
 void bs_local_capabilities(const BSClient *,BSCapabilities *);
 int bs_peer_capabilities(const BSClient *,const char *id,BSCapabilities *);
 int bs_transfer_capabilities(const BSClient *,BSCapabilities *);
+/* Discovery hints, not authenticated identity or a live compatibility guarantee. */
+int bs_peer_summary(const BSClient *,const char *id,char *out,size_t capacity);
 int bs_resume_enable(BSClient *,int enabled);
 int bs_resume_available(BSClient *,const char *destination);
 int bs_accept_resumable(BSClient *,const char *destination,int restart);

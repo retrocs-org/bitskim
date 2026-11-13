@@ -1,4 +1,4 @@
-# Installing BitSkim 0.1
+# Installing BitSkim 0.2
 
 Repository: https://github.com/retrocs-org/bitskim
 Website: https://bitskim.retrocs.org
@@ -31,17 +31,17 @@ Installation locations remain recorded in `ENV:BitSkim/` and `ENVARC:BitSkim/` a
 
 Without records, standard older layouts are detected and their documented locations reused automatically; custom unregistered volumes are not disk-scanned. A leftover BitSkim drawer that blocks the direct executable path is renamed to BitSkim.previous, with its icon and all contents preserved, before installation. If that backup name already exists, the installer stops without overwriting it. Run from the separate unpacked distribution, not from the drawer being preserved. Incomplete/invalid installation records stop the operation rather than silently permitting a second install.
 
-Keep the unpacked package for maintenance. Uninstall removes known executables/shared documentation/manual files and installation-location records. It preserves ENV:/ENVARC: settings and their icons, old shared Config, unknown resources, received files and drawers. There is no recursive deletion. Installer tools stay in the distribution. Version remains 0.1.
+Keep the unpacked package for maintenance. Uninstall removes known executables/shared documentation/manual files and installation-location records. It preserves ENV:/ENVARC: settings and their icons, old shared Config, unknown resources, received files and drawers. There is no recursive deletion. Installer tools stay in the distribution. Version remains 0.2.
 
 ## Windows 10 x64 and newer
 
-Run **BitSkim-0.1-Windows10-x64-Setup.exe**. It installs for all users, normally in `%ProgramFiles%\BitSkim`, creates Start Menu shortcuts and registers in Installed Apps. A desktop shortcut is optional. Administrator approval is requested for installation/removal. The app runs without elevation and stores each user’s settings in `%APPDATA%\BitSkim\preferences.ini`. Close BitSkim using Quit in its tray menu before installing, updating or removing. No login item or firewall rule is installed. Launch BitSkim from the finish page or Start Menu and allow network access if Windows asks.
+Run **BitSkim-0.2-Windows10-x64-Setup.exe**. It installs for all users, normally in `%ProgramFiles%\BitSkim`, creates Start Menu shortcuts and registers in Installed Apps. A desktop shortcut is optional. Administrator approval is requested for installation/removal. The app runs without elevation and stores each user’s settings in `%APPDATA%\BitSkim\preferences.ini`. Close BitSkim using Quit in its tray menu before installing, updating or removing. No login item or firewall rule is installed. Launch BitSkim from the finish page or Start Menu and allow network access if Windows asks.
 
 Use Installed Apps or **Uninstall BitSkim** in the Start Menu to remove it. The uninstaller removes only its known files and shortcuts; `%APPDATA%\BitSkim\preferences.ini`, received files and unknown installation-folder files are preserved. The portable ZIP remains available for users who do not want installation. The setup executable and app are unsigned; Windows may show a publisher/reputation prompt. Code signing remains a release task.
 
 ## macOS / Apple silicon
 
-Open **BitSkim-0.1-macOS-arm64.dmg** and drag **BitSkim.app** onto the **Applications** shortcut. Once copying finishes, eject the image and launch BitSkim from Applications. Quit the running app before replacing it with an update. If you previously pinned a different copy in the Dock, launch the installed copy and update that Dock shortcut.
+Open **BitSkim-0.2-macOS-arm64.dmg** and drag **BitSkim.app** onto the **Applications** shortcut. Once copying finishes, eject the image and launch BitSkim from Applications. Quit the running app before replacing it with an update. If you previously pinned a different copy in the Dock, launch the installed copy and update that Dock shortcut.
 
 macOS 13 or later is required. The public Mac release app and DMG are Developer ID signed and notarized, with stapled tickets. Local developer builds may instead be ad-hoc signed. Fresh-machine and older-macOS compatibility remain separate checks. The DMG does not register a login item or change permissions/firewall settings. To remove the app, quit it and move it from Applications to the Trash. Preferences and received files remain. The ZIP is still supplied as an alternative.
 
@@ -55,7 +55,7 @@ Windows setup requires NSIS (makensis): run `scripts/build-windows-installer.sh`
 
 The DMG requires macOS hdiutil, Python 3 with ds-store. Run `python3 scripts/build-macos-dmg.py`. Its Finder layout settings and build script live in installers/macos and scripts. The image contains the unchanged signed application bundle, Applications shortcut and local installation/license documents. No app is installed by building the image.
 
-Finally run `python3 scripts/package.py` to refresh portable ZIPs, source, website downloads and SHA256SUMS. It includes already-built setup/DMG artifacts when present. Version remains 0.1. See VALIDATION.md for build checks versus actual native installation testing.
+Finally run `python3 scripts/package.py` to refresh portable ZIPs, source, website downloads and SHA256SUMS. It includes already-built setup/DMG artifacts when present. Version remains 0.2. See VALIDATION.md for build checks versus actual native installation testing.
 
 ## Matching source and builds
 
@@ -67,9 +67,9 @@ The Amiga package includes `BitSkim.guide`, a linked AmigaGuide manual. Double-c
 
 ## One-command Amiga release
 
-`./scripts/release-amiga.sh` compiles and packages the Amiga distribution into `outputs/BitSkim-0.1.lha`, the matching `BitSkim-0.1-AmigaOS.zip`, `BitSkim-0.1.lha.sha256` and updated SHA256SUMS. Use `AMIGA_CC=/path/to/m68k-amigaos-gcc` to select a compiler. `LHA` selects a LHa-for-UNIX writer; absent one, a pinned/checksummed upstream build is created locally under work/ (see AMIGA.md for prerequisites). An installed Lhasa reader alone cannot create archives.
+`./scripts/release-amiga.sh` compiles and packages the Amiga distribution into `outputs/BitSkim-0.2.lha`, the matching `BitSkim-0.2-AmigaOS.zip`, `BitSkim-0.2.lha.sha256` and updated SHA256SUMS. Use `AMIGA_CC=/path/to/m68k-amigaos-gcc` to select a compiler. `LHA` selects a LHa-for-UNIX writer; absent one, a pinned/checksummed upstream build is created locally under work/ (see AMIGA.md for prerequisites). An installed Lhasa reader alone cannot create archives.
 
-On Amiga, extract the complete LHA with a compatible LhA tool (for example `lha x BitSkim-0.1.lha RAM:`), keeping `BitSkim.info` beside the extracted `BitSkim` drawer. Open the drawer and run Install-BitSkim. The release script changes no system configuration, performs no guest installation and does not publish a release. It retains version 0.1.
+On Amiga, extract the complete LHA with a compatible LhA tool (for example `lha x BitSkim-0.2.lha RAM:`), keeping `BitSkim.info` beside the extracted `BitSkim` drawer. Open the drawer and run Install-BitSkim. The release script changes no system configuration, performs no guest installation and does not publish a release. It retains version 0.2.
 
 The distribution drawer icon stores an explicit icons-only/icon-view preference. Keep the outer BitSkim.info beside the extracted BitSkim drawer to apply it. Workbench shows entries with associated .info files by default; helpers, licenses and installation assets remain in the archive and can be viewed with Show All Files. An already-open drawer or a previously retained/snapshotted icon may keep the user's existing view until the new drawer icon is used.
 

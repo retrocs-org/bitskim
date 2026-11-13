@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
-[ "$(cat VERSION)" = "0.1" ] || exit 1
+[ "$(cat VERSION)" = "0.2" ] || exit 1
 if [ -z "${MAKENSIS:-}" ]; then
  if command -v makensis >/dev/null 2>&1; then MAKENSIS=makensis
  else
@@ -17,7 +17,7 @@ python3 scripts/build_provenance.py finish setup-legacy --tool "$MAKENSIS" --ver
 python3 - <<'PY'
 from pathlib import Path
 import hashlib
-p=Path('outputs/BitSkim-0.1-Windows-Classic-x86-Setup.exe')
+p=Path('outputs/BitSkim-0.2-Windows-Classic-x86-Setup.exe')
 p.with_suffix('.exe.sha256').write_text(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n')
 PY
 

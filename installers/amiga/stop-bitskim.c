@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 long __stack=32768;
-const char bitskim_stop_version[]="$VER: StopBitSkim 0.1 (02.11.2026)";
+const char bitskim_stop_version[]="$VER: StopBitSkim 0.2 (02.11.2026)";
 static int task_present(struct Task *task) {
     struct Node *node;
     if(SysBase->ThisTask==task)return 1;

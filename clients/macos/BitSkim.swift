@@ -277,7 +277,7 @@ final class ClientModel: ObservableObject {
             }
         }
         let now = Date()
-        guard now.timeIntervalSince(lastDisplayUpdate) >= 0.1 else { return }
+        guard now.timeIntervalSince(lastDisplayUpdate) >= 0.2 else { return }
         lastDisplayUpdate = now
         if bs_completion_notice(engine, &completionSerial) != 0 && completionSound { NSSound.beep() }
         queued = Int(bs_queue_count(engine)); waiting = Int(bs_queue_waiting(engine)); queuePaused = bs_queue_paused(engine) != 0
@@ -310,12 +310,9 @@ final class ClientModel: ObservableObject {
         var found: [Peer] = []
         for index in 0..<bs_peer_count(engine) {
             let p = bs_peer(engine, index)!.pointee
-            var caps = BSCapabilities()
-            var limits = "Capabilities checked when connecting"
-            if bs_peer_capabilities(engine, text(p.id), &caps) != 0 {
-                let mode = caps.security_mode == 2 ? "Force encryption" : caps.security_mode == 1 ? "Prefer encryption" : "Encryption disabled"
-                limits = "\(caps.receive_features & UInt(BS_CAP_TLS) != 0 ? "TLS supported" : "Plaintext build") · \(mode) · max file \(byteSize(caps.max_receive_file)) · wire name \(caps.wire_name_bytes) UTF-8 bytes · local name \(caps.local_name_bytes) bytes · collection \(caps.collection_files) files"
-            }
+            var summary = [CChar](repeating: 0, count: 512)
+            _ = bs_peer_summary(engine, text(p.id), &summary, summary.count)
+            let limits = String(cString: summary)
             found.append(Peer(id: text(p.id) + ":" + text(p.address), name: text(p.name), platform: text(p.platform), address: text(p.address), port: p.port, features: bs_peer_features(engine, text(p.id)), receiverLimits: limits))
         }
         found.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -608,7 +605,7 @@ struct MainView: View {
             HStack(spacing: 8) {
                 Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 30, height: 30)
                 Text("BitSkim").font(.system(size: 17, weight: .semibold, design: .rounded))
-                Text("0.1").font(.system(size: 9, design: .monospaced)).foregroundStyle(model.theme.muted)
+                Text("0.2").font(.system(size: 9, design: .monospaced)).foregroundStyle(model.theme.muted)
                 Spacer()
                 if model.keepInMenuBar {
                     Button { model.hideWindow?() } label: { Image(systemName: "menubar.arrow.up.rectangle") }
@@ -760,12 +757,12 @@ struct PreferencesView: View {
                         Text("Direct local transfers. No account required.")
                             .font(.system(size: 10)).foregroundStyle(model.theme.muted)
                     }.padding(6).frame(maxWidth: .infinity, alignment: .leading)
-                } label: { Text("About BitSkim 0.1").font(.system(size: 11, weight: .semibold)) }
+                } label: { Text("About BitSkim 0.2").font(.system(size: 11, weight: .semibold)) }
             }.padding(18).font(.system(size: 11))
         }
         Divider()
         HStack {
-            Text("BitSkim 0.1").font(.system(size: 9)).foregroundStyle(model.theme.muted)
+            Text("BitSkim 0.2").font(.system(size: 9)).foregroundStyle(model.theme.muted)
             Spacer()
             Button("Save Preferences") { model.savePreferences() }.keyboardShortcut("s", modifiers: .command)
             Button("Close") { model.savePreferences(); close() }
