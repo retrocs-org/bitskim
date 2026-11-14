@@ -2,6 +2,8 @@
 
 ## 0.2 — In development
 
+- Windows Transfer tools follows the selected theme, retains report scroll position and selection during live updates, and avoids repainting unchanged labels.
+
 - Windows receivers no longer ask for a second confirmation when destination free space is known to be sufficient; insufficient and unknown-space handling remains explicit.
 
 - Windows startup and Transfer tools layout fitted to high-DPI desktop work areas; scaled controls and reachable footer actions.

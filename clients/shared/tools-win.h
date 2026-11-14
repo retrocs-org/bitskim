@@ -15,8 +15,75 @@ static void bs_tools_convert(const char *source,TCHAR *target,int count){
 }
 static int bs_tools_find(void){int i;BSHistoryItem h;for(i=0;i<bs_history_count(bs_tools_client);i++)if(bs_history_item(bs_tools_client,i,&h) && h.serial==bs_tools_serial)return i;return -1;}
 static void bs_tools_pick(int index){BSHistoryItem h;if(bs_history_item(bs_tools_client,index,&h))bs_tools_serial=h.serial;}
-static void bs_tools_refresh(void){char report[4096],history[2048],code[20],normalized[4096];TCHAR native[4096],old[4096];size_t used,i,j=0;int peer_index;char compatibility[512];const BSPeer *peer;
-    bs_diagnostics(bs_tools_client,report,sizeof report);used=strlen(report);bs_tools_index=bs_tools_find();
+/* Replacing edit text resets its viewport; restore it after live diagnostics. */
+static void bs_tools_update_report(const TCHAR *text){
+    TCHAR old[4096];DWORD start=0,end=0;int first,now;
+    GetWindowText(bs_tools_report,old,4096);if(!_tcscmp(old,text))return;
+    first=(int)SendMessage(bs_tools_report,EM_GETFIRSTVISIBLELINE,0,0);
+    SendMessage(bs_tools_report,EM_GETSEL,(WPARAM)&start,(LPARAM)&end);
+    SendMessage(bs_tools_report,WM_SETREDRAW,FALSE,0);
+    SetWindowText(bs_tools_report,text);
+    SendMessage(bs_tools_report,EM_SETSEL,start,end);
+    now=(int)SendMessage(bs_tools_report,EM_GETFIRSTVISIBLELINE,0,0);
+    SendMessage(bs_tools_report,EM_LINESCROLL,0,first-now);
+    SendMessage(bs_tools_report,WM_SETREDRAW,TRUE,0);
+    InvalidateRect(bs_tools_report,NULL,FALSE);
+}
+static const WinTheme *bs_tools_palette;
+static HBRUSH bs_tools_base,bs_tools_surface,bs_tools_accent;
+static void bs_tools_free_theme(void){
+    if(bs_tools_base)DeleteObject(bs_tools_base);
+    if(bs_tools_surface)DeleteObject(bs_tools_surface);
+    if(bs_tools_accent)DeleteObject(bs_tools_accent);
+    bs_tools_base=bs_tools_surface=bs_tools_accent=NULL;bs_tools_palette=NULL;
+}
+static void bs_tools_use_palette(const WinTheme *palette){
+    if(palette==bs_tools_palette)return;
+    bs_tools_free_theme();bs_tools_palette=palette;
+    bs_tools_base=CreateSolidBrush(palette->base);bs_tools_surface=CreateSolidBrush(palette->surface);bs_tools_accent=CreateSolidBrush(palette->accent);
+}
+static BOOL CALLBACK bs_tools_repaint_child(HWND child,LPARAM ignored){(void)ignored;InvalidateRect(child,NULL,TRUE);return TRUE;}
+static void bs_tools_apply_theme(void){
+#ifdef BS_WINDOWS_LEGACY
+    const WinTheme *palette=theme();
+#else
+    const WinTheme *palette=&win_themes[prefs.theme];
+#endif
+    if(palette==bs_tools_palette)return;
+    bs_tools_use_palette(palette);
+    if(bs_tools_window){
+#ifndef BS_WINDOWS_LEGACY
+        BOOL dark=palette->dark;DwmSetWindowAttribute(bs_tools_window,20,&dark,sizeof dark);
+#endif
+        InvalidateRect(bs_tools_window,NULL,TRUE);EnumChildWindows(bs_tools_window,bs_tools_repaint_child,0);
+    }
+}
+static LRESULT bs_tools_paint(HWND w,UINT msg,WPARAM wp,LPARAM lp,int *handled){
+    const WinTheme *palette=bs_tools_palette;*handled=1;
+    if(!palette){*handled=0;return 0;}
+    if(msg==WM_ERASEBKGND){RECT rect;GetClientRect(w,&rect);FillRect((HDC)wp,&rect,bs_tools_base);return 1;}
+    if(msg==WM_CTLCOLORSTATIC || msg==WM_CTLCOLOREDIT || msg==WM_CTLCOLORLISTBOX || msg==WM_CTLCOLORBTN){
+        HWND child=(HWND)lp;int surface=msg!=WM_CTLCOLORSTATIC || child==bs_tools_report || child==bs_tools_policy;
+        SetTextColor((HDC)wp,palette->text);SetBkColor((HDC)wp,surface?palette->surface:palette->base);
+        return (LRESULT)(surface?bs_tools_surface:bs_tools_base);
+    }
+    if(msg==WM_DRAWITEM){
+        DRAWITEMSTRUCT *item=(DRAWITEMSTRUCT *)lp;RECT rect=item->rcItem;TCHAR label[256];int selected=(item->itemState&ODS_SELECTED)!=0;
+        HGDIOBJ old_font=SelectObject(item->hDC,GetStockObject(DEFAULT_GUI_FONT));
+        FillRect(item->hDC,&rect,selected?bs_tools_accent:bs_tools_surface);
+        SetBkMode(item->hDC,TRANSPARENT);SetTextColor(item->hDC,(item->itemState&ODS_DISABLED)?palette->muted:selected?palette->base:palette->text);
+        label[0]=0;
+        if(item->CtlType==ODT_COMBOBOX){int index=(int)item->itemID;if(index<0)index=(int)SendMessage(bs_tools_policy,CB_GETCURSEL,0,0);if(index>=0)SendMessage(bs_tools_policy,CB_GETLBTEXT,index,(LPARAM)label);rect.left+=bs_tools_scale(8);}
+        else GetWindowText(item->hwndItem,label,256);
+        DrawText(item->hDC,label,-1,&rect,DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS|(item->CtlType==ODT_COMBOBOX?DT_LEFT:DT_CENTER));
+        if(item->itemState&ODS_FOCUS){InflateRect(&rect,-3,-3);DrawFocusRect(item->hDC,&rect);}
+        SelectObject(item->hDC,old_font);return TRUE;
+    }
+    if(msg==WM_MEASUREITEM){((MEASUREITEMSTRUCT *)lp)->itemHeight=bs_tools_scale(22);return TRUE;}
+    *handled=0;return 0;
+}
+static void bs_tools_refresh(void){char report[4096],history[2048],code[20],normalized[4096];TCHAR native[4096];size_t used,i,j=0;int peer_index;char compatibility[512];const BSPeer *peer;
+    bs_tools_apply_theme();bs_diagnostics(bs_tools_client,report,sizeof report);used=strlen(report);bs_tools_index=bs_tools_find();
     if(bs_tools_index>=0 && bs_history_text(bs_tools_client,bs_tools_index,history,sizeof history)){strncat(report,"\n\nRECENT TRANSFER\n",sizeof report-strlen(report)-1);strncat(report,history,sizeof report-strlen(report)-1);}else if(!used)strcpy(report,"No transfer history.");
     if(bs_peer_count(bs_tools_client))strncat(report,"\n\nNEARBY COMPATIBILITY (DISCOVERY HINTS)\n",sizeof report-strlen(report)-1);
     for(peer_index=0;peer_index<bs_peer_count(bs_tools_client);peer_index++){
@@ -27,10 +94,14 @@ static void bs_tools_refresh(void){char report[4096],history[2048],code[20],norm
         strncat(report,compatibility,sizeof report-strlen(report)-1);strncat(report,"\n",sizeof report-strlen(report)-1);
     }
     for(i=0;report[i] && j<sizeof normalized-2;i++){if(report[i]=='\n' && (!i || report[i-1]!='\r'))normalized[j++]='\r';normalized[j++]=report[i];}normalized[j]=0;
-    bs_tools_convert(normalized,native,4096);GetWindowText(bs_tools_report,old,4096);if(_tcscmp(native,old))SetWindowText(bs_tools_report,native);
-    if(bs_pairing_code(bs_tools_client,code)){char label[160];sprintf(label,"Compare both screens: %s   %s",code,bs_trust_status(bs_tools_client)==1?"(trusted identity matches)":"(not yet trusted)");bs_tools_convert(label,native,4096);SetWindowText(bs_tools_code,native);}else SetWindowText(bs_tools_code,TEXT("Pair during an unpaired TLS connection. Shared-key mode uses its saved key."));
+    bs_tools_convert(normalized,native,4096);bs_tools_update_report(native);
+    if(bs_pairing_code(bs_tools_client,code)){
+        char label[160];sprintf(label,"Compare both screens: %s   %s",code,bs_trust_status(bs_tools_client)==1?"(trusted identity matches)":"(not yet trusted)");bs_tools_convert(label,native,4096);
+    }else lstrcpy(native,TEXT("Pair during an unpaired TLS connection. Shared-key mode uses its saved key."));
+    {TCHAR old[256];GetWindowText(bs_tools_code,old,256);if(_tcscmp(old,native))SetWindowText(bs_tools_code,native);}
+
 }
-static HWND bs_tools_control(HWND parent,LPCTSTR kind,LPCTSTR text,DWORD style,int x,int y,int width,int height,int id){HWND h=CreateWindow(kind,text,WS_CHILD|WS_VISIBLE|style,bs_tools_scale(x),bs_tools_scale(y),bs_tools_scale(width),bs_tools_scale(height),parent,(HMENU)(INT_PTR)id,(HINSTANCE)GetWindowLongPtr(parent,GWLP_HINSTANCE),NULL);SendMessage(h,WM_SETFONT,(WPARAM)GetStockObject(DEFAULT_GUI_FONT),TRUE);return h;}
+static HWND bs_tools_control(HWND parent,LPCTSTR kind,LPCTSTR text,DWORD style,int x,int y,int width,int height,int id){HWND h;if(!lstrcmpi(kind,TEXT("BUTTON")))style=(style&~15UL)|BS_OWNERDRAW;h=CreateWindow(kind,text,WS_CHILD|WS_VISIBLE|style,bs_tools_scale(x),bs_tools_scale(y),bs_tools_scale(width),bs_tools_scale(height),parent,(HMENU)(INT_PTR)id,(HINSTANCE)GetWindowLongPtr(parent,GWLP_HINSTANCE),NULL);SendMessage(h,WM_SETFONT,(WPARAM)GetStockObject(DEFAULT_GUI_FONT),TRUE);return h;}
 static void bs_tools_layout(HWND w){
     RECT rect;int width,height,report_height,row;GetClientRect(w,&rect);
     width=MulDiv(rect.right,96,bs_tools_dpi);height=MulDiv(rect.bottom,96,bs_tools_dpi);
@@ -46,9 +117,10 @@ static void bs_tools_layout(HWND w){
     MoveWindow(bs_tools_address,bs_tools_scale(176),bs_tools_scale(height-42),bs_tools_scale(width-192),bs_tools_scale(26),TRUE);
 }
 static LRESULT CALLBACK bs_tools_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp){
+    int handled;LRESULT painted=bs_tools_paint(w,msg,wp,lp,&handled);if(handled)return painted;
     if(msg==WM_CREATE){
         bs_tools_control(w,TEXT("STATIC"),TEXT("Existing files (this session; applies to remaining collection files):"),0,16,12,560,20,0);
-        bs_tools_policy=bs_tools_control(w,TEXT("COMBOBOX"),TEXT(""),CBS_DROPDOWNLIST|WS_TABSTOP,16,36,560,110,1);
+        bs_tools_policy=bs_tools_control(w,TEXT("COMBOBOX"),TEXT(""),CBS_DROPDOWNLIST|CBS_OWNERDRAWFIXED|CBS_HASSTRINGS|WS_TABSTOP,16,36,560,110,1);
         SendMessage(bs_tools_policy,CB_ADDSTRING,0,(LPARAM)TEXT("Rename safely (default)"));SendMessage(bs_tools_policy,CB_ADDSTRING,0,(LPARAM)TEXT("Skip existing files"));SendMessage(bs_tools_policy,CB_ADDSTRING,0,(LPARAM)TEXT("Replace existing files"));SendMessage(bs_tools_policy,CB_SETCURSEL,bs_conflict_get(bs_tools_client),0);
         bs_tools_code=bs_tools_control(w,TEXT("STATIC"),TEXT(""),0,16,76,560,36,0);
         bs_tools_entry=bs_tools_control(w,TEXT("EDIT"),TEXT(""),WS_BORDER|WS_TABSTOP|ES_AUTOHSCROLL,16,120,220,26,2);SendMessage(bs_tools_entry,EM_SETLIMITTEXT,14,0);
@@ -76,13 +148,13 @@ static LRESULT CALLBACK bs_tools_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp){
         return 0;
     }
     if(msg==WM_CLOSE){DestroyWindow(w);return 0;}
-    if(msg==WM_DESTROY){KillTimer(w,1);bs_tools_window=NULL;return 0;}
+    if(msg==WM_DESTROY){KillTimer(w,1);bs_tools_window=NULL;bs_tools_free_theme();return 0;}
     return DefWindowProc(w,msg,wp,lp);
 }
 static void bs_tools_open(HWND owner,HINSTANCE instance,BSClient *client){
     WNDCLASS cls;RECT work,fit,client_rect;HDC dc;int width,height;
     if(bs_tools_window){SetForegroundWindow(bs_tools_window);return;}
-    bs_tools_client=client;bs_tools_serial=0;
+    bs_tools_client=client;bs_tools_serial=0;bs_tools_apply_theme();
     dc=GetDC(owner);bs_tools_dpi=GetDeviceCaps(dc,LOGPIXELSY);ReleaseDC(owner,dc);if(bs_tools_dpi<96)bs_tools_dpi=96;
     work.left=work.top=0;work.right=GetSystemMetrics(SM_CXSCREEN);work.bottom=GetSystemMetrics(SM_CYSCREEN);
     SystemParametersInfo(SPI_GETWORKAREA,0,&work,0);
@@ -90,13 +162,16 @@ static void bs_tools_open(HWND owner,HINSTANCE instance,BSClient *client){
     {MONITORINFO monitor;ZeroMemory(&monitor,sizeof monitor);monitor.cbSize=sizeof monitor;
      if(GetMonitorInfo(MonitorFromWindow(owner,MONITOR_DEFAULTTONEAREST),&monitor))work=monitor.rcWork;}
 #endif
-    memset(&cls,0,sizeof cls);cls.lpfnWndProc=bs_tools_proc;cls.hInstance=instance;cls.hCursor=LoadCursor(NULL,IDC_ARROW);cls.hbrBackground=(HBRUSH)(COLOR_BTNFACE+1);cls.lpszClassName=TEXT("BitSkimTransferTools");RegisterClass(&cls);
+    memset(&cls,0,sizeof cls);cls.lpfnWndProc=bs_tools_proc;cls.hInstance=instance;cls.hCursor=LoadCursor(NULL,IDC_ARROW);cls.hbrBackground=NULL;cls.lpszClassName=TEXT("BitSkimTransferTools");RegisterClass(&cls);
     /* Request a client size; include the caption/frame before fitting to the work area. */
     client_rect.left=client_rect.top=0;client_rect.right=bs_tools_scale(592);client_rect.bottom=bs_tools_scale(640);
     AdjustWindowRect(&client_rect,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,FALSE);
     width=client_rect.right-client_rect.left;height=client_rect.bottom-client_rect.top;
     fit=bs_window_fit(work,width,height);
     bs_tools_window=CreateWindow(cls.lpszClassName,TEXT("BitSkim - Transfer tools"),WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,fit.left,fit.top,fit.right-fit.left,fit.bottom-fit.top,owner,NULL,instance,NULL);
+#ifndef BS_WINDOWS_LEGACY
+    {BOOL dark=bs_tools_palette->dark;DwmSetWindowAttribute(bs_tools_window,20,&dark,sizeof dark);}
+#endif
     ShowWindow(bs_tools_window,SW_SHOW);
 }
 

@@ -24,7 +24,7 @@ static void check_app_startup(void) {
         else TerminateProcess(process.hProcess,1);
         CloseHandle(process.hThread); CloseHandle(process.hProcess);
     }
-    check(ok,"GUI executable loads and initializes Windows controls and networking");
+    check(ok,"GUI executable initializes controls, themed tools, stable scrolling and networking");
 }
 static BSClient *test_client(char id,unsigned short *port) {
     BSConfig config; int attempt;

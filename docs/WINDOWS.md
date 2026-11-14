@@ -14,6 +14,10 @@ Incoming files require approval and a save location by default. A successful fre
 
 TLS defaults to Prefer encryption. Preferences offer Disable encryption, Prefer encryption and Force encryption. Automatic TLS needs no copied key; an optional matching pairing key authenticates peers. Sender names remain unverified. Disk-backed queues transfer one file at a time, maximum 2 GiB minus one byte each. Resume is negotiated with capable clients; folder collections are negotiated with updated clients. See [Transfer tools](TRANSFER-TOOLS.md) for folder selection and disk-space checks. See [TRANSFERS.md](TRANSFERS.md). Amiga receivers require Latin-1 filenames of at most 30 characters. Windows receivers reject reserved device names, invalid Windows characters and trailing dots/spaces; rename such files on the sender first.
 
+## Transfer tools
+
+Transfer tools uses the selected application palette for its background, diagnostic report, inputs, buttons and conflict list. Saved theme changes apply while it is open. Live diagnostic updates preserve the report’s scroll position and text selection; unchanged text is not replaced or repainted. Standard window/control chrome remains provided by Windows.
+
 ## Tray, preferences and appearance
 
 Closing the main window keeps discovery and reception running when **Keep running in the tray** is enabled (the default). Use the tray icon to show the window, open preferences or quit. **Start minimized to the tray** controls future launches; it does not register a Windows login item. Incoming requests that need your decision bring up a prompt.

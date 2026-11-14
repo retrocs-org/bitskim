@@ -363,7 +363,8 @@ static void create_peer_view(HWND w) {
         if(FAILED(RegisterDragDrop(peer_list,&peer_drop_target))) DragAcceptFiles(peer_list,TRUE);
         SetWindowSubclass(peer_list,peer_subclass,1,0);
 }
-/* Hidden native-control check: validates full tile hit regions and OLE registration. */
+static int check_tools_view(HWND parent);
+/* Hidden native-control check: validates tile hit regions, OLE and tools rendering. */
 static int check_peer_view(void) {
     HWND parent; RECT first={0},second={0}; POINT point; LVITEMW item; int ok=0;
     if(FAILED(OleInitialize(NULL))) return 0;
@@ -379,6 +380,7 @@ static int check_peer_view(void) {
         point=(POINT){second.left+8,second.bottom-8}; ok=ok && peer_at(point)==1;
         point=(POINT){630,310}; ok=ok && peer_at(point)==-1;
         ok=ok && SUCCEEDED(RevokeDragDrop(peer_list));
+        ok=ok && check_tools_view(parent);
         DestroyWindow(parent); if(peer_images) { ImageList_Destroy(peer_images); peer_images=NULL; }
         peer_list=NULL; displayed_count=0;
     }
@@ -386,6 +388,27 @@ static int check_peer_view(void) {
 }
 #include "../shared/collection-win.h"
 #include "../shared/tools-win.h"
+static int check_tools_view(HWND parent){
+    HWND saved_report=bs_tools_report,edit;TCHAR before[4096],after[4096];DWORD start,end;int i,first,ok=1;HDC dc;LOGBRUSH brush;
+    edit=CreateWindowW(L"EDIT",L"",WS_CHILD|ES_MULTILINE|ES_AUTOVSCROLL|ES_READONLY|WS_VSCROLL,0,0,400,80,parent,NULL,instance,NULL);
+    if(!edit)return 0;
+    bs_tools_report=edit;before[0]=0;
+    for(i=0;i<80;i++)lstrcatW(before,L"Transfer diagnostic line\r\n");
+    SetWindowTextW(edit,before);SendMessageW(edit,EM_SETSEL,7,18);SendMessageW(edit,EM_LINESCROLL,0,25);
+    first=(int)SendMessageW(edit,EM_GETFIRSTVISIBLELINE,0,0);ok=first>0;
+    lstrcpyW(after,before);after[0]=L'U';lstrcatW(after,L"Updated status\r\n");
+    bs_tools_update_report(after);SendMessageW(edit,EM_GETSEL,(WPARAM)&start,(LPARAM)&end);
+    ok=ok && (int)SendMessageW(edit,EM_GETFIRSTVISIBLELINE,0,0)==first && start==7 && end==18;
+    after[0]=L'R';bs_tools_update_report(after);
+    ok=ok && (int)SendMessageW(edit,EM_GETFIRSTVISIBLELINE,0,0)==first;
+    dc=GetDC(edit);
+    for(i=0;i<WIN_THEME_COUNT;i++){
+        int handled;HBRUSH used;bs_tools_use_palette(&win_themes[i]);
+        used=(HBRUSH)bs_tools_paint(parent,WM_CTLCOLORSTATIC,(WPARAM)dc,(LPARAM)edit,&handled);
+        ok=ok && handled && GetObjectW(used,sizeof brush,&brush) && brush.lbColor==win_themes[i].surface && GetTextColor(dc)==win_themes[i].text && GetBkColor(dc)==win_themes[i].surface;
+    }
+    ReleaseDC(edit,dc);DestroyWindow(edit);bs_tools_report=saved_report;bs_tools_free_theme();return ok;
+}
 static int CALLBACK recent_browse(HWND w,UINT msg,LPARAM arg,LPARAM context){(void)arg;if(msg==BFFM_INITIALIZED && context)SendMessageW(w,BFFM_SETSELECTIONW,TRUE,context);return 0;}
 static void send_folder(void){BROWSEINFOW browse;PIDLIST_ABSOLUTE item;wchar_t path[PATH_CAP],initial[PATH_CAP];utf16(bs_last_folder(client,0),initial,PATH_CAP);ZeroMemory(&browse,sizeof browse);browse.hwndOwner=main_window;browse.lpszTitle=L"Choose a folder to send (links are not followed)";browse.lpfn=recent_browse;browse.lParam=(LPARAM)initial;browse.ulFlags=BIF_RETURNONLYFSDIRS|BIF_NEWDIALOGSTYLE;item=SHBrowseForFolderW(&browse);if(item){if(SHGetPathFromIDListW(item,path))send_file(path);CoTaskMemFree(item);}}
 static void incoming_batch(void) {
