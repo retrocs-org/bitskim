@@ -2,6 +2,8 @@
 
 ## 0.2 — In development
 
+- iOS Files-provider import guidance and explicit Save to Files for received files/folders, preserving originals and pausing incoming offers while browsing.
+
 - Mac groups multi-interface devices into one card and menu entry, asks for the selected address, retains identity checks and uses iPhone/iPad device icons.
 
 - iOS groups multi-interface discoveries into one computer with explicit, identity-checked address selection; boot migration messages are distinguished from successful app launches without resetting device data.

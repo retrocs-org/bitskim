@@ -1,6 +1,7 @@
 import XCTest
 import Foundation
 import Darwin
+import UIKit
 
 final class TransferTests: XCTestCase {
     private var sender: OpaquePointer!, receiver: OpaquePointer!
@@ -83,6 +84,17 @@ final class TransferTests: XCTestCase {
         guard pump({ bs_queue_count(sender) == 0 && bs_status(receiver)!.pointee.active == 0 }) else { return }
         XCTAssertEqual(try Data(contentsOf: destination), bytes)
         var item = BSHistoryItem(); XCTAssertEqual(bs_history_item(receiver, 0, &item), 1); XCTAssertEqual(item.verified, 1)
+    }
+    @MainActor func testFilesExportCopiesAndCancellationKeepsOriginal() async throws {
+        let source = root.appendingPathComponent("export.txt"); let bytes = Data("keep original".utf8); try bytes.write(to: source)
+        let picker = FileProviderExport.controller(for: [source])
+        XCTAssertEqual(picker.documentPickerMode, .exportToService)
+        var result: Bool?
+        let delegate = FileProviderExport.Coordinator { result = $0 }
+        delegate.documentPickerWasCancelled(picker)
+        XCTAssertEqual(result, false); XCTAssertEqual(try Data(contentsOf: source), bytes)
+        delegate.documentPicker(picker, didPickDocumentsAt: [root.appendingPathComponent("copy")])
+        XCTAssertEqual(result, true); XCTAssertEqual(try Data(contentsOf: source), bytes)
     }
     func testEmptyFile() throws {
         let source = root.appendingPathComponent("empty"), destination = root.appendingPathComponent("received")

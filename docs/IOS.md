@@ -8,7 +8,7 @@ This is a source-only iOS client in development, targeting iOS/iPadOS 16 or late
 
 - Send up to 32 selected regular files per import, each up to 2 GiB minus one byte. Files are staged in private storage before queueing; imported folders are rejected explicitly.
 - Receive files and complete folder manifests, including empty directories, into `Received` in the app's Documents directory. Existing files are preserved with collision-safe names.
-- Browse received folders and use system sharing to save/export files. The Documents directory is also available through Files.
+- Browse received folders, copy files or folders with **Save to Files**, and use system sharing for files. The Documents directory is also available through Files.
 - Prefer or require TLS, compare verification codes, remember device identities, show diagnostics/history and CRC32 readback results, retry queued sends and cancel transfers.
 - Show the Wi-Fi/LAN address for manual incoming connections.
 - Accept files/photos from other apps through the Share extension. The extension copies them to an App Group inbox. Open BitSkim, then select a computer or enter an address to send them. The extension does not silently open the containing app or send to a guessed recipient.
@@ -16,6 +16,16 @@ This is a source-only iOS client in development, targeting iOS/iPadOS 16 or late
 Shared-inbox files stay on the device until queued. Failed or cancelled import copies are cleaned without deleting the originals. An interrupted batch can leave already completed received files; explicit cancellation removes the current partial download. Temporary staging requires enough local storage for a copy of each selected file.
 
 Keep BitSkim open to receive. On entering the background, it cancels active/queued transfers, closes its listeners and clears outgoing copies; completed received files remain. Opening it reconnects. Continuous background receiving and guaranteed completion while locked are not supported. There is no automatic acceptance of incoming files. The mobile UI uses verification-code device pairing; it does not yet expose shared-group PSK key entry.
+
+## Files and cloud storage
+
+BitSkim uses Apple's Files picker, so you can select documents from iCloud Drive and enabled providers such as Dropbox and OneDrive. Install the provider's app, sign in, then open **Files → Browse → … → Edit** and enable its location. See [Apple's setup guide](https://support.apple.com/en-ie/102238).
+
+To send, select a computer (or enter its address), choose **Choose from Files**, and browse to the provider. Selected regular files are downloaded/coordinated by Files and copied into BitSkim's outgoing storage before sending. Imported folders are not supported.
+
+To export received content, open **Received**, tap the item's **…** menu and choose **Save to Files**. Choose a local or enabled cloud location. Files and folders are exported as copies; cancelling leaves the received original untouched. BitSkim pauses new incoming offers while its import/export picker is open. Finish or cancel an active transfer before opening Files.
+
+Providers control availability, authentication, downloads and cloud syncing. BitSkim does not need separate Dropbox or OneDrive tokens, and a successful handoff to Files does not confirm that a remote cloud upload has finished. Physical-device testing with authenticated providers remains pending.
 
 ## Manual builds
 

@@ -34,6 +34,8 @@ struct MobileHistory: Identifiable, Equatable {
     @Published var filePicker = false
     @Published var sharedFiles: [URL] = []
     @Published var security = UserDefaults.standard.object(forKey: "security") as? Int ?? 1
+    private var fileBrowserRequests = 0
+    private var importBrowserOpen = false
     private var generation: UInt = 0
     private var engine: OpaquePointer?
     private var timer: Timer?
@@ -80,7 +82,7 @@ struct MobileHistory: Identifiable, Equatable {
                 }
             }
             store(UIDevice.current.model, in: &config.name); store("iOS", in: &config.platform); store(id, in: &config.id)
-            config.port = listeningPort; config.discovery_port = UInt16(BS_PORT); config.visible = discovery ? 1 : 0; config.receiving = 1
+            config.port = listeningPort; config.discovery_port = UInt16(BS_PORT); config.visible = discovery ? 1 : 0; config.receiving = fileBrowserRequests == 0 ? 1 : 0
             guard platformReady, let client = bs_create(&config, nil, nil) else {
                 throw messageError("Cannot start the local listener. Check Local Network permission and whether another BitSkim copy is open.")
             }
@@ -199,9 +201,28 @@ struct MobileHistory: Identifiable, Equatable {
     }
     private func chooseFiles() {
         guard engine != nil, !active, !importing else { return }
-        if sharedFiles.isEmpty { filePicker = true } else { enqueue(sharedFiles) }
+        if sharedFiles.isEmpty {
+            guard beginFileBrowser() else { return }
+            importBrowserOpen = true; filePicker = true
+        } else { enqueue(sharedFiles) }
+    }
+    func beginFileBrowser() -> Bool {
+        guard let client = engine, bs_status(client)!.pointee.active == 0 else {
+            error = "Finish or cancel the current transfer before opening Files."; return false
+        }
+        fileBrowserRequests += 1
+        bs_configure(client, UIDevice.current.model, discovery ? 1 : 0, 0)
+        return true
+    }
+    func endFileBrowser() {
+        fileBrowserRequests = max(0, fileBrowserRequests - 1)
+        if let client = engine { bs_configure(client, UIDevice.current.model, discovery ? 1 : 0, fileBrowserRequests == 0 ? 1 : 0) }
+    }
+    func endImportBrowser() {
+        guard importBrowserOpen else { return }; importBrowserOpen = false; endFileBrowser()
     }
     func imported(_ result: Result<[URL], Error>) {
+        endImportBrowser()
         switch result {
         case .failure(let failure):
             if (failure as NSError).code != NSUserCancelledError { error = failure.localizedDescription }

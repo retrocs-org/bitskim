@@ -62,8 +62,9 @@ struct MobileHome: View {
                     Section("Connect by IP") {
                         TextField("192.168.1.20 or 192.168.1.20:46440", text: $address)
                             .keyboardType(.numbersAndPunctuation).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        Button(client.sharedFiles.isEmpty ? "Choose files to send" : "Send shared files") { client.prepare(address: address) }
+                        Button(client.sharedFiles.isEmpty ? "Choose from Files" : "Send shared files") { client.prepare(address: address) }
                             .disabled(client.active || client.importing || address.isEmpty)
+                        Text("Files can come from iCloud Drive or any cloud location enabled in Files.").font(.footnote).foregroundStyle(.secondary)
                         Text("Use the receiving computer’s LAN address. It must be running BitSkim and allow incoming connections.").font(.footnote).foregroundStyle(.secondary)
                     }
                     Section("Transfer") {
@@ -79,9 +80,16 @@ struct MobileHome: View {
                 }
                 .navigationTitle("BitSkim")
             }.tabItem { Label("Computers", systemImage: "network") }
-            NavigationStack { ReceivedFiles(folder: client.received) }.tabItem { Label("Received", systemImage: "tray.and.arrow.down") }
+            NavigationStack { ReceivedFiles(folder: client.received, client: client) }.tabItem { Label("Received", systemImage: "tray.and.arrow.down") }
             NavigationStack {
                 List {
+                    Section("Files and cloud storage") {
+                        DisclosureGroup("iCloud Drive, Dropbox and OneDrive") {
+                            Text("Install and sign in to your cloud app. In Files, open Browse → … → Edit and enable the provider. Pick a computer in BitSkim, then choose files from that location.")
+                            Text("For received files or folders, open Received → … → Save to Files. BitSkim keeps the original; the provider handles cloud syncing.")
+                            Link("Files setup guide", destination: URL(string: "https://support.apple.com/en-ie/102238")!)
+                        }
+                    }
                     Section("Device pairing") { PairingControls(client: client) }
                     Section("Encryption") {
                         Picker("Mode", selection: Binding(get: { client.security }, set: { client.setSecurity($0) })) {
@@ -106,6 +114,7 @@ struct MobileHome: View {
             }.tabItem { Label("Tools", systemImage: "slider.horizontal.3") }
         }
         .fileImporter(isPresented: $client.filePicker, allowedContentTypes: [.item], allowsMultipleSelection: true) { client.imported($0) }
+        .onChange(of: client.filePicker) { shown in if !shown { client.endImportBrowser() } }
         .sheet(item: $client.offer) { incoming in IncomingOffer(client: client, incoming: incoming).interactiveDismissDisabled() }
         .alert("BitSkim", isPresented: Binding(get: { client.error != nil }, set: { if !$0 { client.error = nil } })) {
             Button("OK") { client.error = nil }
@@ -170,16 +179,41 @@ struct IncomingOffer: View {
 }
 struct ReceivedFiles: View {
     let folder: URL
+    @ObservedObject var client: IOSClient
     @State private var files: [URL] = []
+    @State private var exporting: FileExportSelection?
+    @State private var exportStatus = ""
     var body: some View {
         List {
+            Section {
+                Text("Save a copy to iCloud Drive, Dropbox, OneDrive or another enabled Files location. Originals stay in BitSkim.").font(.footnote).foregroundStyle(.secondary)
+                if !exportStatus.isEmpty { Text(exportStatus).font(.footnote) }
+            }
             if files.isEmpty { Text("No received files in this folder.").foregroundStyle(.secondary) }
             ForEach(files, id: \.self) { file in
-                if (try? file.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-                    NavigationLink { ReceivedFiles(folder: file) } label: { Label(file.lastPathComponent, systemImage: "folder") }
-                } else { ShareLink(item: file) { Label(file.lastPathComponent, systemImage: "doc") } }
+                HStack {
+                    if (try? file.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                        NavigationLink { ReceivedFiles(folder: file, client: client) } label: { Label(file.lastPathComponent, systemImage: "folder") }
+                    } else { ShareLink(item: file) { Label(file.lastPathComponent, systemImage: "doc") }.disabled(client.active) }
+                    Menu {
+                        Button("Save to Files", systemImage: "folder") {
+                            guard client.beginFileBrowser() else { return }
+                            exporting = FileExportSelection(urls: [file])
+                        }
+                        ShareLink(item: file) { Label("Share", systemImage: "square.and.arrow.up") }
+                    } label: { Image(systemName: "ellipsis.circle") }
+                    .accessibilityLabel("Actions for " + file.lastPathComponent)
+                    .disabled(client.active)
+                }
             }
         }.navigationTitle(folder.lastPathComponent).onAppear(perform: reload).refreshable { reload() }
+        .onChange(of: client.history) { _ in reload() }
+        .sheet(item: $exporting, onDismiss: { client.endFileBrowser() }) { selection in
+            FileProviderExport(urls: selection.urls) { copied in
+                if copied { exportStatus = "Copy handed to Files. Your provider manages cloud syncing." }
+                exporting = nil
+            }
+        }
     }
     private func reload() {
         files = ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])) ?? []).sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
