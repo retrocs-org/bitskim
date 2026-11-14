@@ -1,5 +1,8 @@
 /* Modeless local tools; timers continue servicing the application's engine. */
 #include <tchar.h>
+#include "../windows/window-fit.h"
+static int bs_tools_dpi=96;
+static int bs_tools_scale(int n){return MulDiv(n,bs_tools_dpi,96);}
 static HWND bs_tools_window,bs_tools_report,bs_tools_code,bs_tools_entry,bs_tools_policy,bs_tools_address;
 static BSClient *bs_tools_client;
 static int bs_tools_index=-1;static unsigned long bs_tools_serial;
@@ -27,7 +30,21 @@ static void bs_tools_refresh(void){char report[4096],history[2048],code[20],norm
     bs_tools_convert(normalized,native,4096);GetWindowText(bs_tools_report,old,4096);if(_tcscmp(native,old))SetWindowText(bs_tools_report,native);
     if(bs_pairing_code(bs_tools_client,code)){char label[160];sprintf(label,"Compare both screens: %s   %s",code,bs_trust_status(bs_tools_client)==1?"(trusted identity matches)":"(not yet trusted)");bs_tools_convert(label,native,4096);SetWindowText(bs_tools_code,native);}else SetWindowText(bs_tools_code,TEXT("Pair during an unpaired TLS connection. Shared-key mode uses its saved key."));
 }
-static HWND bs_tools_control(HWND parent,LPCTSTR kind,LPCTSTR text,DWORD style,int x,int y,int width,int height,int id){HWND h=CreateWindow(kind,text,WS_CHILD|WS_VISIBLE|style,x,y,width,height,parent,(HMENU)(INT_PTR)id,(HINSTANCE)GetWindowLongPtr(parent,GWLP_HINSTANCE),NULL);SendMessage(h,WM_SETFONT,(WPARAM)GetStockObject(DEFAULT_GUI_FONT),TRUE);return h;}
+static HWND bs_tools_control(HWND parent,LPCTSTR kind,LPCTSTR text,DWORD style,int x,int y,int width,int height,int id){HWND h=CreateWindow(kind,text,WS_CHILD|WS_VISIBLE|style,bs_tools_scale(x),bs_tools_scale(y),bs_tools_scale(width),bs_tools_scale(height),parent,(HMENU)(INT_PTR)id,(HINSTANCE)GetWindowLongPtr(parent,GWLP_HINSTANCE),NULL);SendMessage(h,WM_SETFONT,(WPARAM)GetStockObject(DEFAULT_GUI_FONT),TRUE);return h;}
+static void bs_tools_layout(HWND w){
+    RECT rect;int width,height,report_height,row;GetClientRect(w,&rect);
+    width=MulDiv(rect.right,96,bs_tools_dpi);height=MulDiv(rect.bottom,96,bs_tools_dpi);
+    report_height=height-164-88;if(report_height<40)report_height=40;
+    MoveWindow(bs_tools_report,bs_tools_scale(16),bs_tools_scale(164),bs_tools_scale(width-32),bs_tools_scale(report_height),TRUE);
+    row=height-78;
+    MoveWindow(GetDlgItem(w,6),bs_tools_scale(16),bs_tools_scale(row),bs_tools_scale(75),bs_tools_scale(28),TRUE);
+    MoveWindow(GetDlgItem(w,7),bs_tools_scale(99),bs_tools_scale(row),bs_tools_scale(75),bs_tools_scale(28),TRUE);
+    MoveWindow(GetDlgItem(w,8),bs_tools_scale(182),bs_tools_scale(row),bs_tools_scale(120),bs_tools_scale(28),TRUE);
+    MoveWindow(GetDlgItem(w,9),bs_tools_scale(310),bs_tools_scale(row),bs_tools_scale(100),bs_tools_scale(28),TRUE);
+    MoveWindow(GetDlgItem(w,10),bs_tools_scale(width-116),bs_tools_scale(row),bs_tools_scale(100),bs_tools_scale(28),TRUE);
+    MoveWindow(GetDlgItem(w,11),bs_tools_scale(16),bs_tools_scale(height-42),bs_tools_scale(150),bs_tools_scale(26),TRUE);
+    MoveWindow(bs_tools_address,bs_tools_scale(176),bs_tools_scale(height-42),bs_tools_scale(width-192),bs_tools_scale(26),TRUE);
+}
 static LRESULT CALLBACK bs_tools_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp){
     if(msg==WM_CREATE){
         bs_tools_control(w,TEXT("STATIC"),TEXT("Existing files (this session; applies to remaining collection files):"),0,16,12,560,20,0);
@@ -42,8 +59,9 @@ static LRESULT CALLBACK bs_tools_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp){
         bs_tools_control(w,TEXT("BUTTON"),TEXT("Retry outgoing"),WS_TABSTOP,182,556,120,28,8);bs_tools_control(w,TEXT("BUTTON"),TEXT("Open folder"),WS_TABSTOP,310,556,100,28,9);bs_tools_control(w,TEXT("BUTTON"),TEXT("Close"),WS_TABSTOP,476,556,100,28,10);
         bs_tools_control(w,TEXT("BUTTON"),TEXT("Test connection"),WS_TABSTOP,16,590,150,26,11);
         bs_tools_address=bs_tools_control(w,TEXT("EDIT"),TEXT(""),WS_TABSTOP|WS_BORDER|ES_AUTOHSCROLL,176,590,400,26,12);
-        bs_tools_pick(0);SetTimer(w,1,500,NULL);bs_tools_refresh();return 0;
+        bs_tools_layout(w);bs_tools_pick(0);SetTimer(w,1,500,NULL);bs_tools_refresh();return 0;
     }
+    if(msg==WM_SIZE){if(bs_tools_report)bs_tools_layout(w);return 0;}
     if(msg==WM_TIMER){if(!bs_tools_serial)bs_tools_pick(0);bs_tools_refresh();return 0;}
     if(msg==WM_COMMAND){int id=LOWORD(wp);char error[256];TCHAR native[512];
         if(id==1 && HIWORD(wp)==CBN_SELCHANGE)bs_conflict_policy(bs_tools_client,(int)SendMessage(bs_tools_policy,CB_GETCURSEL,0,0));
@@ -61,7 +79,26 @@ static LRESULT CALLBACK bs_tools_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp){
     if(msg==WM_DESTROY){KillTimer(w,1);bs_tools_window=NULL;return 0;}
     return DefWindowProc(w,msg,wp,lp);
 }
-static void bs_tools_open(HWND owner,HINSTANCE instance,BSClient *client){WNDCLASS cls;if(bs_tools_window){SetForegroundWindow(bs_tools_window);return;}bs_tools_client=client;bs_tools_serial=0;memset(&cls,0,sizeof cls);cls.lpfnWndProc=bs_tools_proc;cls.hInstance=instance;cls.hCursor=LoadCursor(NULL,IDC_ARROW);cls.hbrBackground=(HBRUSH)(COLOR_BTNFACE+1);cls.lpszClassName=TEXT("BitSkimTransferTools");RegisterClass(&cls);bs_tools_window=CreateWindow(cls.lpszClassName,TEXT("BitSkim - Transfer tools"),WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,CW_USEDEFAULT,CW_USEDEFAULT,610,680,owner,NULL,instance,NULL);ShowWindow(bs_tools_window,SW_SHOW);}
+static void bs_tools_open(HWND owner,HINSTANCE instance,BSClient *client){
+    WNDCLASS cls;RECT work,fit,client_rect;HDC dc;int width,height;
+    if(bs_tools_window){SetForegroundWindow(bs_tools_window);return;}
+    bs_tools_client=client;bs_tools_serial=0;
+    dc=GetDC(owner);bs_tools_dpi=GetDeviceCaps(dc,LOGPIXELSY);ReleaseDC(owner,dc);if(bs_tools_dpi<96)bs_tools_dpi=96;
+    work.left=work.top=0;work.right=GetSystemMetrics(SM_CXSCREEN);work.bottom=GetSystemMetrics(SM_CYSCREEN);
+    SystemParametersInfo(SPI_GETWORKAREA,0,&work,0);
+#ifndef BS_WINDOWS_LEGACY
+    {MONITORINFO monitor;ZeroMemory(&monitor,sizeof monitor);monitor.cbSize=sizeof monitor;
+     if(GetMonitorInfo(MonitorFromWindow(owner,MONITOR_DEFAULTTONEAREST),&monitor))work=monitor.rcWork;}
+#endif
+    memset(&cls,0,sizeof cls);cls.lpfnWndProc=bs_tools_proc;cls.hInstance=instance;cls.hCursor=LoadCursor(NULL,IDC_ARROW);cls.hbrBackground=(HBRUSH)(COLOR_BTNFACE+1);cls.lpszClassName=TEXT("BitSkimTransferTools");RegisterClass(&cls);
+    /* Request a client size; include the caption/frame before fitting to the work area. */
+    client_rect.left=client_rect.top=0;client_rect.right=bs_tools_scale(592);client_rect.bottom=bs_tools_scale(640);
+    AdjustWindowRect(&client_rect,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,FALSE);
+    width=client_rect.right-client_rect.left;height=client_rect.bottom-client_rect.top;
+    fit=bs_window_fit(work,width,height);
+    bs_tools_window=CreateWindow(cls.lpszClassName,TEXT("BitSkim - Transfer tools"),WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,fit.left,fit.top,fit.right-fit.left,fit.bottom-fit.top,owner,NULL,instance,NULL);
+    ShowWindow(bs_tools_window,SW_SHOW);
+}
 
 static int bs_tools_pair_offer(HWND owner,BSClient *client){char code[20],label[600];TCHAR native[600];int answer;
     if(bs_trust_status(client)==1 || !bs_pairing_code(client,code))return 1;
@@ -72,7 +109,8 @@ static int bs_tools_pair_offer(HWND owner,BSClient *client){char code[20],label[
     return 1;
 }
 
-static int bs_tools_space(HWND owner,BSClient *client,const char *path,int collection,int ask){char report[256];TCHAR native[512];int enough;if(!collection && bs_conflict_get(client)==BS_CONFLICT_SKIP && bsp_path_kind(path)==1)return 1;enough=bs_destination_space_report(client,path,collection,report,sizeof report);bs_tools_convert(report,native,512);
+static int bs_tools_space(HWND owner,BSClient *client,const char *path,int collection,int ask){char report[256]="Destination free space could not be determined.";TCHAR native[512];BSStorage info;int enough;if(!collection && bs_conflict_get(client)==BS_CONFLICT_SKIP && bsp_path_kind(path)==1)return 1;enough=bs_destination_space_report(client,path,collection,report,sizeof report);bs_tools_convert(report,native,512);
     if(enough<0){MessageBox(owner,native,TEXT("Destination disk space"),MB_OK|MB_ICONEXCLAMATION);return 0;}
+    if(bs_destination_space_info(client,path,collection,&info) && info.known && info.enough)return 1;
     return !ask || MessageBox(owner,native,TEXT("Destination disk space - continue?"),MB_YESNO|MB_ICONQUESTION)==IDYES;
 }

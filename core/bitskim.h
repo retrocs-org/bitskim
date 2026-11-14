@@ -101,6 +101,8 @@ int bs_safe_relative(const char *);
 int bs_batch_is_tree(const BSClient *);
 typedef struct {unsigned long required_high,required_low,available_high,available_low,allocation_unit;int known,enough;} BSStorage;
 int bs_storage_info(const BSClient *,const char *folder,int collection,BSStorage *);
+/* Query the destination volume without parsing display text. */
+int bs_destination_space_info(const BSClient *,const char *destination,int collection,BSStorage *);
 int bs_destination_space_report(const BSClient *,const char *destination,int collection,char *out,size_t capacity);
 int bs_storage_report(const BSClient *,const char *folder,int collection,char *out,size_t capacity);
 int bs_queue_scanning(const BSClient *);

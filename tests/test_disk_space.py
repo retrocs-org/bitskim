@@ -49,4 +49,13 @@ class DiskSpace(CoreTests):
   self.until(lambda:self.status(self.b).awaiting_decision);target=self.root/'receive';target.mkdir();self.assertEqual(l.bs_accept_batch(self.b,os.fsencode(target)),1)
   l.bs_test_space(1,0,0,4096);self.until(lambda:not self.status(self.a).active and not self.status(self.b).active)
   self.until(lambda:l.bs_queue_paused(self.a)!=0);self.assertEqual((target/'0').read_bytes(),b'x'*10000);self.assertFalse((target/'1').exists())
+ def test_destination_info_distinguishes_known_space_from_unknown(self):
+  self.lib.bs_destination_space_info.argtypes=[C.c_void_p,C.c_char_p,C.c_int,C.POINTER(Storage)]
+  self.start(b'small');info=Storage();destination=os.fsencode(self.root/'target')
+  for known,available,expected in ((1,1000000,1),(1,1,0),(0,0,1)):
+   self.lib.bs_test_space(known,0,available,4096)
+   self.assertEqual(self.lib.bs_destination_space_info(self.b,destination,0,C.byref(info)),1)
+   self.assertEqual(info.known,known);self.assertEqual(info.enough,expected)
+  self.assertEqual(self.lib.bs_destination_space_info(self.b,None,0,C.byref(info)),0);self.assertFalse(info.known)
+
 def load_tests(loader,tests,pattern):return unittest.TestSuite(DiskSpace(n) for n in DiskSpace.__dict__ if n.startswith('test_'))

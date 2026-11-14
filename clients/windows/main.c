@@ -23,6 +23,7 @@
 #include <windowsx.h>
 #include "themes.h"
 #include "windows-names.h"
+#include "window-fit.h"
 #define ID_ICON 1
 #define WM_TRAY (WM_APP+1)
 #define WM_ENGINE (WM_APP+2)
@@ -703,7 +704,17 @@ static LRESULT CALLBACK main_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
         progress_bar=control(w,PROGRESS_CLASSW,L"",0,0); SetWindowTheme(progress_bar,L"",L""); SendMessageW(progress_bar,PBM_SETRANGE,0,MAKELPARAM(0,100));
         DragAcceptFiles(w,TRUE); SetTimer(w,1,50,NULL); update_tray(); return 0;
     case WM_SIZE: if(peer_list) layout_main(); return 0;
-    case WM_GETMINMAXINFO: ((MINMAXINFO *)lp)->ptMinTrackSize.x=S(580); ((MINMAXINFO *)lp)->ptMinTrackSize.y=S(500); return 0;
+    case WM_GETMINMAXINFO: {
+        MINMAXINFO *limits=(MINMAXINFO *)lp;MONITORINFO monitor;
+        limits->ptMinTrackSize.x=S(580);limits->ptMinTrackSize.y=S(500);
+        ZeroMemory(&monitor,sizeof monitor);monitor.cbSize=sizeof monitor;
+        if(GetMonitorInfoW(MonitorFromWindow(w,MONITOR_DEFAULTTONEAREST),&monitor)){
+            int width=monitor.rcWork.right-monitor.rcWork.left,height=monitor.rcWork.bottom-monitor.rcWork.top;
+            if(width>0 && limits->ptMinTrackSize.x>width)limits->ptMinTrackSize.x=width;
+            if(height>0 && limits->ptMinTrackSize.y>height)limits->ptMinTrackSize.y=height;
+        }
+        return 0;
+    }
     case WM_TIMER: bs_service(client,4); refresh(); return 0;
     case WM_ENGINE:
         if(wp==BS_EVENT_COMPLETE){if(bs_completion_notice(client,&completion_serial) && completion_alerts)notify(L"Transfer complete",L"Delivery finished successfully.");}
@@ -812,6 +823,12 @@ int WINAPI wWinMain(HINSTANCE h,HINSTANCE previous,PWSTR command,int show) {
     cls.lpfnWndProc=preview_proc; cls.lpszClassName=L"BitSkimPreview"; RegisterClassExW(&cls);
     main_window=CreateWindowExW(0,L"BitSkimMain",L"BitSkim",WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,CW_USEDEFAULT,CW_USEDEFAULT,S(720),S(660),NULL,NULL,h,NULL);
     if(!main_window) { bs_destroy(client); bs_platform_cleanup(); return 1; }
+    { MONITORINFO monitor;ZeroMemory(&monitor,sizeof monitor);monitor.cbSize=sizeof monitor;
+      if(GetMonitorInfoW(MonitorFromWindow(main_window,MONITOR_DEFAULTTONEAREST),&monitor)){
+          RECT fit=bs_window_fit(monitor.rcWork,S(720),S(660));
+          SetWindowPos(main_window,NULL,fit.left,fit.top,fit.right-fit.left,fit.bottom-fit.top,SWP_NOZORDER|SWP_NOACTIVATE);
+      }
+    }
     layout_main(); repaint(main_window); save_preferences();
     if(!prefs.start || !prefs.tray || !tray_added) show_main();
     while(GetMessageW(&msg,NULL,0,0)>0) {

@@ -19,3 +19,12 @@ Run `python3 -m unittest discover -s tests` for the host suite. Build and packag
 `test_transfer_tools.py` injects ENOSPC-style short writes and final-close errors on the receiver's temporary file. Existing destinations must remain unchanged, partial files must be removed and neither endpoint may report successful delivery. Existing readback-corruption checks exercise CRC verification failures. This is deterministic fault injection, not a claim that every filesystem or full target machine has been tested.
 
 The Mac and Windows Transfer tools present nearby compatibility details directly, including unknown profiles, rather than requiring hover tooltips. These are discovery hints and do not replace live negotiation. Native and target-system checks remain distinct from the host engine tests above.
+
+
+## Native Windows 0.2 review — 14 November 2026
+
+The Windows 11 run of `BitSkim-CoreCheck.exe` passed all 12 checks with zero failures: GUI image initialization, native socket handles, exclusive creation, device-name rejection, Winsock/Unicode binary transfer, automatic TLS, reverse empty-file transfer, collision-safe finalization, preserved destination size, a 24-file collection, native free-space queries, and nested Unicode/empty-directory transfer. This is a native Windows runtime result, distinct from host-only interoperability tests.
+
+The visual review found the startup window extending beyond the desktop at high DPI and unscaled/clipped Transfer tools controls. Window placement now fits the monitor work area; Transfer tools uses DPI-scaled controls with report and action rows anchored to the actual client size. `test_windows_window_fit.py` exercises the production placement/layout functions across DPI values and monitor work areas. Windows 10 and setup-installer interaction remain unverified.
+
+A native GUI transfer from the installed Mac 0.1 app to Windows 0.2 also completed successfully. Windows reported all 60 test bytes received, `written file verified (CRC32)`, and a matching history entry with no error. The high-DPI tools window was visually rechecked after the layout fix: labels and footer controls fit the desktop. The extra disk-space confirmation seen during that run is removed for known-sufficient space; unknown/insufficient outcomes have dedicated regression coverage.

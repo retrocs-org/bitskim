@@ -36,6 +36,7 @@ int bs_storage_report(const BSClient *c,const char *folder,int collection,char *
 }
 static int storage_check(BSClient *c,const char *folder,int collection){BSStorage info;if(!bs_storage_info(c,folder,collection,&info)){copystr(c->error,"Cannot calculate required disk space",256);return 0;}if(!info.enough){bs_storage_report(c,folder,collection,c->error,sizeof c->error);return 0;}return 1;}
 
+int bs_destination_space_info(const BSClient *c,const char *path,int collection,BSStorage *out){char folder[BS_PATH_MAX+1];if(!out)return 0;memset(out,0,sizeof *out);if(!path || strlen(path)>BS_PATH_MAX)return 0;if(collection)copystr(folder,path,sizeof folder);else storage_parent(path,folder);return bs_storage_info(c,folder,collection,out);}
 int bs_destination_space_report(const BSClient *c,const char *path,int collection,char *out,size_t capacity){char folder[BS_PATH_MAX+1];if(!path || strlen(path)>BS_PATH_MAX)return 0;if(collection)copystr(folder,path,sizeof folder);else storage_parent(path,folder);return bs_storage_report(c,folder,collection,out,capacity);}
 
 #ifdef BS_OPENSSL
