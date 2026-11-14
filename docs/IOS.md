@@ -11,11 +11,25 @@ This is a source-only iOS client in development, targeting iOS/iPadOS 16 or late
 - Browse received folders, copy files or folders with **Save to Files**, and use system sharing for files. The Documents directory is also available through Files.
 - Prefer or require TLS, compare verification codes, remember device identities, show diagnostics/history and CRC32 readback results, retry queued sends and cancel transfers.
 - Show the Wi-Fi/LAN address for manual incoming connections.
-- Accept files/photos from other apps through the Share extension. The extension copies them to an App Group inbox. Open BitSkim, then select a computer or enter an address to send them. The extension does not silently open the containing app or send to a guessed recipient.
+- Accept files/photos from other apps through the Share extension. The extension copies them to an App Group inbox. Open BitSkim, select a client or enter an address, then review the files and confirm Send. The extension does not silently open the containing app or send to a guessed recipient.
 
 Shared-inbox files stay on the device until queued. Failed or cancelled import copies are cleaned without deleting the originals. An interrupted batch can leave already completed received files; explicit cancellation removes the current partial download. Temporary staging requires enough local storage for a copy of each selected file.
 
 Keep BitSkim open to receive. On entering the background, it cancels active/queued transfers, closes its listeners and clears outgoing copies; completed received files remain. Opening it reconnects. Continuous background receiving and guaranteed completion while locked are not supported. There is no automatic acceptance of incoming files. The mobile UI uses verification-code device pairing; it does not yet expose shared-group PSK key entry.
+
+## Review and send
+
+Select documents in **Files**, then choose a recipient in **Clients**. Selecting a client first also opens the standard file picker when no files are ready. Both routes open **Review transfer**, showing the recipient name/address, filenames, individual sizes, total size and encryption mode. Only the explicit **Send** button starts networking. Cancelling the review leaves the staged selections available for another recipient; it does not send or delete the originals. File sizes are rechecked at confirmation, and changed files require another review.
+
+During a transfer, **Clients → Transfer** shows the current filename, item position, transferred bytes, recent speed and an estimated time remaining once data is moving. Reviewed outgoing batches also show an overall progress bar and total bytes. Incoming collections use the engine's overall summary; their time estimate is for the current item. Estimates can change with network speed and do not replace the final written-file verification result. Paused queues can be retried or cancelled explicitly.
+
+## Manage received files
+
+Open **Received** to browse folders and search filenames in the current folder. Tap a regular file to preview it using Quick Look, then **Done** to return. Unsupported preview formats remain available to share or export.
+
+An item's **…** menu offers **Preview**, **Share**, **Save to Files**, **Rename** and **Delete**, as applicable. Rename includes the extension, rejects invalid names and never overwrites another file. Delete requires confirmation and permanently removes selected files or selected folders with their contents; it cannot be undone.
+
+Use **Select** to choose several items, optionally **Select all** for the visible search results, then **Selected file actions** to share, export or delete them together. File actions are blocked during transfers, and incoming offers pause while a preview, share sheet or document picker is open. Operations are scoped to BitSkim's Received folder, reject symbolic-link escapes and preserve unrelated files.
 
 ## Appearance and diagnostics
 

@@ -35,7 +35,7 @@ struct MobileHome: View {
                         Text("Keep BitSkim open to receive. Incoming files are saved in Files → On My iPhone/iPad → BitSkim → Received.").font(.footnote).foregroundStyle(theme?.muted ?? Color.secondary)
                     }
                     if !client.sharedFiles.isEmpty {
-                        Section("Ready to send · \(client.sharedFiles.count) files") {
+                        Section("Ready to send · \(client.sharedFiles.count) \(client.sharedFiles.count == 1 ? "file" : "files")") {
                             ForEach(client.sharedFiles, id: \.self) { Text($0.lastPathComponent) }
                             Text("Choose a computer below to send these files.").font(.footnote).foregroundStyle(theme?.muted ?? Color.secondary)
                         }
@@ -77,9 +77,20 @@ struct MobileHome: View {
                         Text(client.status)
                         if client.importing { ProgressView("Preparing files…") }
                         if client.active {
-                            ProgressView(value: Double(client.transferred), total: Double(max(client.total, 1)))
-                            Text("\(client.transferred) / \(client.total) bytes").font(.caption).monospacedDigit()
+                            Text(client.progress.filename).font(.headline).lineLimit(2)
+                            if !client.progress.position.isEmpty { Text(client.progress.position).font(.caption) }
+                            ProgressView(value: Double(min(client.transferred, client.total)), total: Double(max(client.total, 1)))
+                            Text("\(MobileProgress.size(UInt64(client.transferred))) / \(MobileProgress.size(UInt64(client.total)))").font(.caption).monospacedDigit()
+                            Text("\(MobileProgress.size(client.progress.rate))/s · \(client.progress.overallTotal == 0 ? "Current item: " : "")\(client.progress.timeRemaining)").font(.caption).monospacedDigit()
+                            if client.progress.overallTotal > 0 {
+                                ProgressView("Overall batch", value: Double(client.progress.overallDone), total: Double(client.progress.overallTotal))
+                                Text("\(MobileProgress.size(client.progress.overallDone)) / \(MobileProgress.size(client.progress.overallTotal)) overall").font(.caption)
+                            } else { Text(client.progress.summary).font(.caption) }
                             Button("Cancel transfer", role: .destructive) { client.cancel() }
+                        }
+                        if !client.active && client.progress.queued > 0 {
+                            Text(client.progress.paused ? "Transfer queue paused." : "Waiting for the next file.").font(.caption)
+                            Button("Cancel queued transfer", role: .destructive) { client.cancel() }
                         }
                         Button("Retry queued transfer") { client.retry() }.disabled(client.active)
                     }
@@ -142,6 +153,9 @@ struct MobileHome: View {
             }
         }
         .onChange(of: client.filePicker) { shown in if !shown { client.endImportBrowser() } }
+        .sheet(item: $client.review, onDismiss: { client.closeReview() }) { review in
+            SendReviewScreen(client: client, review: review)
+        }
         .sheet(item: $client.offer) { incoming in IncomingOffer(client: client, incoming: incoming).interactiveDismissDisabled() }
         .alert("BitSkim", isPresented: Binding(get: { client.error != nil }, set: { if !$0 { client.error = nil } })) {
             Button("OK") { client.error = nil }
@@ -253,48 +267,5 @@ struct IncomingOffer: View {
                 }
             }.navigationTitle("Incoming transfer")
         }
-    }
-}
-struct ReceivedFiles: View {
-    @Environment(\.mobileTheme) private var theme
-    let folder: URL
-    @ObservedObject var client: IOSClient
-    @State private var files: [URL] = []
-    @State private var exporting: FileExportSelection?
-    @State private var exportStatus = ""
-    var body: some View {
-        MobileList {
-            Section {
-                Text("Save a copy to iCloud Drive, Dropbox, OneDrive or another enabled Files location. Originals stay in BitSkim.").font(.footnote).foregroundStyle(theme?.muted ?? Color.secondary)
-                if !exportStatus.isEmpty { Text(exportStatus).font(.footnote) }
-            }
-            if files.isEmpty { Text("No received files in this folder.").foregroundStyle(theme?.muted ?? Color.secondary) }
-            ForEach(files, id: \.self) { file in
-                HStack {
-                    if (try? file.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-                        NavigationLink { ReceivedFiles(folder: file, client: client) } label: { Label(file.lastPathComponent, systemImage: "folder") }
-                    } else { ShareLink(item: file) { Label(file.lastPathComponent, systemImage: "doc") }.disabled(client.active) }
-                    Menu {
-                        Button("Save to Files", systemImage: "folder") {
-                            guard client.beginFileBrowser() else { return }
-                            exporting = FileExportSelection(urls: [file])
-                        }
-                        ShareLink(item: file) { Label("Share", systemImage: "square.and.arrow.up") }
-                    } label: { Image(systemName: "ellipsis.circle") }
-                    .accessibilityLabel("Actions for " + file.lastPathComponent)
-                    .disabled(client.active)
-                }
-            }
-        }.navigationTitle(folder.lastPathComponent).onAppear(perform: reload).refreshable { reload() }
-        .onChange(of: client.history) { _ in reload() }
-        .sheet(item: $exporting, onDismiss: { client.endFileBrowser() }) { selection in
-            FileProviderExport(urls: selection.urls) { copied in
-                if copied { exportStatus = "Copy handed to Files. Your provider manages cloud syncing." }
-                exporting = nil
-            }
-        }
-    }
-    private func reload() {
-        files = ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])) ?? []).sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
 }

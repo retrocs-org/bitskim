@@ -2,6 +2,10 @@
 
 ## 0.2 — In development
 
+- iOS review-before-send with recipient address, filenames, total size and explicit confirmation; changed files require another review.
+- iOS current-file progress, recent speed, remaining-time estimates and overall outgoing batch progress.
+- iOS received-file Quick Look previews, filename search, safe rename, confirmed deletion and multiple-item sharing/export.
+
 - iOS selects regular files through copy-based Apple Files import, preserving provider originals.
 
 - iOS persistent themes using the eight desktop palettes or system appearance; Settings with separate Theme and Diagnostics pages.

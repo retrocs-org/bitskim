@@ -33,6 +33,11 @@ struct MobileHistory: Identifiable, Equatable {
     @Published var importing = false
     @Published var filePicker = false
     @Published var sharedFiles: [URL] = []
+    @Published var review: SendReview?
+    @Published var progress = MobileProgress()
+    private var reviewLease = false
+    private var reviewCopies: [URL] = []
+    private var sendPlan: [SendFile] = []
     @Published var security = UserDefaults.standard.object(forKey: "security") as? Int ?? 1
     private var fileBrowserRequests = 0
     private var importBrowserOpen = false
@@ -44,7 +49,7 @@ struct MobileHistory: Identifiable, Equatable {
     private var lastDisplay = Date.distantPast
     private var lastAddressUpdate = Date.distantPast
     private var sending: [URL] = []
-    private var destination: (peer: String?, address: String, port: UInt16)?
+    private var destination: (peer: String?, address: String, port: UInt16, name: String)?
     private var platformReady = false
     let received: URL
     let listeningPort: UInt16
@@ -106,6 +111,7 @@ struct MobileHistory: Identifiable, Equatable {
         }
     }
     func stop() {
+        closeReview()
         generation &+= 1
         timer?.invalidate(); timer = nil
         if let client = engine { bs_cancel(client); updateHistory(client); bs_destroy(client) }
@@ -148,8 +154,32 @@ struct MobileHistory: Identifiable, Equatable {
         let nextCode = bs_pairing_code(client, &pairing) != 0 ? String(cString: pairing) : ""
         if code != nextCode { code = nextCode }
         let nextTrust = bs_trust_status(client) == 1; if trusted != nextTrust { trusted = nextTrust }
+        updateProgress(client, state: state)
         updateHistory(client)
         if !active && bs_queue_count(client) == 0 { cleanupSending() }
+    }
+    private func updateProgress(_ client: OpaquePointer, state: BSStatus) {
+        var next = MobileProgress()
+        next.filename = wireText(state.filename)
+        next.queued = Int(bs_queue_count(client)); next.paused = bs_queue_paused(client) != 0
+        next.rate = state.active != 0 ? UInt64(bs_transfer_rate(client)) : 0
+        var report = [CChar](repeating: 0, count: 256)
+        _ = bs_progress_summary(client, &report, report.count)
+        next.summary = String(cString: report)
+        var position: UInt = 0, count: UInt = 0
+        bs_queue_progress(client, &position, &count)
+        if state.incoming == 0, !sendPlan.isEmpty, Int(count) == sendPlan.count, position > 0 {
+            let completed = min(Int(position - 1), sendPlan.count)
+            next.position = "File \(position) of \(count)"
+            next.overallTotal = sendPlan.reduce(0) { $0 + $1.bytes }
+            next.overallDone = min(next.overallTotal, sendPlan.prefix(completed).reduce(0) { $0 + $1.bytes } + UInt64(state.transferred))
+            next.remainingSeconds = state.active != 0 ? MobileProgress.eta(remaining: next.overallTotal - next.overallDone, rate: next.rate) : nil
+        } else {
+            let count = bs_batch_count(client)
+            if count > 0 { next.position = "Item \(bs_batch_index(client) + 1) of \(count)" }
+            next.remainingSeconds = state.active != 0 && state.awaiting_decision == 0 ? MobileProgress.eta(remaining: UInt64(state.total - min(state.total, state.transferred)), rate: next.rate) : nil
+        }
+        if progress != next { progress = next }
     }
     private func updateHistory(_ client: OpaquePointer) {
         let next: [MobileHistory] = (0..<Int(bs_history_count(client))).compactMap { i in
@@ -195,20 +225,22 @@ struct MobileHistory: Identifiable, Equatable {
         if bs_security_configure(client, Int32(value), "") != 0 { security = value; defaults.set(value, forKey: "security") }
     }
     func prepare(peer: MobilePeer) {
+        guard review == nil, !active, !importing else { return }
         browseBeforeRecipient = false
-        destination = (peer.deviceID, peer.address, peer.port); chooseFiles()
+        destination = (peer.deviceID, peer.address, peer.port, peer.name); chooseFiles()
     }
     func prepare(address: String) {
         guard let target = ConnectionTarget(address) else { error = "Enter an IPv4 address, optionally followed by :port."; return }
+        guard review == nil, !active, !importing else { return }
         browseBeforeRecipient = false
-        destination = (nil, target.address, target.port); chooseFiles()
+        destination = (nil, target.address, target.port, ConnectionTarget.endpoint(target.address, port: target.port)); chooseFiles()
     }
     private func chooseFiles() {
         guard engine != nil, !active, !importing else { return }
         if sharedFiles.isEmpty {
             guard beginFileBrowser() else { return }
             importBrowserOpen = true; filePicker = true
-        } else { enqueue(sharedFiles) }
+        } else { presentReview(sharedFiles) }
     }
     func browseFiles() {
         guard !importing, beginFileBrowser() else { return }
@@ -240,7 +272,7 @@ struct MobileHistory: Identifiable, Equatable {
             importing = true
             let holdForClient = browseBeforeRecipient
             let root: URL
-            do { root = holdForClient ? try ShareInbox.root() : imports }
+            do { root = try ShareInbox.root() }
             catch { importing = false; self.error = error.localizedDescription; return }
             let currentGeneration = generation
             Task {
@@ -258,10 +290,44 @@ struct MobileHistory: Identifiable, Equatable {
                     }.value
                     importing = false
                     guard generation == currentGeneration else { removeOwned(staged); return }
-                    if holdForClient { refreshSharedFiles() } else { enqueue(staged) }
+                    refreshSharedFiles()
+                    if !holdForClient {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            guard self.generation == currentGeneration else { return }
+                            self.presentReview(staged)
+                        }
+                    }
                 } catch { importing = false; self.error = error.localizedDescription }
             }
         }
+    }
+    private func presentReview(_ files: [URL]) {
+        guard let destination, review == nil, let client = engine else { return }
+        guard bs_queue_count(client) == 0 else {
+            error = "Retry or cancel the queued transfer before starting another send."; return
+        }
+        do {
+            let manifest = try SendReview.make(recipient: destination.name, urls: files, endpoint: ConnectionTarget.endpoint(destination.address, port: destination.port))
+            guard beginFileBrowser() else { return }
+            reviewLease = true; reviewCopies = files; review = manifest
+        } catch { self.error = error.localizedDescription }
+    }
+    func closeReview() {
+        guard reviewLease else { return }
+        review = nil; reviewLease = false
+        let temporary = reviewCopies.filter { $0.standardizedFileURL.path.hasPrefix(imports.standardizedFileURL.path + "/") }
+        removeOwned(temporary); reviewCopies = []
+        endFileBrowser()
+    }
+    func confirmSend(_ manifest: SendReview) {
+        guard review?.id == manifest.id, let client = engine, bs_status(client)!.pointee.active == 0 else { return }
+        do {
+            let fresh = try SendReview.make(recipient: manifest.recipient, urls: manifest.files.map(\.url), endpoint: manifest.endpoint)
+            guard fresh.files.map(\.bytes) == manifest.files.map(\.bytes) else { throw messageError("The selected files changed. Review them again before sending.") }
+            sendPlan = fresh.files
+            reviewCopies = []; closeReview()
+            enqueue(fresh.files.map(\.url))
+        } catch { self.error = error.localizedDescription; closeReview() }
     }
     private func enqueue(_ files: [URL]) {
         guard let client = engine, let destination else { removeOwned(files); return }

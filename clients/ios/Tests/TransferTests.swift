@@ -130,6 +130,80 @@ final class TransferTests: XCTestCase {
         try await Task.sleep(nanoseconds: 250_000_000)
         withExtendedLifetime(subscription) { XCTAssertEqual(emptyOffers, 0) }
     }
+    @MainActor func testReviewDoesNotSendUntilExplicitConfirmation() async throws {
+        let source = root.appendingPathComponent("review.txt"), destination = root.appendingPathComponent("received.txt")
+        let bytes = Data("only after confirmation".utf8); try bytes.write(to: source)
+        let model = IOSClient(listeningPort: freePort())
+        model.start(); defer { model.stop() }
+        XCTAssertNil(model.error)
+        model.sharedFiles = [source]
+        model.prepare(address: "127.0.0.1:\(receiverPort)")
+        guard let review = model.review else { return XCTFail("Missing review") }
+        XCTAssertEqual(review.total, UInt64(bytes.count)); XCTAssertEqual(review.files.count, 1)
+        for _ in 0..<15 { bs_service(receiver, 4); try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertEqual(bs_status(receiver)!.pointee.active, 0)
+        model.closeReview(); XCTAssertNil(model.review)
+        XCTAssertEqual(try Data(contentsOf: source), bytes)
+        model.sharedFiles = [source]; model.prepare(address: "127.0.0.1:\(receiverPort)")
+        guard let confirmed = model.review else { return XCTFail("Missing second review") }
+        model.confirmSend(confirmed)
+        var accepted = false
+        for _ in 0..<400 {
+            bs_service(receiver, 4)
+            if !accepted, bs_status(receiver)!.pointee.awaiting_decision != 0 {
+                XCTAssertNotEqual(bs_accept(receiver, destination.path), 0); accepted = true
+            }
+            if accepted, !model.history.isEmpty, bs_status(receiver)!.pointee.active == 0 { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(accepted); XCTAssertEqual(try Data(contentsOf: destination), bytes)
+        XCTAssertEqual(model.history.first?.integrity, "Written file verified (CRC32)")
+    }
+    @MainActor func testReviewRejectsChangedFilesWithoutSending() async throws {
+        let source = root.appendingPathComponent("changed.txt")
+        try Data("first".utf8).write(to: source)
+        let model = IOSClient(listeningPort: freePort()); model.start(); defer { model.stop() }
+        model.sharedFiles = [source]; model.prepare(address: "127.0.0.1:\(receiverPort)")
+        guard let review = model.review else { return XCTFail("Missing review") }
+        try Data("a different length".utf8).write(to: source)
+        model.confirmSend(review)
+        XCTAssertNil(model.review); XCTAssertTrue(model.error?.contains("changed") == true)
+        bs_service(receiver, 4); XCTAssertEqual(bs_status(receiver)!.pointee.active, 0)
+    }
+    @MainActor func testConfirmedBatchReportsOverallProgress() async throws {
+        let first = root.appendingPathComponent("one.txt"), second = root.appendingPathComponent("two.bin")
+        let firstBytes = Data("first".utf8), secondBytes = Data(repeating: 61, count: 96 * 1024)
+        try firstBytes.write(to: first); try secondBytes.write(to: second)
+        let destination = root.appendingPathComponent("batch", isDirectory: true)
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
+        XCTAssertNotEqual(bs_limits_configure(receiver, 0, 64 * 1024), 0)
+        let model = IOSClient(listeningPort: freePort()); model.start(); defer { model.stop() }
+        model.sharedFiles = [first, second]; model.prepare(address: "127.0.0.1:\(receiverPort)")
+        guard let review = model.review else { return XCTFail("Missing review") }
+        let expected = UInt64(firstBytes.count + secondBytes.count)
+        XCTAssertEqual(review.total, expected); model.confirmSend(review)
+        var accepted = Set<UInt>(), observedOverall = false, previous: UInt64 = 0
+        for _ in 0..<600 {
+            bs_service(receiver, 4)
+            let state = bs_status(receiver)!.pointee, serial = bs_transfer_serial(receiver)
+            if state.awaiting_decision != 0, accepted.insert(serial).inserted {
+                if bs_batch_count(receiver) > 0 { XCTAssertNotEqual(bs_accept_batch(receiver, destination.path), 0) }
+                else { XCTAssertNotEqual(bs_accept(receiver, destination.appendingPathComponent(wireText(state.filename)).path), 0) }
+            }
+            if model.active, model.progress.overallTotal == expected {
+                observedOverall = true
+                XCTAssertGreaterThanOrEqual(model.progress.overallDone, previous)
+                XCTAssertLessThanOrEqual(model.progress.overallDone, expected)
+                previous = model.progress.overallDone
+            }
+            if model.history.count >= 2, state.active == 0 { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(observedOverall)
+        XCTAssertEqual(try Data(contentsOf: destination.appendingPathComponent("one.txt")), firstBytes)
+        XCTAssertEqual(try Data(contentsOf: destination.appendingPathComponent("two.bin")), secondBytes)
+        XCTAssertTrue(model.history.prefix(2).allSatisfy { $0.integrity == "Written file verified (CRC32)" })
+    }
     func testEmptyFile() throws {
         let source = root.appendingPathComponent("empty"), destination = root.appendingPathComponent("received")
         try Data().write(to: source)

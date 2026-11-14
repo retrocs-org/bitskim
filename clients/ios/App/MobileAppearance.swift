@@ -14,9 +14,10 @@ extension EnvironmentValues {
 }
 struct MobileList<Content: View>: View {
     @Environment(\.mobileTheme) private var theme
+    var selection: Binding<Set<URL>>? = nil
     @ViewBuilder let content: Content
     var body: some View {
-        List {
+        List(selection: selection) {
             content.listRowBackground(theme?.surface)
         }
         .scrollContentBackground(theme == nil ? .visible : .hidden)

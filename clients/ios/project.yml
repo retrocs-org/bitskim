@@ -70,6 +70,7 @@ targets:
       - path: App/FileProviderExport.swift
       - path: App/FileProviderImport.swift
       - path: App/IOSClient.swift
+      - path: App/ReceivedStore.swift
       - path: Shared
       - path: ../../core/bitskim.c
       - path: ../../core/platform.c
