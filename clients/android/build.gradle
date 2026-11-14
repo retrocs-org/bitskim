@@ -1,0 +1,2 @@
+plugins { id 'com.android.application' version '9.2.1' apply false }
+layout.buildDirectory = file('../../build/android/gradle-root')

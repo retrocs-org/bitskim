@@ -2,6 +2,9 @@
 
 ## 0.2 — In development
 
+- Experimental source-only Android client: native Clients/Files/Received/Settings tabs, standard document-provider selection, review before sending, foreground receiving, TLS/device trust, written-file verification, progress, session diagnostics and Mocha/shared themes.
+- Android build/run/bootstrap commands keep downloaded tools, SDK/NDK, Gradle and custom OpenSSL builds in the external shared tools directory. Physical-device and cloud-provider validation remain pending.
+
 - iOS review-before-send with recipient address, filenames, total size and explicit confirmation; changed files require another review.
 - iOS current-file progress, recent speed, remaining-time estimates and overall outgoing batch progress.
 - iOS received-file Quick Look previews, filename search, safe rename, confirmed deletion and multiple-item sharing/export.

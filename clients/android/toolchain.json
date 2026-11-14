@@ -1,0 +1,13 @@
+{
+  "gradle": "9.4.1",
+  "gradle_sha256": "2ab2958f2a1e51120c326cad6f385153bb11ee93b3c216c5fccebfdfbb7ec6cb",
+  "agp": "9.2.1",
+  "command_tools": "23.0",
+  "command_tools_archive": "commandlinetools-mac_arm64-16111833_latest.zip",
+  "command_tools_sha256": "58da8f215781cc0208743e88b65ae259780c55e7eb40e50373d377cf369232d6",
+  "platform": "android-37.0",
+  "build_tools": "36.0.0",
+  "ndk": "28.2.13676358",
+  "min_sdk": 26,
+  "target_sdk": 37
+}

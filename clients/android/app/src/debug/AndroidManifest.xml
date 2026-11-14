@@ -1,0 +1,3 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <instrumentation android:name=".RuntimeChecks" android:targetPackage="org.bitskim.android" android:label="BitSkim development checks" />
+</manifest>

@@ -20,3 +20,10 @@ release-config.json
 *.pem
 id_rsa
 id_ed25519
+
+# Android local IDE state; SDKs and keys live in the shared tools directory.
+clients/android/.gradle/
+clients/android/local.properties
+clients/android/app/build/
+*.keystore
+*.jks

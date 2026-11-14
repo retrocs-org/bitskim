@@ -36,10 +36,14 @@ External development runners and packet drivers are not redistributed with BitSk
 
 ## OpenSSL 3.5.9 (modern clients only)
 
-The macOS arm64 and Windows 10 x64 binaries statically link OpenSSL 3.5.9 under Apache License 2.0. See assets/licenses/OpenSSL-LICENSE (also included in modern distributions). Source: https://github.com/openssl/openssl/releases/tag/openssl-3.5.9 . The pinned download checksum and platform build procedure are in scripts/build-openssl.sh. Retro clients do not link OpenSSL.
+The macOS arm64, Windows 10 x64 and experimental Android/iOS binaries statically link OpenSSL 3.5.9 under Apache License 2.0. See assets/licenses/OpenSSL-LICENSE (also included in modern distributions). Source: https://github.com/openssl/openssl/releases/tag/openssl-3.5.9 . The pinned download checksum and platform build procedure are in scripts/build-openssl.sh. Retro clients do not link OpenSSL.
 
 ## Atari builds
 
 Atari executables statically link MiNTLib 0.60.1 (component licences, including COPYMINT, LGPL and BSD terms) and GEMlib 0.44.0 (identified as Public Domain in its gemlib.spec.in). MiNTLib contributors are credited; full component notices and source snapshots are included with Atari packages, alongside own-code relink objects. See assets/licenses/atari and RELINK in each archive. GCC 4.6.4 runtime code uses GPLv3 with the GCC Runtime Library Exception; the license and exception are included.
 
 STiNG 1.26's external transprt.h SDK is fetched from th-otto/STinG commit ab065dc94b01e9a5e29b584e2566a6552facd504 with a pinned hash. No STiNG runtime, NetUSBee driver, TOS ROM or SDK source is redistributed. Library/toolchain/source URLs, hashes and CPU flags are recorded in scripts/bootstrap-atari.py and docs/ATARI.md. Own BitSkim Atari source remains under the project MIT license.
+
+## Android development client
+
+The Android client uses AndroidX Core 1.17.0 and its transitive AndroidX components from Google Maven, Copyright The Android Open Source Project, under Apache License 2.0. See https://developer.android.com/jetpack/androidx and the corresponding Maven POM/license notices. AndroidX FileProvider grants access only to explicitly shared received files. The APK includes third-party notices, the project license, the Catppuccin license and the full Apache 2.0 text in OPENSSL-LICENSE.txt. Google Android SDK/NDK, Gradle and JDK are external build dependencies and are not included in the source archive.

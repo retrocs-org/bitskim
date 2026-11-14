@@ -30,6 +30,18 @@ Use an Apple silicon Mac with Xcode command-line tools/macOS SDK, Clang and Swif
 
 Output: `build/macos/BitSkim.app`. A local build defaults to ad-hoc signing. An installed Developer ID identity can be selected through `BITSKIM_SIGN_IDENTITY`; signing alone does not notarize an app. See [MACOS.md](MACOS.md).
 
+## Android — experimental
+
+On Apple silicon macOS, use JDK 21, Python, Perl, make and Xcode command-line tools. SDK/NDK, Gradle, their caches and custom OpenSSL builds remain in `~/Development/tools/android`. No release credentials are used.
+
+```sh
+brew install openjdk@21
+python3 scripts/bootstrap-android.py --install-sdk
+./scripts/build-android.sh
+```
+
+Output: `build/android/BitSkim-0.2-Android-debug.apk`, development-signed with an external debug key. `--discovery off` builds manual connections only. For local testing, install the runtime with `python3 scripts/bootstrap-android.py --runtime`, then use `./scripts/build-android.sh --run --avd BitSkim_API_37`. Use `--list-devices` and `--run --device SERIAL` for a connected device. See [ANDROID.md](ANDROID.md) for limits, permissions and the standalone run command.
+
 ## iPhone / iPad — experimental
 
 Use an Apple silicon Mac with full Xcode/iOS SDKs, XcodeGen, Perl, make and curl. Targets iOS 16+; App Group provisioning and development signing are needed to install on a device. Default builds use manual connections; automatic broadcast discovery requires Apple's approved entitlement.
