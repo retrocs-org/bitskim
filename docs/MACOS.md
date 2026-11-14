@@ -59,3 +59,8 @@ All clients now use disk-backed queues with a portable 32,760-file count ceiling
 New configurations default to Prefer encryption. Disable always uses plaintext; Prefer negotiates automatic TLS over discovery or manual IP when possible; Force rejects plaintext. A blank optional pairing key enables unpaired TLS, which does not verify peer identity. Matching optional keys authenticate trusted group membership. See TRANSFERS.md.
 
 Incoming file and folder approvals attach to the main BitSkim window after Transfer tools or connection sheets are dismissed. Preferences remains a separate window. Approval callbacks recheck the transfer identity so expired offers cannot approve a replacement transfer.
+
+
+Nearby devices are grouped by installation identity. A device with several advertised interfaces has one card; clicking it or dropping files asks which address to use. The same grouping applies to the menu-bar Send File To list. Selected endpoints retain the advertised identity check. iOS devices use iPhone/iPad icons.
+
+For a locally built development copy, quit the running BitSkim using its app/menu-bar Quit command, then run `open build/macos/BitSkim.app` from the project root. This opens the build product rather than the installed Applications copy.

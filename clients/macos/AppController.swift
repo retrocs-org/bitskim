@@ -92,14 +92,14 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     }
     func menuWillOpen(_ menu: NSMenu) {
         menu.removeAllItems()
-        let status = NSMenuItem(title: model.active ? model.status : "BitSkim · \(model.peers.count) nearby", action: nil, keyEquivalent: "")
+        let status = NSMenuItem(title: model.active ? model.status : "BitSkim · \(model.computers.count) nearby", action: nil, keyEquivalent: "")
         status.isEnabled = false; menu.addItem(status)
         menu.addItem(item("Show BitSkim", #selector(showAction)))
         menu.addItem(item("Connect by IP…", #selector(connectAction)))
         if !model.peers.isEmpty {
             let peers = NSMenuItem(title: "Send File To", action: nil, keyEquivalent: ""); let list = NSMenu()
-            for peer in model.peers {
-                let entry = item("\(peer.name) — \(peer.platform)", #selector(sendAction)); entry.representedObject = peer; entry.isEnabled = !model.active; list.addItem(entry)
+            for computer in model.computers {
+                let entry = item("\(computer.name) — \(computer.platform)", #selector(sendAction)); entry.representedObject = computer; entry.isEnabled = !model.active; list.addItem(entry)
             }
             peers.submenu = list; menu.addItem(peers)
         }
@@ -154,7 +154,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
     @objc private func cancelAction() { model.cancel() }
     @objc private func receivingAction() { model.receiving.toggle(); model.savePreferences() }
     @objc private func themeAction(_ sender: NSMenuItem) { if let id = sender.representedObject as? String { model.applyTheme(id) } }
-    @objc private func sendAction(_ sender: NSMenuItem) { if let peer = sender.representedObject as? Peer { model.chooseFile(for: peer) } }
+    @objc private func sendAction(_ sender: NSMenuItem) { if let computer = sender.representedObject as? PeerComputer { model.chooseFiles(for: computer) } }
     @objc private func quitAction() { NSApp.terminate(nil) }
 }
 @main enum BitSkimMain {

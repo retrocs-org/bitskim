@@ -13,6 +13,13 @@ struct Peer: Identifiable, Equatable {
     let port: UInt16
     var features: UInt32 = 0
     var receiverLimits = "Capabilities checked when connecting"
+    var symbolName: String {
+        let kind = platform.lowercased(), label = name.lowercased()
+        if kind.contains("ipad") || (kind.contains("ios") && label.contains("ipad")) { return "ipad" }
+        if kind.contains("ios") || kind.contains("iphone") { return "iphone" }
+        return kind.contains("amiga") ? "desktopcomputer" : "laptopcomputer"
+    }
+    var endpointLabel: String { address + ":" + String(port) }
     var transferFeatures: String {
         var options = ["File transfers"]
         if features & UInt32(BS_CAP_DIRECTORIES) != 0 { options.append("Folder transfers available") }
@@ -22,6 +29,23 @@ struct Peer: Identifiable, Equatable {
         if features & UInt32(BS_CAP_DISK_VERIFY) != 0 { options.append("Written-file verification available") }
         if features & UInt32(BS_CAP_RESUME) != 0 { options.append("Interrupted-file resume available") }
         return options.joined(separator: " · ") + "\n" + receiverLimits + "\nActive-file pause is not supported. Queue pause takes effect after the current file."
+    }
+}
+
+struct PeerComputer: Identifiable {
+    let id: String, name: String, platform: String
+    let endpoints: [Peer]
+    static func grouped(_ peers: [Peer]) -> [PeerComputer] {
+        var order: [String] = [], groups: [String: [Peer]] = [:], seen: Set<String> = []
+        for peer in peers where seen.insert(peer.id).inserted {
+            let identity = peer.id.count > 32 ? String(peer.id.prefix(32)) : peer.id
+            if groups[identity] == nil { order.append(identity) }
+            groups[identity, default: []].append(peer)
+        }
+        return order.compactMap { id in
+            guard let endpoints = groups[id], let first = endpoints.first else { return nil }
+            return PeerComputer(id: id, name: first.name, platform: first.platform, endpoints: endpoints.sorted { $0.endpointLabel < $1.endpointLabel })
+        }
     }
 }
 
@@ -319,6 +343,8 @@ final class ClientModel: ObservableObject {
         if peers != found { peers = found }
     }
 
+    var computers: [PeerComputer] { PeerComputer.grouped(peers) }
+
     func refresh() { if let engine { bs_refresh(engine) } }
     func cancel() { if let engine { bs_cancel(engine) } }
     func applyTheme(_ id: String) { themeID = AppTheme.find(id).id; savePreferences() }
@@ -339,7 +365,7 @@ final class ClientModel: ObservableObject {
         guard bs_status(engine)!.pointee.active == 0, bs_queue_scanning(engine) == 0 else { error("A transfer is already in progress."); return }
         let wasPaused = bs_queue_count(engine) > 0 && bs_queue_paused(engine) != 0
         let result: Int32
-        if peer.id.count > 32 { result = bs_queue_peer(engine, String(peer.id.prefix(32)), url.path) }
+        if peer.id.count > 32 { result = bs_queue_peer_address(engine, String(peer.id.prefix(32)), peer.address, peer.port, url.path) }
         else { result = bs_queue_address(engine, peer.address, peer.port, url.path) }
         if result == 0 { error(String(cString: bs_last_error(engine))) }
         else if !wasPaused { bs_queue_continue(engine) }
@@ -348,7 +374,7 @@ final class ClientModel: ObservableObject {
         revealWindow?()
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = true; panel.treatsFilePackagesAsDirectories = true; panel.allowsMultipleSelection = true
         panel.directoryURL = URL(fileURLWithPath: recentFolder(false))
-        panel.message = "Choose a file or directory to send to \(peer.name)"
+        panel.message = "Choose a file or directory to send to \(peer.name) at \(peer.endpointLabel)"
         panel.begin { [weak self] response in if response == .OK { for url in panel.urls { self?.send(url, to: peer) } } }
     }
     func sendSelected() {
@@ -379,6 +405,28 @@ final class ClientModel: ObservableObject {
             guard files.allSatisfy({ $0 != nil }) else { self.error("Could not read every dropped item."); return }
             for file in files.compactMap({ $0 }) { self.send(file, to: peer) }
         }
+        return true
+    }
+    private func chooseEndpoint(_ computer: PeerComputer, completion: @escaping (Peer) -> Void) {
+        guard !computer.endpoints.isEmpty else { return }
+        if computer.endpoints.count == 1 { completion(computer.endpoints[0]); return }
+        revealWindow?()
+        let alert = NSAlert(); alert.messageText = "Choose an address for " + computer.name
+        alert.informativeText = "This computer advertises several network interfaces. Choose the address reachable from this Mac; the device identity is checked before sending."
+        let menu = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 360, height: 28))
+        menu.addItems(withTitles: computer.endpoints.map { $0.endpointLabel }); alert.accessoryView = menu
+        alert.addButton(withTitle: "Continue"); alert.addButton(withTitle: "Cancel")
+        let decide: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+            guard response == .alertFirstButtonReturn, computer.endpoints.indices.contains(menu.indexOfSelectedItem) else { return }
+            let peer = computer.endpoints[menu.indexOfSelectedItem]; self?.selected = peer.id; DispatchQueue.main.async { completion(peer) }
+        }
+        if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "BitSkimMain" }) { alert.beginSheetModal(for: window, completionHandler: decide) }
+        else { decide(alert.runModal()) }
+    }
+    func chooseFiles(for computer: PeerComputer) { chooseEndpoint(computer) { [weak self] peer in self?.chooseFile(for: peer) } }
+    func drop(_ providers: [NSItemProvider], on computer: PeerComputer) -> Bool {
+        guard !providers.isEmpty else { return false }
+        chooseEndpoint(computer) { [weak self] peer in _ = self?.drop(providers, on: peer) }
         return true
     }
     private var automaticallyAcceptCurrent: Bool {
@@ -574,17 +622,18 @@ final class ClientModel: ObservableObject {
 
 final class PeerTileState: ObservableObject { @Published var targeted = false; @Published var hovered = false }
 struct PeerTile: View {
-    let peer: Peer
+    let computer: PeerComputer
+    private var peer: Peer { computer.endpoints[0] }
     @ObservedObject var model: ClientModel
     @StateObject private var tile = PeerTileState()
     private var highlighted: Bool { tile.targeted || tile.hovered }
     var body: some View {
         Button {
             model.selected = peer.id
-            model.chooseFile(for: peer)
+            model.chooseFiles(for: computer)
         } label: {
             VStack(spacing: 6) {
-                Image(systemName: peer.platform.lowercased().contains("amiga") ? "desktopcomputer" : "laptopcomputer")
+                Image(systemName: peer.symbolName)
                     .font(.system(size: 24, weight: .light))
                     .foregroundStyle(model.theme.accent)
                     .frame(width: 48, height: 48)
@@ -593,7 +642,7 @@ struct PeerTile: View {
                 Text(peer.name).font(.system(size: 12, weight: .semibold))
                     .multilineTextAlignment(.center).lineLimit(2).frame(height: 32)
                 Text(peer.platform).font(.system(size: 10)).foregroundStyle(model.theme.muted).lineLimit(1)
-                Text(peer.address + (peer.port == BS_PORT ? "" : ":\(peer.port)"))
+                Text(verbatim: computer.endpoints.count == 1 ? peer.endpointLabel : String(computer.endpoints.count) + " network addresses")
                     .font(.system(size: 9, design: .monospaced)).foregroundStyle(model.theme.muted)
                     .lineLimit(1).truncationMode(.middle)
             }
@@ -606,9 +655,9 @@ struct PeerTile: View {
         }
         .buttonStyle(.plain)
         .onHover { tile.hovered = $0 }
-        .onDrop(of: [UTType.fileURL.identifier], isTargeted: $tile.targeted) { model.drop($0, on: peer) }
+        .onDrop(of: [UTType.fileURL.identifier], isTargeted: $tile.targeted) { model.drop($0, on: computer) }
         .help("Click or drop a file or directory to send to \(peer.name)\n\(peer.transferFeatures)")
-        .accessibilityLabel("\(peer.name), \(peer.platform), \(peer.address)")
+        .accessibilityLabel("\(peer.name), \(peer.platform), \(computer.endpoints.count == 1 ? peer.endpointLabel : String(computer.endpoints.count) + " network addresses")")
         .accessibilityHint("Choose a file to send, or drop a file onto this computer. \(peer.receiverLimits)")
     }
 }
@@ -645,7 +694,7 @@ struct MainView: View {
                     }.frame(maxWidth: .infinity).padding(.vertical, 32)
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 160, maximum: 190), spacing: 12)], alignment: .leading, spacing: 12) {
-                        ForEach(model.peers) { PeerTile(peer: $0, model: model) }
+                        ForEach(model.computers) { PeerTile(computer: $0, model: model) }
                     }
                     .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 16)
                 }

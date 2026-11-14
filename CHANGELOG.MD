@@ -2,6 +2,8 @@
 
 ## 0.2 — In development
 
+- Mac groups multi-interface devices into one card and menu entry, asks for the selected address, retains identity checks and uses iPhone/iPad device icons.
+
 - iOS groups multi-interface discoveries into one computer with explicit, identity-checked address selection; boot migration messages are distinguished from successful app launches without resetting device data.
 
 - iOS receiving addresses keep port numbers ungrouped in all locales; local launch supports Device Hub and older Simulator app names.
