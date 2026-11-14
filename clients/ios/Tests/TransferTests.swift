@@ -2,6 +2,7 @@ import XCTest
 import Foundation
 import Darwin
 import UIKit
+import Combine
 
 final class TransferTests: XCTestCase {
     private var sender: OpaquePointer!, receiver: OpaquePointer!
@@ -15,6 +16,9 @@ final class TransferTests: XCTestCase {
         senderPort = freePort(); sender = makeClient("1", port: senderPort); receiverPort = freePort(); receiver = makeClient("2", port: receiverPort)
         XCTAssertNotNil(sender); XCTAssertNotNil(receiver)
         guard sender != nil, receiver != nil else { throw NSError(domain: "BitSkimTests", code: 1) }
+        let trust = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Trust", isDirectory: true)
+        try FileManager.default.createDirectory(at: trust, withIntermediateDirectories: true)
+        XCTAssertNotEqual(bs_trust_configure(sender, trust.path), 0)
         bs_batch_enable(sender, 1); bs_batch_enable(receiver, 1)
     }
     override func tearDownWithError() throws {
@@ -95,6 +99,35 @@ final class TransferTests: XCTestCase {
         XCTAssertEqual(result, false); XCTAssertEqual(try Data(contentsOf: source), bytes)
         delegate.documentPicker(picker, didPickDocumentsAt: [root.appendingPathComponent("copy")])
         XCTAssertEqual(result, true); XCTAssertEqual(try Data(contentsOf: source), bytes)
+    }
+    @MainActor func testFilesImportStartsAtCurrentReceivedDirectoryAndCancels() async throws {
+        let picker = FileProviderImport.controller(directory: root)
+        XCTAssertEqual(picker.directoryURL, root)
+        XCTAssertTrue(picker.allowsMultipleSelection)
+        var selected: [URL]?
+        var cancelled = false
+        let delegate = FileProviderImport.Coordinator { result in
+            switch result {
+            case .success(let urls): selected = urls
+            case .failure(let error): cancelled = (error as NSError).code == NSUserCancelledError
+            }
+        }
+        delegate.documentPickerWasCancelled(picker)
+        XCTAssertTrue(cancelled); XCTAssertNil(selected)
+        let source = root.appendingPathComponent("original.txt")
+        try Data("original".utf8).write(to: source)
+        delegate.documentPicker(picker, didPickDocumentsAt: [source])
+        XCTAssertEqual(selected, [source])
+        XCTAssertEqual(try String(contentsOf: source), "original")
+    }
+    @MainActor func testIdleReceiverDoesNotRepublishEmptyOffers() async throws {
+        let model = IOSClient(listeningPort: freePort())
+        model.start(); defer { model.stop() }
+        XCTAssertNil(model.error)
+        var emptyOffers = 0
+        let subscription = model.$offer.dropFirst().sink { if $0 == nil { emptyOffers += 1 } }
+        try await Task.sleep(nanoseconds: 250_000_000)
+        withExtendedLifetime(subscription) { XCTAssertEqual(emptyOffers, 0) }
     }
     func testEmptyFile() throws {
         let source = root.appendingPathComponent("empty"), destination = root.appendingPathComponent("received")

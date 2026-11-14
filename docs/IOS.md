@@ -17,13 +17,19 @@ Shared-inbox files stay on the device until queued. Failed or cancelled import c
 
 Keep BitSkim open to receive. On entering the background, it cancels active/queued transfers, closes its listeners and clears outgoing copies; completed received files remain. Opening it reconnects. Continuous background receiving and guaranteed completion while locked are not supported. There is no automatic acceptance of incoming files. The mobile UI uses verification-code device pairing; it does not yet expose shared-group PSK key entry.
 
+## Appearance and diagnostics
+
+The tabs are **Clients**, **Files**, **Received** and **Settings**. Open **Settings → Appearance → Theme** to choose Follow system or any of the eight desktop palettes from a dedicated selection page. Changes apply immediately to BitSkim screens, including received folders and incoming approvals, and are saved on this device. System document pickers retain Apple's standard interface.
+
+**Settings → Diagnostics** contains pairing controls, recent transfer verification results and the connection report. Incoming approvals also retain their pairing controls.
+
 ## Files and cloud storage
 
 BitSkim uses Apple's Files picker, so you can select documents from iCloud Drive and enabled providers such as Dropbox and OneDrive. Install the provider's app, sign in, then open **Files → Browse → … → Edit** and enable its location. See [Apple's setup guide](https://support.apple.com/en-ie/102238).
 
-To send, select a computer (or enter its address), choose **Choose from Files**, and browse to the provider. Selected regular files are downloaded/coordinated by Files and copied into BitSkim's outgoing storage before sending. Imported folders are not supported.
+To select files before choosing a recipient, open **Files → Browse Files**, browse to a local or enabled cloud location, and select your documents. BitSkim stages them in its local inbox; open **Clients** and choose a recipient to send. Pending selections survive reopening the app. You can also select a client (or enter its address) first and choose **Choose from Files**. Selected regular files are downloaded/coordinated by Files and copied into BitSkim's outgoing storage before sending. Imported folders are not supported.
 
-To export received content, open **Received**, tap the item's **…** menu and choose **Save to Files**. Choose a local or enabled cloud location. Files and folders are exported as copies; cancelling leaves the received original untouched. BitSkim pauses new incoming offers while its import/export picker is open. Finish or cancel an active transfer before opening Files.
+To export received content, open **Received**, tap the item's **…** menu and choose **Save to Files**. Choose a local or enabled cloud location. Files and folders are exported as copies; cancelling leaves the received original untouched. The importer opens the current Received directory, avoiding a stale initial Files location after updating the app. Browse/back controls still let you choose other enabled providers. BitSkim pauses new incoming offers while its import/export picker is open. Finish or cancel an active transfer before opening Files.
 
 Providers control availability, authentication, downloads and cloud syncing. BitSkim does not need separate Dropbox or OneDrive tokens, and a successful handoff to Files does not confirm that a remote cloud upload has finished. Physical-device testing with authenticated providers remains pending.
 

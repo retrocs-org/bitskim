@@ -36,6 +36,7 @@ struct MobileHistory: Identifiable, Equatable {
     @Published var security = UserDefaults.standard.object(forKey: "security") as? Int ?? 1
     private var fileBrowserRequests = 0
     private var importBrowserOpen = false
+    private var browseBeforeRecipient = false
     private var generation: UInt = 0
     private var engine: OpaquePointer?
     private var timer: Timer?
@@ -46,16 +47,17 @@ struct MobileHistory: Identifiable, Equatable {
     private var destination: (peer: String?, address: String, port: UInt16)?
     private var platformReady = false
     let received: URL
-    let listeningPort: UInt16 = {
-        guard let value = Bundle.main.object(forInfoDictionaryKey: "BitSkimListeningPort") as? String, let port = UInt16(value), port > 0 else { return UInt16(BS_PORT) }
-        return port
-    }()
+    let listeningPort: UInt16
     let discovery = (Bundle.main.object(forInfoDictionaryKey: "BitSkimBroadcastDiscovery") as? String) == "YES"
     private let support: URL
     private let imports: URL
     private let defaults = UserDefaults.standard
 
-    init() {
+    init(listeningPort: UInt16? = nil) {
+        self.listeningPort = listeningPort ?? {
+            guard let value = Bundle.main.object(forInfoDictionaryKey: "BitSkimListeningPort") as? String, let port = UInt16(value), port > 0 else { return UInt16(BS_PORT) }
+            return port
+        }()
         let fm = FileManager.default
         received = fm.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Received", isDirectory: true)
         support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -116,7 +118,7 @@ struct MobileHistory: Identifiable, Equatable {
         guard let client = engine else { return }
         bs_service(client, 4)
         let state = bs_status(client)!.pointee, serial = bs_transfer_serial(client)
-        if state.awaiting_decision == 0 || serial != displayedOffer { offer = nil }
+        if offer != nil && (state.awaiting_decision == 0 || serial != displayedOffer) { offer = nil }
         if state.awaiting_decision != 0 && serial != displayedOffer {
             displayedOffer = serial; filePicker = false
             let next = MobileOffer(id: serial, name: wireText(state.filename), peer: wireText(state.peer_name), size: state.total, count: Int(bs_batch_count(client)))
@@ -193,10 +195,12 @@ struct MobileHistory: Identifiable, Equatable {
         if bs_security_configure(client, Int32(value), "") != 0 { security = value; defaults.set(value, forKey: "security") }
     }
     func prepare(peer: MobilePeer) {
+        browseBeforeRecipient = false
         destination = (peer.deviceID, peer.address, peer.port); chooseFiles()
     }
     func prepare(address: String) {
         guard let target = ConnectionTarget(address) else { error = "Enter an IPv4 address, optionally followed by :port."; return }
+        browseBeforeRecipient = false
         destination = (nil, target.address, target.port); chooseFiles()
     }
     private func chooseFiles() {
@@ -205,6 +209,11 @@ struct MobileHistory: Identifiable, Equatable {
             guard beginFileBrowser() else { return }
             importBrowserOpen = true; filePicker = true
         } else { enqueue(sharedFiles) }
+    }
+    func browseFiles() {
+        guard !importing, beginFileBrowser() else { return }
+        browseBeforeRecipient = true; destination = nil
+        importBrowserOpen = true; filePicker = true
     }
     func beginFileBrowser() -> Bool {
         guard let client = engine, bs_status(client)!.pointee.active == 0 else {
@@ -229,7 +238,11 @@ struct MobileHistory: Identifiable, Equatable {
         case .success(let urls):
             guard !urls.isEmpty, urls.count <= 32 else { error = "Choose between 1 and 32 files at a time."; return }
             importing = true
-            let root = imports, currentGeneration = generation
+            let holdForClient = browseBeforeRecipient
+            let root: URL
+            do { root = holdForClient ? try ShareInbox.root() : imports }
+            catch { importing = false; self.error = error.localizedDescription; return }
+            let currentGeneration = generation
             Task {
                 do {
                     let staged = try await Task.detached(priority: .userInitiated) {
@@ -245,7 +258,7 @@ struct MobileHistory: Identifiable, Equatable {
                     }.value
                     importing = false
                     guard generation == currentGeneration else { removeOwned(staged); return }
-                    enqueue(staged)
+                    if holdForClient { refreshSharedFiles() } else { enqueue(staged) }
                 } catch { importing = false; self.error = error.localizedDescription }
             }
         }

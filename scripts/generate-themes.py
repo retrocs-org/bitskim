@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate both clients' palette tables from one committed source."""
+"""Generate client palette tables from one committed source."""
 from pathlib import Path
 import json
 ROOT=Path(__file__).resolve().parents[1]
@@ -30,7 +30,7 @@ c+='typedef struct { const char *id, *name; unsigned long base,surface,text,mute
 c+='#define BS_THEME_COUNT '+str(len(themes))+'\n#define BS_THEME_DEFAULT 3\n#define BS_THEME_CLASSIC 7\nstatic const BSTheme bs_themes[BS_THEME_COUNT] = {\n'
 for t in themes:c+='    {"'+t['id']+'","'+t['name']+'",'+','.join('0x'+t[r]+'UL' for r in roles)+'},\n'
 c+='};\n#endif\n'; (ROOT/'clients/amiga/themes.h').write_text(c)
-print('Generated matching palettes for both clients')
+print('Generated shared client palettes')
 win='/* Generated from assets/themes/palettes.json. */\n#ifndef BITSKIM_WINDOWS_THEMES_H\n#define BITSKIM_WINDOWS_THEMES_H\n'
 win+='typedef struct { const char *id; const wchar_t *name; COLORREF base,surface,text,muted,accent; int dark; } WinTheme;\n#define WIN_THEME_COUNT 8\n#define WIN_THEME_DEFAULT 3\nstatic const WinTheme win_themes[WIN_THEME_COUNT] = {\n'
 for t in themes:
@@ -40,3 +40,6 @@ for t in themes:
     win+='    {"'+t['id']+'",L"'+t['name']+'",'+','.join(colors)+','+str(int(t['dark']))+'},\n'
 win+='};\n#endif\n'
 (ROOT/'clients/windows/themes.h').write_text(win)
+
+ios = swift.replace('import AppKit', 'import UIKit').replace('struct AppTheme', 'struct MobileTheme').replace('AppTheme', 'MobileTheme').replace('NSColor', 'UIColor').replace('static func ns', 'static func ui').replace('UIColor(srgbRed:', 'UIColor(red:').replace('Color(nsColor: Self.ns(', 'Color(uiColor: Self.ui(')
+(ROOT/'clients/ios/App/Themes.swift').write_text(ios)

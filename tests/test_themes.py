@@ -24,6 +24,12 @@ class ThemeTests(unittest.TestCase):
         palettes=json.loads((ROOT/'assets/themes/palettes.json').read_text())
         ids=[t['id'] for t in palettes]; self.assertEqual(len(set(ids)),8)
         swift=(ROOT/'clients/macos/Themes.swift').read_text()
+        ios=(ROOT/'clients/ios/App/Themes.swift').read_text()
+        self.assertEqual(re.findall(r'MobileTheme\(id: "([^"]+)"',ios),ids)
+        for theme in palettes:
+            row=next(line for line in ios.splitlines() if 'id: "'+theme['id']+'"' in line)
+            for role in ('base','surface','text','muted','accent'):
+                self.assertIn(role+'Hex: 0x'+theme[role],row)
         amiga=(ROOT/'clients/amiga/themes.h').read_text()
         self.assertEqual(re.findall(r'AppTheme\(id: "([^"]+)"',swift),ids)
         self.assertEqual(re.findall(r'\{"([^"]+)"',amiga),ids)
