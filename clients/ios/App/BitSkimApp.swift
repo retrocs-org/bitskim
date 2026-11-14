@@ -35,13 +35,18 @@ struct MobileHome: View {
                         }
                     }
                     Section("Nearby computers") {
-                        ForEach(client.peers) { peer in
-                            Button { client.prepare(peer: peer) } label: {
-                                VStack(alignment: .leading) {
-                                    Label(peer.name, systemImage: "desktopcomputer")
-                                    Text("\(peer.platform) · \(peer.address)").font(.caption).foregroundStyle(.secondary)
-                                }
-                            }.disabled(client.active || client.importing)
+                        ForEach(PeerCatalog.computers(client.peers)) { computer in
+                            if computer.endpoints.count == 1, let peer = computer.endpoints.first {
+                                Button { client.prepare(peer: peer) } label: { ComputerRow(computer: computer) }
+                                    .buttonStyle(.plain).disabled(client.active || client.importing)
+                            } else {
+                                Menu {
+                                    ForEach(computer.endpoints) { peer in
+                                        Button(ConnectionTarget.endpoint(peer.address, port: peer.port)) { client.prepare(peer: peer) }
+                                    }
+                                } label: { ComputerRow(computer: computer) }
+                                    .disabled(client.active || client.importing)
+                            }
                         }
                         if client.peers.isEmpty {
                             Text(client.discovery ? "No computers found. Check Local Network permission, Wi-Fi and the other computer’s firewall." : "This build uses manual connections. Enter the computer’s IPv4 address below.")
@@ -105,6 +110,21 @@ struct MobileHome: View {
         .alert("BitSkim", isPresented: Binding(get: { client.error != nil }, set: { if !$0 { client.error = nil } })) {
             Button("OK") { client.error = nil }
         } message: { Text(client.error ?? "") }
+    }
+}
+struct ComputerRow: View {
+    let computer: MobileComputer
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "desktopcomputer").foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(computer.name).foregroundStyle(.primary)
+                Text(computer.platform).font(.caption).foregroundStyle(.secondary)
+                if computer.endpoints.count == 1, let peer = computer.endpoints.first {
+                    Text(verbatim: ConnectionTarget.endpoint(peer.address, port: peer.port)).font(.caption).foregroundStyle(.secondary)
+                } else { Text("\(computer.endpoints.count) network addresses · choose one").font(.caption).foregroundStyle(.secondary) }
+            }
+        }
     }
 }
 struct PairingControls: View {

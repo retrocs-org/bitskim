@@ -85,6 +85,8 @@ void bs_configure(BSClient *, const char *name, int visible, int receiving);
 int bs_send(BSClient *, const char *address, unsigned short port, const char *path);
 /* Resolve a unique catalog ID now and verify it in HELLO before offering data. */
 int bs_send_peer(BSClient *, const char *id, const char *path);
+/* Select one currently advertised endpoint without dropping HELLO identity checks. */
+int bs_send_peer_address(BSClient *,const char *id,const char *address,unsigned short port,const char *path);
 int bs_accept(BSClient *, const char *destination);
 /* Session policy; applies to future approvals, including the rest of a batch.
    Replace moves an existing file to a unique backup until final commit succeeds. */
@@ -125,6 +127,7 @@ const char *bs_last_folder(const BSClient *,int incoming);
 /* Local FIFO; failures/cancellation pause the current item for explicit retry.
    Capacity includes the running queued item. Folders are scanned; no implicit retry. */
 int bs_queue_peer(BSClient *,const char *id,const char *path);
+int bs_queue_peer_address(BSClient *,const char *id,const char *address,unsigned short port,const char *path);
 int bs_queue_address(BSClient *,const char *address,unsigned short port,const char *path);
 typedef struct { char path[BS_PATH_MAX+1]; unsigned long total; int active,paused; } BSQueueItem;
 /* Copy a bounded queue snapshot. Paths are local native encoding, not wire UTF-8.

@@ -557,6 +557,17 @@ int bs_send_peer(BSClient *c,const char *id,const char *path) {
     if(!bs_send(c,address,port,path)) return 0;
     copystr(c->expected_id,identity,sizeof(c->expected_id)); return 1;
 }
+int bs_send_peer_address(BSClient *c,const char *id,const char *address,unsigned short port,const char *path) {
+    int i,found=0;char identity[33],ip[48];
+    if(!c)return 0;
+    if(c->state!=IDLE){copystr(c->error,"A transfer is already active",256);return 0;}
+    if(!id || strlen(id)!=32 || !address || strlen(address)>=48){copystr(c->error,"Invalid peer endpoint",256);return 0;}
+    copystr(identity,id,sizeof identity);copystr(ip,address,sizeof ip);if(!port)port=BS_PORT;
+    for(i=0;i<c->peer_count;i++)if(!strcmp(c->peers[i].id,identity) && !strcmp(c->peers[i].address,ip) && c->peers[i].port==port){found=1;break;}
+    if(!found){copystr(c->error,"Selected peer address is unavailable; refresh and try again",256);return 0;}
+    if(!bs_send(c,ip,port,path))return 0;
+    copystr(c->expected_id,identity,sizeof c->expected_id);return 1;
+}
 static int same_local_path(const char *a,const char *b){while(*a && *b){if(toupper((unsigned char)*a++)!=toupper((unsigned char)*b++))return 0;}return !*a && !*b;}
 static int storage_check(BSClient *,const char *,int);
 static void storage_parent(const char *,char *);

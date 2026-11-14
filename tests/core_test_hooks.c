@@ -46,3 +46,8 @@ int bs_test_broadcast_count(void) { return broadcasts; }
 #define tmpfile test_tmpfile
 #include "../core/bitskim.c"
 int bs_test_batch_token(const BSClient *c,unsigned char *out) {if(!c->in_batch)return 0;memcpy(out,c->in_batch->token,16);return 1;}
+
+void bs_test_peer_endpoint(BSClient *c,const char *id,const char *address,unsigned short port) {
+    BSPeer *p;if(c->peer_count>=BS_MAX_PEERS)return;p=&c->peers[c->peer_count++];memset(p,0,sizeof *p);
+    copystr(p->id,id,sizeof p->id);copystr(p->address,address,sizeof p->address);copystr(p->name,"Test endpoint",sizeof p->name);p->port=port;p->last_seen=bsp_seconds();
+}

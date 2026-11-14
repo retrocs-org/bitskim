@@ -25,10 +25,16 @@ class ManualAddress(unittest.TestCase):
  let plain=ConnectionTarget(" 192.168.1.5 ")!;assert(plain.address=="192.168.1.5" && plain.port==46440)
  assert(ConnectionTarget("10.1.2.3:1234")!.port==1234)
  assert(ConnectionTarget.endpoint("10.1.2.3",port:46441)=="10.1.2.3:46441")
+ let a=MobilePeer(deviceID:"mac",name:"Mac",platform:"macOS",address:"10.1.2.3",port:46440)
+ let b=MobilePeer(deviceID:"mac",name:"Mac",platform:"macOS",address:"192.168.1.3",port:46440)
+ let c=MobilePeer(deviceID:"windows",name:"PC",platform:"Windows",address:"10.1.2.4",port:46440)
+ let computers=PeerCatalog.computers([a,a,b,c]);assert(computers.count==2)
+ assert(computers[0].endpoints.count==2 && a.id != b.id)
+ assert(computers[0].endpoints[0].port==46440)
  for bad in ["", "host.local", "http://10.1.2.3", "999.1.2.3", "1.2.3.4:0", "1.2.3.4:65536", "1.2.3.4:", "::1", "1.2.3.4:1:2"] {assert(ConnectionTarget(bad)==nil,bad)}
 }}
 '''
   with tempfile.TemporaryDirectory() as d:
    folder=Path(d);(folder/'check.swift').write_text(source)
-   subprocess.run(['swiftc','-parse-as-library','-module-cache-path',str(folder/'cache'),str(ROOT/'clients/ios/Shared/ConnectionTarget.swift'),str(folder/'check.swift'),'-o',str(folder/'check')],check=True,capture_output=True)
+   subprocess.run(['swiftc','-parse-as-library','-module-cache-path',str(folder/'cache'),str(ROOT/'clients/ios/Shared/ConnectionTarget.swift'),str(ROOT/'clients/ios/Shared/PeerCatalog.swift'),str(folder/'check.swift'),'-o',str(folder/'check')],check=True,capture_output=True)
    subprocess.run([str(folder/'check')],check=True,capture_output=True)

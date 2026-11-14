@@ -25,6 +25,10 @@ class CoreTests(unittest.TestCase):
         l.bs_discovery_search.argtypes=[C.c_void_p,C.c_int]
         l.bs_send.argtypes=[C.c_void_p,C.c_char_p,C.c_ushort,C.c_char_p]; l.bs_send.restype=C.c_int
         l.bs_send_peer.argtypes=[C.c_void_p,C.c_char_p,C.c_char_p]; l.bs_send_peer.restype=C.c_int
+        for name in ('bs_send_peer_address','bs_queue_peer_address'):
+            getattr(l,name).argtypes=[C.c_void_p,C.c_char_p,C.c_char_p,C.c_ushort,C.c_char_p];getattr(l,name).restype=C.c_int
+        l.bs_test_peer_endpoint.argtypes=[C.c_void_p,C.c_char_p,C.c_char_p,C.c_ushort]
+        l.bs_queue_count.argtypes=[C.c_void_p];l.bs_queue_count.restype=C.c_int
         l.bs_accept.argtypes=[C.c_void_p,C.c_char_p]; l.bs_accept.restype=C.c_int
         l.bs_transfer_rate.argtypes=[C.c_void_p]; l.bs_transfer_rate.restype=C.c_ulong
         l.bs_transfer_serial.argtypes=[C.c_void_p];l.bs_transfer_serial.restype=C.c_ulong
@@ -385,4 +389,29 @@ class CoreTests(unittest.TestCase):
         self.until(lambda:self.lib.bs_peer_count(self.b)>0)
         peer=self.lib.bs_peer(self.b,0).contents
         self.assertEqual(peer.name,b'Test'); self.assertEqual(peer.address,b'127.0.0.1')
+    def test_queued_discovered_endpoint_selects_one_address_and_preserves_identity(self):
+        source=self.root/'selected.txt';source.write_bytes(b'selected endpoint')
+        self.lib.bs_test_peer_endpoint(self.a,b'b'*32,b'127.0.0.1',self.pb)
+        self.lib.bs_test_peer_endpoint(self.a,b'b'*32,b'192.0.2.123',self.pb)
+        self.assertEqual(self.lib.bs_send_peer(self.a,b'b'*32,os.fsencode(source)),0)
+        self.assertIn(b'ambiguous',self.lib.bs_last_error(self.a))
+        self.assertEqual(self.lib.bs_queue_peer_address(self.a,b'b'*32,b'127.0.0.1',self.pb,os.fsencode(source)),1)
+        self.until(lambda:self.status(self.b).awaiting_decision)
+        dest=self.root/'received-selected.txt';self.assertEqual(self.lib.bs_accept(self.b,os.fsencode(dest)),1)
+        self.until(lambda:not self.status(self.a).active and not self.status(self.b).active and not self.lib.bs_queue_count(self.a))
+        self.assertEqual(dest.read_bytes(),b'selected endpoint')
+    def test_selected_endpoint_rejects_changed_hello_identity(self):
+        source=self.root/'private.txt';source.write_bytes(b'must not be offered')
+        self.lib.bs_test_peer_endpoint(self.a,b'c'*32,b'127.0.0.1',self.pb)
+        self.assertEqual(self.lib.bs_send_peer_address(self.a,b'c'*32,b'127.0.0.1',self.pb,os.fsencode(source)),1)
+        self.until(lambda:not self.status(self.a).active)
+        self.assertIn(b'Peer identity changed',self.lib.bs_last_error(self.a))
+        self.assertFalse(self.status(self.b).awaiting_decision)
+    def test_selected_endpoint_rejects_unadvertised_address_or_port(self):
+        source=self.root/'unused.txt';source.write_bytes(b'x')
+        self.lib.bs_test_peer_endpoint(self.a,b'b'*32,b'127.0.0.1',self.pb)
+        port=self.pb+1 if self.pb<65535 else self.pb-1
+        self.assertEqual(self.lib.bs_send_peer_address(self.a,b'b'*32,b'127.0.0.1',port,os.fsencode(source)),0)
+        self.assertFalse(self.status(self.a).active)
+        self.assertIn(b'address is unavailable',self.lib.bs_last_error(self.a))
 if __name__=='__main__': unittest.main(verbosity=2)

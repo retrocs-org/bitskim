@@ -2,6 +2,8 @@
 
 ## 0.2 — In development
 
+- iOS groups multi-interface discoveries into one computer with explicit, identity-checked address selection; boot migration messages are distinguished from successful app launches without resetting device data.
+
 - iOS receiving addresses keep port numbers ungrouped in all locales; local launch supports Device Hub and older Simulator app names.
 
 - iOS `--run`, device selection and device listing for local build/install/launch, with a separate test listening port so the Mac desktop client can run alongside it.

@@ -6,11 +6,12 @@ final class TransferTests: XCTestCase {
     private var sender: OpaquePointer!, receiver: OpaquePointer!
     private var root: URL!
     private var receiverPort: UInt16 = 0
+    private var senderPort: UInt16 = 0
     override func setUpWithError() throws {
         root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         XCTAssertNotEqual(bs_platform_init(), 0)
-        sender = makeClient("1", port: freePort()); receiverPort = freePort(); receiver = makeClient("2", port: receiverPort)
+        senderPort = freePort(); sender = makeClient("1", port: senderPort); receiverPort = freePort(); receiver = makeClient("2", port: receiverPort)
         XCTAssertNotNil(sender); XCTAssertNotNil(receiver)
         guard sender != nil, receiver != nil else { throw NSError(domain: "BitSkimTests", code: 1) }
         bs_batch_enable(sender, 1); bs_batch_enable(receiver, 1)
@@ -60,6 +61,28 @@ final class TransferTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: destination), bytes)
         var item = BSHistoryItem(); XCTAssertEqual(bs_history_item(receiver, 0, &item), 1)
         XCTAssertEqual(item.result, Int32(BS_RESULT_COMPLETE.rawValue)); XCTAssertEqual(item.verified, 1)
+    }
+    func testSelectedAdvertisedEndpointKeepsVerifiedReceipt() throws {
+        let source = root.appendingPathComponent("selected"), destination = root.appendingPathComponent("received")
+        let bytes = Data("selected address".utf8); try bytes.write(to: source)
+        let udp = Darwin.socket(AF_INET, SOCK_DGRAM, 0); defer { Darwin.close(udp) }
+        var address = sockaddr_in(); address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size); address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = senderPort.bigEndian; address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        var packet = Array("BSKD".utf8) + [UInt8(1), 2] + [UInt8](repeating: 0, count: 15) + [2, UInt8(receiverPort >> 8), UInt8(receiverPort & 255), 4, 3] + Array("PeeriOS".utf8)
+        packet += [UInt8](repeating: 0, count: 160 - packet.count)
+        packet.withUnsafeBytes { data in
+            withUnsafePointer(to: &address) { pointer in pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                XCTAssertEqual(sendto(udp, data.baseAddress, data.count, 0, $0, socklen_t(MemoryLayout<sockaddr_in>.size)), data.count)
+            } }
+        }
+        guard pump({ bs_peer_count(sender) == 1 }) else { return }
+        let identity = String(repeating: "0", count: 31) + "2"
+        XCTAssertEqual(bs_queue_peer_address(sender, identity, "127.0.0.1", receiverPort, source.path), 1)
+        guard pump({ bs_status(receiver)!.pointee.awaiting_decision != 0 }) else { return }
+        XCTAssertEqual(bs_accept(receiver, destination.path), 1)
+        guard pump({ bs_queue_count(sender) == 0 && bs_status(receiver)!.pointee.active == 0 }) else { return }
+        XCTAssertEqual(try Data(contentsOf: destination), bytes)
+        var item = BSHistoryItem(); XCTAssertEqual(bs_history_item(receiver, 0, &item), 1); XCTAssertEqual(item.verified, 1)
     }
     func testEmptyFile() throws {
         let source = root.appendingPathComponent("empty"), destination = root.appendingPathComponent("received")

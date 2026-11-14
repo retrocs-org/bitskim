@@ -12,7 +12,7 @@ static int bs_queue_add(BSClient *c,const char *id,const char *address,unsigned 
     kind=bsp_path_kind(path);if((kind!=1 && kind!=2) || (kind==1 && !bsp_size(path,&size))){copystr(c->error,"Choose a regular file or readable folder; links and special files are not sent",256);return 0;}
     if(c->queue_count>=BS_QUEUE_MAX){copystr(c->error,"Queue count exceeds the portable count range",256);return 0;}
     if((id && strlen(id)!=32) || (!id && (!address || strlen(address)>=48 || !inet_addr(address) || inet_addr(address)==INADDR_NONE))){copystr(c->error,"Invalid queue recipient",256);return 0;}
-    memset(&q,0,sizeof q);if(id)copystr(q.id,id,33);else copystr(q.address,address,48);
+    memset(&q,0,sizeof q);if(id)copystr(q.id,id,33);if(address)copystr(q.address,address,48);
     q.kind=kind==2?2:0;if(kind==2){if(++c->tree_counter==0)++c->tree_counter;q.group=c->tree_counter;}
     q.total=size;q.port=port?port:BS_PORT;copystr(q.path,path,sizeof q.path);
     if(!c->queue_file)c->queue_file=bsp_temp_file();
@@ -23,6 +23,11 @@ static int bs_queue_add(BSClient *c,const char *id,const char *address,unsigned 
     c->queue_count++;remember_folder(c,0,path,kind==2);return 1;
 }
 int bs_queue_peer(BSClient *c,const char *id,const char *path){return bs_queue_add(c,id,NULL,0,path);}
+int bs_queue_peer_address(BSClient *c,const char *id,const char *address,unsigned short port,const char *path){
+    if(!c || !id || !address)return 0;
+    if(strlen(address)>=48 || !inet_addr(address) || inet_addr(address)==INADDR_NONE){copystr(c->error,"Invalid queue recipient",256);return 0;}
+    return bs_queue_add(c,id,address,port,path);
+}
 int bs_queue_address(BSClient *c,const char *ip,unsigned short port,const char *path){return bs_queue_add(c,NULL,ip,port,path);}
 int bs_queue_item(const BSClient *c,int index,BSQueueItem *out){BSQueued q;if(!out)return 0;memset(out,0,sizeof *out);if(!c || !queue_read(c,index,&q))return 0;copystr(out->path,q.path,sizeof out->path);out->total=q.total;out->active=index==0 && c->queue_active && c->status.active && !c->status.incoming;out->paused=c->queue_paused;return 1;}
 void bs_queue_progress(const BSClient *c,unsigned long *position,unsigned long *total){if(position)*position=c?c->queue_processed+(c->queue_count?1:0):0;if(total)*total=c?c->queue_processed+(unsigned long)c->queue_count:0;}
@@ -64,7 +69,7 @@ static void queue_tick(BSClient *c){BSQueued q;const BSBatchItem *item;char name
     item=batch_item(c->queue_batch,c->queue_batch_index);
     if(!item || (q.kind==1?bsp_path_kind(q.path)!=2:(!bsp_size(q.path,&size) || bsp_path_kind(q.path)!=1)) || (q.relative[0]?(copystr(name,q.relative,256),0):!wire_filename(q.path,name)) || (q.kind!=1 && size!=item->total) || strcmp(name,item->filename)){copystr(c->error,"A queued file changed; clear and queue it again",256);goto failed;}
     c->queue_dir_request=q.kind==1;
-    ok=q.id[0]?bs_send_peer(c,q.id,q.path):bs_send(c,q.address,q.port,q.path);c->queue_dir_request=0;
+    ok=q.id[0]?(q.address[0]?bs_send_peer_address(c,q.id,q.address,q.port,q.path):bs_send_peer(c,q.id,q.path)):bs_send(c,q.address,q.port,q.path);c->queue_dir_request=0;
     if(ok){c->queue_active=1;c->out_batch=c->queue_batch;c->out_batch_index=c->queue_batch_index;if(q.relative[0])copystr(c->status.filename,q.relative,256);return;}
 failed:run_record(c,BS_RESULT_FAILED);c->queue_paused=1;copystr(c->status.message,c->error,256);notify(c,BS_EVENT_ERROR);
 }

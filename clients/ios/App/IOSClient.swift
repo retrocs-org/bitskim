@@ -9,9 +9,6 @@ func wireText<T>(_ value: T) -> String {
         String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
     }
 }
-struct MobilePeer: Identifiable, Equatable {
-    let id: String, name: String, platform: String, address: String
-}
 struct MobileOffer: Identifiable {
     let id: UInt, name: String, peer: String, size: UInt, count: Int
 }
@@ -137,7 +134,7 @@ struct MobileHistory: Identifiable, Equatable {
         if transferred != state.transferred { transferred = state.transferred }; if total != state.total { total = state.total }
         let next = (0..<Int(bs_peer_count(client))).compactMap { i -> MobilePeer? in
             guard let p = bs_peer(client, Int32(i))?.pointee else { return nil }
-            return MobilePeer(id: wireText(p.id), name: wireText(p.name), platform: wireText(p.platform), address: wireText(p.address))
+            return MobilePeer(deviceID: wireText(p.id), name: wireText(p.name), platform: wireText(p.platform), address: wireText(p.address), port: p.port)
         }
         if peers != next { peers = next }
         var buffer = [CChar](repeating: 0, count: 8192)
@@ -194,7 +191,7 @@ struct MobileHistory: Identifiable, Equatable {
         if bs_security_configure(client, Int32(value), "") != 0 { security = value; defaults.set(value, forKey: "security") }
     }
     func prepare(peer: MobilePeer) {
-        destination = (peer.id, peer.address, UInt16(BS_PORT)); chooseFiles()
+        destination = (peer.deviceID, peer.address, peer.port); chooseFiles()
     }
     func prepare(address: String) {
         guard let target = ConnectionTarget(address) else { error = "Enter an IPv4 address, optionally followed by :port."; return }
@@ -235,7 +232,7 @@ struct MobileHistory: Identifiable, Equatable {
     private func enqueue(_ files: [URL]) {
         guard let client = engine, let destination else { removeOwned(files); return }
         for (index, file) in files.enumerated() {
-            let ok = destination.peer.map { bs_queue_peer(client, $0, file.path) } ?? bs_queue_address(client, destination.address, destination.port, file.path)
+            let ok = destination.peer.map { bs_queue_peer_address(client, $0, destination.address, destination.port, file.path) } ?? bs_queue_address(client, destination.address, destination.port, file.path)
             if ok == 0 {
                 error = String(cString: bs_last_error(client))
                 let unsentImports = files[index...].filter { $0.standardizedFileURL.path.hasPrefix(imports.standardizedFileURL.path + "/") }

@@ -1,5 +1,5 @@
 """Exercise device selection and install/launch sequencing without changing devices."""
-import importlib.util,json,plistlib,subprocess,tempfile,unittest
+import importlib.util,io,json,plistlib,subprocess,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
@@ -28,6 +28,20 @@ class IOSRunner(unittest.TestCase):
     self.assertEqual(run.call_args_list[-1].args[0][2],('Device Hub','DeviceHub','Simulator')[first_success])
   with patch.object(runner.subprocess,'run',return_value=subprocess.CompletedProcess([],1,'')):
    self.assertFalse(runner.open_window('ONE'))
+ def test_migration_failure_is_distinguished_from_successful_launch(self):
+  with tempfile.TemporaryDirectory() as d:
+   app=Path(d);(app/'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'org.example.bitskim'}))
+   boot=subprocess.CompletedProcess([],0,'Data Migration Failed','')
+   good=subprocess.CompletedProcess([],0,'','')
+   with patch.object(runner.subprocess,'run',side_effect=[boot,good,good,good]) as run,patch('sys.stderr',new_callable=io.StringIO) as error:
+    runner.launch(app,device());self.assertIn('installation and launch succeeded',error.getvalue())
+    self.assertFalse(any('erase' in call.args[0] or 'uninstall' in call.args[0] for call in run.call_args_list))
+ def test_boot_failure_stops_before_install(self):
+  with tempfile.TemporaryDirectory() as d:
+   app=Path(d);(app/'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'org.example.bitskim'}))
+   with patch.object(runner.subprocess,'run',side_effect=subprocess.CalledProcessError(1,['bootstatus'])) as run:
+    with self.assertRaises(subprocess.CalledProcessError):runner.launch(app,device())
+    self.assertEqual(run.call_count,1)
  def test_launch_preserves_existing_data_and_uses_built_bundle_identifier(self):
   with tempfile.TemporaryDirectory() as d:
    app=Path(d)/'App with spaces.app';app.mkdir();(app/'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'org.example.bitskim'}))
