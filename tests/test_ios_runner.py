@@ -20,6 +20,14 @@ class IOSRunner(unittest.TestCase):
   data={'devices':{'com.apple.CoreSimulator.SimRuntime.iOS-27-2':[device()], 'com.apple.CoreSimulator.SimRuntime.iOS-15-0':[device(udid='OLD')], 'com.apple.CoreSimulator.SimRuntime.tvOS-27-2':[device(udid='TV')]}}
   with patch.object(runner.subprocess,'run',return_value=subprocess.CompletedProcess([],0,json.dumps(data))):
    self.assertEqual([item['udid'] for item in runner.devices()],['ONE'])
+ def test_viewer_supports_device_hub_and_legacy_simulator(self):
+  for first_success in range(3):
+   results=[subprocess.CompletedProcess([],1,'') for _ in range(first_success)]+[subprocess.CompletedProcess([],0,'')]
+   with patch.object(runner.subprocess,'run',side_effect=results) as run:
+    self.assertTrue(runner.open_window('ONE'))
+    self.assertEqual(run.call_args_list[-1].args[0][2],('Device Hub','DeviceHub','Simulator')[first_success])
+  with patch.object(runner.subprocess,'run',return_value=subprocess.CompletedProcess([],1,'')):
+   self.assertFalse(runner.open_window('ONE'))
  def test_launch_preserves_existing_data_and_uses_built_bundle_identifier(self):
   with tempfile.TemporaryDirectory() as d:
    app=Path(d)/'App with spaces.app';app.mkdir();(app/'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'org.example.bitskim'}))

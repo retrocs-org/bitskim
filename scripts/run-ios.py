@@ -19,14 +19,19 @@ def choose(available,requested=None):
   if len(matches)!=1:raise ValueError('Device name is missing or ambiguous. Use --list-devices and select an exact device ID.')
   return matches[0]
  return next((item for item in available if item['state']=='Booted'),next((item for item in available if 'iPhone' in item['name']),available[0]))
+def open_window(udid):
+ # Current Xcode uses Device Hub; older installations provide Simulator.
+ for name in ('Device Hub','DeviceHub','Simulator'):
+  window=subprocess.run(['open','-a',name,'--args','-CurrentDeviceUDID',udid],text=True,capture_output=True)
+  if window.returncode==0:return True
+ return False
 def launch(app,device):
  info=plistlib.loads((app/'Info.plist').read_bytes())
  bundle=info['CFBundleIdentifier'];udid=device['udid']
  print('Starting '+device['name']+' ('+udid+')',flush=True)
  subprocess.run(['xcrun','simctl','bootstatus',udid,'-b'],check=True)
  # A headless Xcode installation can run the app even if the window app is absent.
- window=subprocess.run(['open','-a','Simulator','--args','-CurrentDeviceUDID',udid],text=True,capture_output=True)
- if window.returncode:print('Simulator window unavailable. Open it from Xcode → Open Developer Tool → Simulator.',file=sys.stderr)
+ if not open_window(udid):print('Device Hub/Simulator window unavailable. Open it from Xcode → Open Developer Tool.',file=sys.stderr)
  subprocess.run(['xcrun','simctl','install',udid,str(app)],check=True)
  subprocess.run(['xcrun','simctl','launch','--terminate-running-process',udid,bundle],check=True)
  print('Launched '+bundle+' on '+device['name']+'. Existing app data was retained.')

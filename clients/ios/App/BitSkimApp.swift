@@ -50,7 +50,7 @@ struct MobileHome: View {
                         if client.discovery { Button("Refresh computers") { client.refresh() } }
                     }
                     Section("Receive on this device") {
-                        ForEach(client.addresses, id: \.self) { ip in Text("\(ip):\(client.listeningPort)").monospaced().textSelection(.enabled) }
+                        ForEach(client.addresses, id: \.self) { ip in Text(verbatim: ConnectionTarget.endpoint(ip, port: client.listeningPort)).monospaced().textSelection(.enabled) }
                         if client.addresses.isEmpty { Text("Connect to Wi-Fi to see a local receiving address.").font(.footnote).foregroundStyle(.secondary) }
                         Text("Enter this address on the sending computer. BitSkim must stay open.").font(.footnote).foregroundStyle(.secondary)
                     }

@@ -2,6 +2,7 @@ import Foundation
 import Network
 
 struct ConnectionTarget {
+    static func endpoint(_ address: String, port: UInt16) -> String { address + ":" + String(port) }
     let address: String
     let port: UInt16
     init?(_ text: String) {

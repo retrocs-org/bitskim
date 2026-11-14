@@ -24,6 +24,7 @@ class ManualAddress(unittest.TestCase):
 @main enum Check {static func main(){
  let plain=ConnectionTarget(" 192.168.1.5 ")!;assert(plain.address=="192.168.1.5" && plain.port==46440)
  assert(ConnectionTarget("10.1.2.3:1234")!.port==1234)
+ assert(ConnectionTarget.endpoint("10.1.2.3",port:46441)=="10.1.2.3:46441")
  for bad in ["", "host.local", "http://10.1.2.3", "999.1.2.3", "1.2.3.4:0", "1.2.3.4:65536", "1.2.3.4:", "::1", "1.2.3.4:1:2"] {assert(ConnectionTarget(bad)==nil,bad)}
 }}
 '''
