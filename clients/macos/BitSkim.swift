@@ -390,6 +390,22 @@ final class ClientModel: ObservableObject {
         let state = bs_status(engine)!.pointee
         return bs_transfer_serial(engine) == serial && state.incoming != 0 && state.awaiting_decision != 0
     }
+    private func presentIncomingAlert(_ alert: NSAlert, serial: UInt, decision: @escaping (NSApplication.ModalResponse) -> Void) {
+        guard offerMatches(serial), incomingAlert === alert else { return }
+        // Finish dismissing SwiftUI sheets before attaching approval to the main window.
+        tools = false; manual = false
+        revealWindow?()
+        guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "BitSkimMain" }) else {
+            decision(alert.runModal()); return
+        }
+        if window.attachedSheet != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                self?.presentIncomingAlert(alert, serial: serial, decision: decision)
+            }
+            return
+        }
+        alert.beginSheetModal(for: window, completionHandler: decision)
+    }
     private func incoming(peer: String, address: String, file: String, size: UInt) {
         guard let engine, bs_status(engine)!.pointee.awaiting_decision != 0 else { return }
         let serial = bs_transfer_serial(engine)
@@ -421,8 +437,7 @@ final class ClientModel: ObservableObject {
             } else if response == .alertFirstButtonReturn { self.chooseDestination(file, serial: serial) } else { bs_decline(engine) }
         }
         incomingAlert = alert
-        if let window = NSApp.windows.first(where: { $0.isVisible }) { alert.beginSheetModal(for: window, completionHandler: decision) }
-        else { decision(alert.runModal()) }
+        presentIncomingAlert(alert, serial: serial, decision: decision)
     }
     private func spaceReport(_ destination: String, collection: Bool) -> String {
         guard let engine else { return "" };var bytes=[CChar](repeating:0,count:256)
@@ -488,8 +503,7 @@ final class ClientModel: ObservableObject {
             } else if response == .alertFirstButtonReturn { choose() } else { bs_decline(engine) }
         }
         incomingAlert = alert
-        if let window = NSApp.keyWindow { alert.beginSheetModal(for: window, completionHandler: decision) }
-        else { decision(alert.runModal()) }
+        presentIncomingAlert(alert, serial: serial, decision: decision)
     }
     private func uniqueURL(_ url: URL) -> URL {
         if !FileManager.default.fileExists(atPath: url.path) { return url }

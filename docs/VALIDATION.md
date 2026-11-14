@@ -3,7 +3,7 @@
 Version 0.2 is checked through host regression tests, memory sanitizers, target builds and application startup checks. See [RELEASE-READINESS.md](RELEASE-READINESS.md) for the current release status.
 
 - Mac: application startup, preferences, transfer tools and receive-decision lifetime checks.
-- Windows: x64 build and startup/engine checks. Interactive setup and Windows 10 GUI coverage remain pending.
+- Windows: x64 build and startup/engine checks. Silent installer lifecycle checks passed on Windows 11; wizard interaction and Windows 10 GUI coverage remain pending.
 - AmigaOS: 68000 build, application startup, preferences and discovery. Broader hardware coverage remains pending.
 - DOS: 8086 build; binary payloads in both directions, discovery, tagged sends, queues, folders and incoming decisions. Physical network cards and older DOS versions remain unverified.
 - Atari: STinG and MiNTNet builds; STinG application startup and transfer tools navigation. Transfers and hardware coverage remain unverified.
@@ -25,9 +25,22 @@ The Mac and Windows Transfer tools present nearby compatibility details directly
 
 The Windows 11 run of `BitSkim-CoreCheck.exe` passed all 12 checks with zero failures: GUI image initialization, native socket handles, exclusive creation, device-name rejection, Winsock/Unicode binary transfer, automatic TLS, reverse empty-file transfer, collision-safe finalization, preserved destination size, a 24-file collection, native free-space queries, and nested Unicode/empty-directory transfer. This is a native Windows runtime result, distinct from host-only interoperability tests.
 
-The visual review found the startup window extending beyond the desktop at high DPI and unscaled/clipped Transfer tools controls. Window placement now fits the monitor work area; Transfer tools uses DPI-scaled controls with report and action rows anchored to the actual client size. `test_windows_window_fit.py` exercises the production placement/layout functions across DPI values and monitor work areas. Windows 10 and setup-installer interaction remain unverified.
+The visual review found the startup window extending beyond the desktop at high DPI and unscaled/clipped Transfer tools controls. Window placement now fits the monitor work area; Transfer tools uses DPI-scaled controls with report and action rows anchored to the actual client size. `test_windows_window_fit.py` exercises the production placement/layout functions across DPI values and monitor work areas. Windows 10 and interactive setup-wizard navigation remain unverified.
 
 A native GUI transfer from the installed Mac 0.1 app to Windows 0.2 also completed successfully. Windows reported all 60 test bytes received, `written file verified (CRC32)`, and a matching history entry with no error. The high-DPI tools window was visually rechecked after the layout fix: labels and footer controls fit the desktop. The extra disk-space confirmation seen during that run is removed for known-sufficient space; unknown/insufficient outcomes have dedicated regression coverage.
 
 
 The native Windows GUI initialization check also creates an actual multiline edit control, scrolls into its diagnostic text, updates it twice, and checks that the first visible line and text selection remain unchanged. It verifies report text/background brush colours for all eight application palettes using native GDI. `test_windows_tools_refresh.py` additionally covers unchanged updates and clamping when a report becomes shorter. The check is part of `BitSkim-CoreCheck.exe` through the sibling GUI executable’s `--check-startup` mode.
+
+
+## Native transfer, trust and installer follow-up — 14 November 2026
+
+Windows 0.2 sent a 38-byte file to the installed Mac 0.1 application with exact byte comparison and receiver readback verification. A second transfer used automatic TLS with matching verification codes; its received bytes also matched. The Mac remembered the Windows identity after restart. This check exposed Windows configuring persistent identity storage only when preferences were saved: startup now configures it before security initialization and fails closed if storage cannot be opened. Existing pins are retained.
+
+The actual tagged 0.1 and current cores additionally pass `test_cross_release_trust.py`: mutual code verification and saved pins, fresh-process restart in both directions, plaintext downgrade rejection, and changed-identity rejection. Native mutual trust persistence on both applications is not inferred solely from those engine tests.
+
+The updated Mac 0.2 received a Windows 0.2 folder containing three files and three directories, including an empty file, an empty directory and a Unicode filename. All file hashes matched and every file reported CRC32 readback verification. A separate encrypted 1 GiB transfer was cancelled after 1,855,488 received bytes: both clients recorded cancellation, the Mac reported incomplete integrity, and the destination was absent. Declining an offer before receiving bytes was checked separately. Finder-generated metadata is excluded from source/destination comparisons.
+
+Mac 0.2 attaches incoming approvals to the main window after dismissing Transfer tools or manual-connection sheets, rather than choosing an arbitrary visible/key window. `test_macos_approval_presentation.py` exercises dismissal scheduling and expired-offer guards without opening UI; `test_macos_offer_lifetime.py` retains the real-engine stale-offer checks.
+
+The isolated native Windows installer lifecycle passed: actual 0.1 payload install, upgrade to 0.2, refusal while old/current application mutexes are held, repeated installation, uninstall, fresh 0.2 install and uninstall, shortcut removal, and preservation of unknown files, settings and received data. The live application's settings hashes were unchanged. This is silent installer testing under the distinct `BitSkimInstallerTest` product, not navigation of the production setup wizard. Prepare it with `python3 scripts/prepare-windows-installer-review.py --makensis /path/to/makensis`; run `build/windows-installer-review/Run-installer-review.cmd` on Windows. Administrator approval is required for the isolated all-users test. It stages files locally before elevation and copies the report back.

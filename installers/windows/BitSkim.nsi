@@ -7,6 +7,9 @@ Unicode true
 !ifndef PRODUCT
 !define PRODUCT "BitSkim"
 !endif
+!ifndef PREVIOUS_APP_MUTEX
+!define PREVIOUS_APP_MUTEX "Local\BitSkim0.1"
+!endif
 !define KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT}"
 !ifndef APP_MUTEX
 !define APP_MUTEX "Local\BitSkim0.2"
@@ -20,7 +23,7 @@ InstallDir "$PROGRAMFILES64\${PRODUCT}"
 RequestExecutionLevel admin
 SetCompressor /SOLID zlib
 VIProductVersion "0.2.0.0"
-VIAddVersionKey "ProductName" "BitSkim"
+VIAddVersionKey "ProductName" "${PRODUCT}"
 VIAddVersionKey "ProductVersion" "0.2"
 VIAddVersionKey "FileVersion" "0.2"
 VIAddVersionKey "FileDescription" "BitSkim 0.2 all-users installer"
@@ -41,21 +44,28 @@ VIAddVersionKey "LegalCopyright" "BitSkim contributors; see included licenses"
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
 
-!macro CheckRunning
- System::Call 'kernel32::OpenMutexW(i 0x100000, i 0, w "${APP_MUTEX}") p.r0'
+!macro CheckMutex MUTEX_NAME
+ System::Call 'kernel32::OpenMutexW(i 0x100000, i 0, w "${MUTEX_NAME}") p.r0'
  ${If} $0 != 0
   System::Call 'kernel32::CloseHandle(p r0)'
   MessageBox MB_OK|MB_ICONEXCLAMATION "Close BitSkim using Quit in its tray menu, then run this installer again." /SD IDOK
+  SetErrorLevel 1
   Abort
  ${EndIf}
+!macroend
+!macro CheckRunning
+ !insertmacro CheckMutex "${APP_MUTEX}"
+ !insertmacro CheckMutex "${PREVIOUS_APP_MUTEX}"
 !macroend
 Function .onInit
  ${IfNot} ${AtLeastWin10}
   MessageBox MB_OK|MB_ICONSTOP "BitSkim requires Windows 10 or later." /SD IDOK
+  SetErrorLevel 1
   Abort
  ${EndIf}
  ${IfNot} ${RunningX64}
   MessageBox MB_OK|MB_ICONSTOP "This package requires a 64-bit Windows system with x64 application support." /SD IDOK
+  SetErrorLevel 1
   Abort
  ${EndIf}
  SetShellVarContext all
@@ -63,6 +73,7 @@ Function .onInit
  ReadRegStr $1 HKCU "${KEY}" "InstallLocation"
  ${If} $1 != ""
   MessageBox MB_OK|MB_ICONEXCLAMATION "An older per-user BitSkim installation was found at $1. Uninstall that copy first, then run this installer. Your AppData preferences and received files are preserved." /SD IDOK
+  SetErrorLevel 1
   Abort
  ${EndIf}
  ReadRegStr $0 HKLM "${KEY}" "InstallLocation"
@@ -118,6 +129,7 @@ Section "Uninstall"
  Delete "$INSTDIR\BitSkim.exe"
  ${If} ${Errors}
   MessageBox MB_OK|MB_ICONSTOP "BitSkim could not be removed. Close the app, then try again." /SD IDOK
+  SetErrorLevel 1
   Abort
  ${EndIf}
  Delete "$INSTDIR\Tools\BitSkim-CoreCheck.exe"

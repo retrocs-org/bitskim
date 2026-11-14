@@ -6,7 +6,7 @@ ROOT=Path(__file__).resolve().parents[1]
 class MacOfferLifetime(unittest.TestCase):
  def test_expired_offer_cannot_accept_or_decline_its_replacement(self):
   source=(ROOT/'clients/macos/BitSkim.swift').read_text()
-  guard=source[source.index('    private var automaticallyAcceptCurrent'):source.index('    private func incoming(peer:')]
+  guard=source[source.index('    private var automaticallyAcceptCurrent'):source.index('    private func presentIncomingAlert(')]
   accept=source[source.index('    private func accept(_ url:'):source.index('    func chooseFolder()')]
   send=source[source.index('    func send(_ url:'):source.index('    func chooseFile(for peer:')]
   swift='''import AppKit

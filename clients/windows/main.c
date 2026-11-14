@@ -668,7 +668,6 @@ static LRESULT CALLBACK prefs_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
             char name[64],folder[PATH_CAP]; capture_page();
             if(pref_bad_limits){error_box(w,L"Network speed limits: enter 0..1048575 KiB/s; 0 is Unlimited.");return 0;}
             if(!draft.name[0] || !utf8(draft.name,name,sizeof name) || !utf8(draft.folder,folder,sizeof folder)) { error_box(w,L"Use a nonempty name of at most 63 UTF-8 bytes and a folder path of at most 1023 UTF-8 bytes."); return 0; }
-            {wchar_t directory[PATH_CAP];char path[PATH_CAP];wchar_t *leaf;wcscpy(directory,ini_path);leaf=wcsrchr(directory,L'\\');if(leaf){*leaf=0;wcscat(directory,L"\\Trust");CreateDirectoryW(directory,NULL);if(utf8(directory,path,sizeof path) && !bs_trust_configure(client,path))error_box(NULL,L"Cannot initialize device trust storage.");}}
     { char key[65];
               if(bs_status(client)->active || bs_queue_count(client)) {error_box(w,L"Wait until the transfer queue is empty before saving preferences.");return 0;}
               if(!utf8(draft.key,key,sizeof key) || !bs_security_configure(client,draft.security,key)) {core_error();return 0;}
@@ -830,6 +829,18 @@ int WINAPI wWinMain(HINSTANCE h,HINSTANCE previous,PWSTR command,int show) {
     client=bs_create(&config,engine_event,NULL); if(!client) { error_box(NULL,L"Cannot listen on port 46440. Close another BitSkim instance or check your firewall/network settings."); bs_platform_cleanup(); return 1; }
     {char store[BS_PATH_MAX+1],*slash;
         if(utf8(ini_path,store,sizeof store)) {slash=strrchr(store,92);if(slash)strcpy(slash+1,"BSFOLD.DAT");bs_folders_configure(client,store);}
+    }
+    /* Load the persistent identity before any connection can initialize TLS. */
+    {wchar_t directory[PATH_CAP];char path[PATH_CAP];wchar_t *leaf;
+      lstrcpynW(directory,ini_path,PATH_CAP);leaf=wcsrchr(directory,L'\\');
+      if(!leaf || (size_t)(leaf-directory)+7>=PATH_CAP) {
+          error_box(NULL,L"Cannot initialize device trust storage.");bs_destroy(client);bs_platform_cleanup();return 1;
+      }
+      wcscpy(leaf,L"\\Trust");
+      if((!CreateDirectoryW(directory,NULL) && GetLastError()!=ERROR_ALREADY_EXISTS) ||
+         !utf8(directory,path,sizeof path) || !bs_trust_configure(client,path)) {
+          error_box(NULL,L"Cannot initialize device trust storage.");bs_destroy(client);bs_platform_cleanup();return 1;
+      }
     }
     { char key[65];
       if(!utf8(prefs.key,key,sizeof key) || !bs_security_configure(client,prefs.security,key)) {core_error();bs_destroy(client);bs_platform_cleanup();return 1;}

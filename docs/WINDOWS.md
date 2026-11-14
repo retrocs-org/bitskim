@@ -55,7 +55,7 @@ Outputs:
 
 Generated ICO/theme headers are committed. Ordinary builds need no Pillow or icon-generation service. The C application has no .NET, Electron, CMake or npm dependency.
 
-### Per-user setup
+### All-users setup
 
 Build the Windows applications first, then provide **NSIS/makensis** and its standard includes/plugins:
 
@@ -81,7 +81,7 @@ On Windows, run `BitSkim-CoreCheck.exe` from build/windows with BitSkim.exe besi
 
 The x64 executables cross-build with MinGW-w64 GCC 15.2, `-Wall -Wextra -Werror`. The shared-engine host tests pass. `Tools\BitSkim-CoreCheck.exe` is a console self-check using temporary files and two local clients. It first launches the actual GUI executable in `--check-startup` mode, verifying its image loads and initializes Windows controls/networking without opening a window or saving settings. It then verifies Winsock transfers, Unicode paths, an empty file, exclusive creation, reserved filenames and collision preservation. It removes its test files on success.
 
-Native 0.2 self-check: all 12 checks passed on Windows 11 ARM running the x64 executable on 14 November 2026, including actual GUI initialization, Winsock/automatic TLS, Unicode paths, zero-byte files, a 24-file collection, folder/empty-directory transfer, disk-space queries and collision preservation. The native visual review identified high-DPI startup-window overflow and clipped Transfer tools controls; startup placement now fits the monitor work area and Transfer tools scales its controls and anchors the report/footer to the client size. Windows 10 runtime/UI, installer interaction, cross-platform Windows-to-Mac/Amiga transfers, firewall prompts and broader real-network testing remain separate checks. Other Windows architectures and older Windows versions are not included in this package.
+Native 0.2 self-check: all 12 checks passed on Windows 11 ARM running the x64 executable on 14 November 2026, including actual GUI initialization, Winsock/automatic TLS, Unicode paths, zero-byte files, a 24-file collection, folder/empty-directory transfer, disk-space queries and collision preservation. The native visual review identified high-DPI startup-window overflow and clipped Transfer tools controls; startup placement now fits the monitor work area and Transfer tools scales its controls and anchors the report/footer to the client size. Windows-to-Mac file/folder transfers and cancellation, plus an isolated silent installer lifecycle, passed in the follow-up review described in [VALIDATION.md](VALIDATION.md). Windows 10 runtime/UI, interactive installer navigation, Windows-to-Amiga transfers, firewall prompts and broader network testing remain separate checks. Other Windows architectures and older Windows versions are not included in this package.
 
 ## Setup installer
 
@@ -100,3 +100,5 @@ Updated senders/receivers stream a complete disk-backed list; paged/scrolling vi
 All clients now use disk-backed queues with a portable 32,760-file count ceiling and one approval per complete collection. See [queue storage](TRANSFERS.md#queue-storage-and-practical-limits).
 
 Settings remain in `%APPDATA%\BitSkim\preferences.ini` (Roaming AppData), independent of the program folder. Older registered per-user installations must be uninstalled before the all-users installer proceeds; settings are preserved.
+
+Device identities and remembered peer pins are stored beside preferences in the `Trust` directory and loaded before networking can establish an encrypted session. A storage initialization failure stops startup; existing identities are not silently replaced.

@@ -2,6 +2,10 @@
 
 ## 0.2 — In development
 
+- Windows loads saved device identities at startup so remembered pairing survives restarting.
+- Mac incoming approvals appear on the main window after dismissing Transfer tools or connection sheets.
+- Windows installer blocks upgrades while either 0.1 or 0.2 is running.
+
 - Windows Transfer tools follows the selected theme, retains report scroll position and selection during live updates, and avoids repainting unchanged labels.
 
 - Windows receivers no longer ask for a second confirmation when destination free space is known to be sufficient; insufficient and unknown-space handling remains explicit.
