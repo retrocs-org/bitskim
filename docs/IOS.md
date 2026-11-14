@@ -19,7 +19,7 @@ Keep BitSkim open to receive. On entering the background, it cancels active/queu
 
 ## Appearance and diagnostics
 
-The tabs are **Clients**, **Files**, **Received** and **Settings**. Open **Settings → Appearance → Theme** to choose Follow system or any of the eight desktop palettes from a dedicated selection page. Changes apply immediately to BitSkim screens, including received folders and incoming approvals, and are saved on this device. System document pickers retain Apple's standard interface.
+The tabs are **Clients**, **Files**, **Received** and **Settings**. Open **Settings → Appearance → Theme** to choose Follow system or any of the eight desktop palettes from a dedicated selection page. Catppuccin Mocha is the default on new installations; existing saved choices are retained. Changes apply immediately to BitSkim screens, including received folders and incoming approvals, and are saved on this device. System document pickers retain Apple's standard interface.
 
 **Settings → Diagnostics** contains pairing controls, recent transfer verification results and the connection report. Incoming approvals also retain their pairing controls.
 

@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 @main struct BitSkimMobileApp: App {
     @StateObject private var client = IOSClient()
-    @AppStorage("appearanceTheme") private var themeID = "system"
+    @AppStorage("appearanceTheme") private var themeID = "mocha"
     @Environment(\.scenePhase) private var phase
     var body: some Scene {
         WindowGroup {
@@ -25,7 +25,7 @@ struct MobileHome: View {
     @ObservedObject var client: IOSClient
     @State private var address = ""
     @State private var selectedTab = "clients"
-    @AppStorage("appearanceTheme") private var themeID = "system"
+    @AppStorage("appearanceTheme") private var themeID = "mocha"
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
@@ -149,7 +149,7 @@ struct MobileHome: View {
     }
 }
 struct MobileThemeSettings: View {
-    @AppStorage("appearanceTheme") private var themeID = "system"
+    @AppStorage("appearanceTheme") private var themeID = "mocha"
     var body: some View {
         MobileList {
             themeButton(id: "system", name: "Follow system", color: .primary)
