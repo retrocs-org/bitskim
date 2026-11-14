@@ -38,7 +38,7 @@ Use an Apple silicon Mac with full Xcode/iOS SDKs, XcodeGen, Perl, make and curl
 ./scripts/build-ios.sh iphoneos --multicast=off
 ```
 
-Output: unsigned `build/ios-derived/Build/Products/Debug-iphoneos/BitSkim.app` with embedded Share extension. This is source-only development work, outside the desktop/retro release pipeline. See [IOS.md](IOS.md) for local test builds, signing, discovery and unit tests.
+Output: unsigned `build/ios-derived/Build/Products/Debug-iphoneos/BitSkim.app` with embedded Share extension. This is source-only development work, outside the desktop/retro release pipeline. Run `./scripts/build-ios.sh --run` to build and launch a local iOS test device; use `--list-devices` to choose one. See [IOS.md](IOS.md) for signing, discovery and unit tests.
 
 ## Windows — x64
 

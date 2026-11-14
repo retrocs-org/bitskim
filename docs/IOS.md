@@ -29,6 +29,26 @@ Use an Apple silicon Mac, full Xcode with iOS SDKs, XcodeGen, Python 3.9+, Perl,
 ./scripts/build-ios.sh iphoneos --multicast=off
 ```
 
+## Build and run locally
+
+```sh
+# Build, boot a suitable local device, install and launch
+./scripts/build-ios.sh --run
+
+# Show available iOS devices without building
+./scripts/build-ios.sh --list-devices
+
+# Choose an exact name or device ID from that list
+./scripts/build-ios.sh --run --device "DEVICE_NAME_OR_ID"
+
+# Optional discovery-enabled local run
+./scripts/build-ios.sh --multicast=on --run
+```
+
+`--run` defaults to `iphonesimulator`, selects an already booted compatible iOS device when available, otherwise an available iPhone, and opens Apple's Simulator window. Names shared by several runtimes are ambiguous; use the listed device ID instead. Installing updates the app while preserving its existing data, and only the selected BitSkim process is restarted. No device is erased or uninstalled. The local test app is signed to run on this Mac; a physical iPhone still needs development signing. If only headless Xcode tools are installed, the launcher reports that the Simulator window must be opened from a full Xcode installation.
+
+Local iOS builds listen on TCP **46441**, allowing the desktop Mac app to keep **46440**. From BitSkim on that Mac, use `127.0.0.1:46441` to send to the local iOS app. From the local iOS app, use `127.0.0.1:46440` to send to the Mac client. From a different computer, use the Mac's LAN IPv4 address and port 46441. Physical iPhone/iPad builds keep TCP 46440. Discovery still uses UDP 46440. `--run` is rejected for `iphoneos`; it never installs on a physical phone.
+
 The generated Xcode project is `build/ios/BitSkim.xcodeproj`. Products are under `build/ios-derived/Build/Products/Debug-<sdk>/BitSkim.app`. The Share extension is embedded in the app. The device product is deliberately unsigned and cannot be installed directly until provisioned. These scripts are separate from the desktop/retro release pipeline; no unsigned iOS artifact is uploaded by the release tool.
 
 To install a development build, open the generated project in Xcode, select the BitSkim scheme and your connected iPhone/iPad, and set your development team for both targets. `BITSKIM_BUNDLE_ID` defaults to `org.bitskim.ios`; change it to an identifier available to your team. The extension derives its `.share` identifier from it. `BITSKIM_APP_GROUP` defaults to `group.$(BITSKIM_BUNDLE_ID)` and must match the App Group provisioned for both targets. Keep team-specific settings local or pass build settings on the command line. Regenerating the project replaces edits to the generated project file.

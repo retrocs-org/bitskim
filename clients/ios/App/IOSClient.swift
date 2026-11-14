@@ -47,6 +47,10 @@ struct MobileHistory: Identifiable, Equatable {
     private var destination: (peer: String?, address: String, port: UInt16)?
     private var platformReady = false
     let received: URL
+    let listeningPort: UInt16 = {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "BitSkimListeningPort") as? String, let port = UInt16(value), port > 0 else { return UInt16(BS_PORT) }
+        return port
+    }()
     let discovery = (Bundle.main.object(forInfoDictionaryKey: "BitSkimBroadcastDiscovery") as? String) == "YES"
     private let support: URL
     private let imports: URL
@@ -70,7 +74,17 @@ struct MobileHistory: Identifiable, Equatable {
             let id = defaults.string(forKey: "installationID") ?? UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
             defaults.set(id, forKey: "installationID")
             platformReady = bs_platform_init() != 0
-            guard platformReady, let client = bs_create_app(UIDevice.current.model, "iOS", id, discovery ? 1 : 0, 1) else {
+            var config = BSConfig()
+            func store<T>(_ string: String, in field: inout T) {
+                withUnsafeMutableBytes(of: &field) { buffer in
+                    let bytes = Array(string.utf8); precondition(bytes.count < buffer.count)
+                    for index in buffer.indices { buffer[index] = 0 }
+                    for (index, byte) in bytes.enumerated() { buffer[index] = byte }
+                }
+            }
+            store(UIDevice.current.model, in: &config.name); store("iOS", in: &config.platform); store(id, in: &config.id)
+            config.port = listeningPort; config.discovery_port = UInt16(BS_PORT); config.visible = discovery ? 1 : 0; config.receiving = 1
+            guard platformReady, let client = bs_create(&config, nil, nil) else {
                 throw messageError("Cannot start the local listener. Check Local Network permission and whether another BitSkim copy is open.")
             }
             engine = client

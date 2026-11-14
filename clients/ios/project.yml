@@ -14,6 +14,8 @@ settings:
     BITSKIM_ROOT: '$(SRCROOT)/../..'
     BITSKIM_BUNDLE_ID: org.bitskim.ios
     BITSKIM_APP_GROUP: 'group.$(BITSKIM_BUNDLE_ID)'
+    BITSKIM_LISTEN_PORT: '46440'
+    'BITSKIM_LISTEN_PORT[sdk=iphonesimulator*]': '46441'
     BITSKIM_BROADCAST: 'NO'
     BITSKIM_BROADCAST_DEFINE: BS_NO_BROADCAST
     BITSKIM_ENTITLEMENTS: '$(BITSKIM_ROOT)/clients/ios/Manual.entitlements'

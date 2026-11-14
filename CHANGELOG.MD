@@ -2,6 +2,8 @@
 
 ## 0.2 — In development
 
+- iOS `--run`, device selection and device listing for local build/install/launch, with a separate test listening port so the Mac desktop client can run alongside it.
+
 - iOS build switch `--multicast=off|on` keeps discovery, compiler flags and entitlements consistent; manual IP connections remain available when disabled.
 
 - Experimental source-only iPhone/iPad client with native file import/receive, shared-inbox extension, manual IPv4, optional broadcast discovery, TLS/device trust and transfer history. Device signing and physical-device validation remain pending.

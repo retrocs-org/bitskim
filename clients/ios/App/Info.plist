@@ -6,6 +6,8 @@
 	<string>$(BITSKIM_APP_GROUP)</string>
 	<key>BitSkimBroadcastDiscovery</key>
 	<string>$(BITSKIM_BROADCAST)</string>
+	<key>BitSkimListeningPort</key>
+	<string>$(BITSKIM_LISTEN_PORT)</string>
 	<key>CFBundleDisplayName</key>
 	<string>BitSkim</string>
 	<key>CFBundleExecutable</key>

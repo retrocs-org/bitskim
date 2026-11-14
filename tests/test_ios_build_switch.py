@@ -7,6 +7,7 @@ class IOSBuildSwitch(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    root=Path(d);(root/'scripts').mkdir();(root/'tools').mkdir();(root/'VERSION').write_text('0.2\n')
    shutil.copyfile(ROOT/'scripts/build-ios.sh',root/'scripts/build-ios.sh')
+   (root/'scripts/run-ios.py').write_text('import sys; print("RUN", *sys.argv[1:])\n')
    (root/'scripts/check-ios-build.py').write_text('import sys; print("CHECK", *sys.argv[1:])\n')
    for sdk in ('iphoneos','iphonesimulator'):
     lib=root/('work/openssl-ios-'+sdk)/'lib';lib.mkdir(parents=True);(lib/'libssl.a').touch()
@@ -34,6 +35,16 @@ class IOSBuildSwitch(unittest.TestCase):
  def test_help_does_not_build(self):
   for flag in ['--help','-h']:
    result,settings=self.run_build(flag);self.assertEqual(result.returncode,0);self.assertIn('--multicast=off|on',result.stdout);self.assertEqual(settings,[])
+ def test_run_uses_local_signing_and_forwards_device_as_one_argument(self):
+  result,settings=self.run_build('--run','--device','iPhone Test')
+  self.assertEqual(result.returncode,0,result.stderr);self.assertIn('CODE_SIGNING_ALLOWED=YES',settings)
+  self.assertIn('RUN --device iPhone Test',result.stdout)
+ def test_run_is_rejected_for_device_sdk_and_device_requires_run(self):
+  for args in [('iphoneos','--run'),('--device','iPhone Test'),('--device',)]:
+   result,settings=self.run_build(*args);self.assertNotEqual(result.returncode,0);self.assertEqual(settings,[])
+ def test_listing_devices_skips_the_build(self):
+  result,settings=self.run_build('--list-devices');self.assertEqual(result.returncode,0,result.stderr)
+  self.assertEqual(settings,[]);self.assertIn('RUN --list-devices',result.stdout)
  def test_manual_entitlements_omit_multicast_and_share_extension_stays_manual(self):
   with (ROOT/'clients/ios/Manual.entitlements').open('rb') as f:manual=plistlib.load(f)
   with (ROOT/'clients/ios/Discovery.entitlements').open('rb') as f:discovery=plistlib.load(f)
