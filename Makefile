@@ -34,3 +34,7 @@ release-check:
 	python3 scripts/release.py check
 release-prepare:
 	python3 scripts/release.py prepare
+
+.PHONY: ios
+ios:
+	./scripts/build-ios.sh iphoneos

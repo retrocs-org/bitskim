@@ -30,6 +30,16 @@ Use an Apple silicon Mac with Xcode command-line tools/macOS SDK, Clang and Swif
 
 Output: `build/macos/BitSkim.app`. A local build defaults to ad-hoc signing. An installed Developer ID identity can be selected through `BITSKIM_SIGN_IDENTITY`; signing alone does not notarize an app. See [MACOS.md](MACOS.md).
 
+## iPhone / iPad — experimental
+
+Use an Apple silicon Mac with full Xcode/iOS SDKs, XcodeGen, Perl, make and curl. Targets iOS 16+; App Group provisioning and development signing are needed to install on a device. Default builds use manual connections; automatic broadcast discovery requires Apple's approved entitlement.
+
+```sh
+./scripts/build-ios.sh iphoneos
+```
+
+Output: unsigned `build/ios-derived/Build/Products/Debug-iphoneos/BitSkim.app` with embedded Share extension. This is source-only development work, outside the desktop/retro release pipeline. See [IOS.md](IOS.md) for local test builds, signing, discovery and unit tests.
+
 ## Windows — x64
 
 Provide MinGW-w64 GCC and windres targeting x86_64 Windows. On the first build, the OpenSSL dependency also invokes `x86_64-w64-mingw32-*` tools directly, so the complete MinGW bin directory must be in PATH even when `WINDOWS_CC` and `WINDOWS_RC` are set. For example:

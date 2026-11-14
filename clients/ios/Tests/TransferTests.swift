@@ -1,0 +1,121 @@
+import XCTest
+import Foundation
+import Darwin
+
+final class TransferTests: XCTestCase {
+    private var sender: OpaquePointer!, receiver: OpaquePointer!
+    private var root: URL!
+    private var receiverPort: UInt16 = 0
+    override func setUpWithError() throws {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        XCTAssertNotEqual(bs_platform_init(), 0)
+        sender = makeClient("1", port: freePort()); receiverPort = freePort(); receiver = makeClient("2", port: receiverPort)
+        XCTAssertNotNil(sender); XCTAssertNotNil(receiver)
+        guard sender != nil, receiver != nil else { throw NSError(domain: "BitSkimTests", code: 1) }
+        bs_batch_enable(sender, 1); bs_batch_enable(receiver, 1)
+    }
+    override func tearDownWithError() throws {
+        if let sender { bs_destroy(sender) }; if let receiver { bs_destroy(receiver) }
+        bs_platform_cleanup(); if let root { try? FileManager.default.removeItem(at: root) }
+    }
+    private func freePort() -> UInt16 {
+        let socket = Darwin.socket(AF_INET, SOCK_STREAM, 0); defer { Darwin.close(socket) }
+        var address = sockaddr_in(); address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size); address.sin_family = sa_family_t(AF_INET); address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        withUnsafePointer(to: &address) { pointer in pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { XCTAssertEqual(bind(socket, $0, socklen_t(MemoryLayout<sockaddr_in>.size)), 0) } }
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        withUnsafeMutablePointer(to: &address) { pointer in pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { XCTAssertEqual(getsockname(socket, $0, &length), 0) } }
+        return UInt16(bigEndian: address.sin_port)
+    }
+    private func tuple<T>(_ field: inout T, _ string: String) {
+        withUnsafeMutableBytes(of: &field) { buffer in
+            let data = Array(string.utf8) + [0]; precondition(data.count <= buffer.count)
+            for (index, byte) in data.enumerated() { buffer[index] = byte }
+        }
+    }
+    private func makeClient(_ suffix: String, port: UInt16) -> OpaquePointer? {
+        var config = BSConfig(); tuple(&config.id, String(repeating: "0", count: 31) + suffix)
+        tuple(&config.name, "iOS unit check"); tuple(&config.platform, "iOS"); tuple(&config.bind_address, "127.0.0.1")
+        config.port = port; config.receiving = 1
+        return bs_create(&config, nil, nil)
+    }
+    @discardableResult private func pump(_ ready: () -> Bool) -> Bool {
+        let end = Date().addingTimeInterval(12)
+        while Date() < end {
+            bs_service(sender, 4); bs_service(receiver, 4)
+            if ready() { return true }
+            usleep(1000)
+        }
+        XCTFail("Transfer timed out: \(String(cString: bs_last_error(sender))) / \(String(cString: bs_last_error(receiver)))")
+        return false
+    }
+    func testEncryptedUnicodeBinaryAndVerifiedReceipt() throws {
+        let source = root.appendingPathComponent("å-λ.bin"), destination = root.appendingPathComponent("received.bin")
+        let bytes = Data((0..<262144).map { UInt8($0 & 255) }); try bytes.write(to: source)
+        XCTAssertEqual(bs_send(sender, "127.0.0.1", receiverPort, source.path), 1)
+        guard pump({ bs_status(receiver)!.pointee.awaiting_decision != 0 }) else { return }
+        XCTAssertEqual(bs_transfer_encrypted(sender), 1); XCTAssertEqual(bs_transfer_encrypted(receiver), 1)
+        XCTAssertEqual(bs_accept(receiver, destination.path), 1)
+        guard pump({ bs_status(sender)!.pointee.active == 0 && bs_status(receiver)!.pointee.active == 0 }) else { return }
+        XCTAssertEqual(try Data(contentsOf: destination), bytes)
+        var item = BSHistoryItem(); XCTAssertEqual(bs_history_item(receiver, 0, &item), 1)
+        XCTAssertEqual(item.result, Int32(BS_RESULT_COMPLETE.rawValue)); XCTAssertEqual(item.verified, 1)
+    }
+    func testEmptyFile() throws {
+        let source = root.appendingPathComponent("empty"), destination = root.appendingPathComponent("received")
+        try Data().write(to: source)
+        XCTAssertEqual(bs_send(sender, "127.0.0.1", receiverPort, source.path), 1)
+        guard pump({ bs_status(receiver)!.pointee.awaiting_decision != 0 }) else { return }
+        XCTAssertEqual(bs_accept(receiver, destination.path), 1)
+        guard pump({ bs_status(sender)!.pointee.active == 0 && bs_status(receiver)!.pointee.active == 0 }) else { return }
+        XCTAssertEqual(try Data(contentsOf: destination), Data())
+    }
+    func testCancellationRemovesPartial() throws {
+        let source = root.appendingPathComponent("large"), destination = root.appendingPathComponent("received")
+        try Data(repeating: 42, count: 2 * 1024 * 1024).write(to: source)
+        XCTAssertEqual(bs_limits_configure(sender, 65536, 0), 1)
+        XCTAssertEqual(bs_send(sender, "127.0.0.1", receiverPort, source.path), 1)
+        guard pump({ bs_status(receiver)!.pointee.awaiting_decision != 0 }) else { return }
+        XCTAssertEqual(bs_accept(receiver, destination.path), 1)
+        guard pump({ bs_status(receiver)!.pointee.transferred > 0 }) else { return }
+        bs_cancel(receiver)
+        guard pump({ bs_status(sender)!.pointee.active == 0 && bs_status(receiver)!.pointee.active == 0 }) else { return }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        XCTAssertEqual(bs_transfer_result(receiver), BS_RESULT_CANCELLED)
+    }
+    func testNestedFolderAndEmptyDirectory() throws {
+        let source = root.appendingPathComponent("Tree", isDirectory: true)
+        try FileManager.default.createDirectory(at: source.appendingPathComponent("sub/empty"), withIntermediateDirectories: true)
+        try Data("folder payload".utf8).write(to: source.appendingPathComponent("sub/å-λ.txt"))
+        let destination = root.appendingPathComponent("inbox", isDirectory: true)
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
+        XCTAssertEqual(bs_queue_address(sender, "127.0.0.1", receiverPort, source.path), 1)
+        guard pump({ bs_status(receiver)!.pointee.awaiting_decision != 0 }) else { return }
+        XCTAssertNotEqual(bs_batch_is_tree(receiver), 0)
+        XCTAssertEqual(bs_accept_batch(receiver, destination.path), 1)
+        guard pump({ bs_queue_count(sender) == 0 && bs_status(sender)!.pointee.active == 0 && bs_status(receiver)!.pointee.active == 0 }) else { return }
+        XCTAssertEqual(try Data(contentsOf: destination.appendingPathComponent("Tree/sub/å-λ.txt")), Data("folder payload".utf8))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destination.appendingPathComponent("Tree/sub/empty").path))
+    }
+    func testInboxRejectsOversizedFilesAndFoldersWithoutPartialCommit() throws {
+        let inbox = root.appendingPathComponent("Inbox"); try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: false)
+        let source = root.appendingPathComponent("too-large")
+        FileManager.default.createFile(atPath: source.path, contents: nil)
+        let file = try FileHandle(forWritingTo: source); try file.truncate(atOffset: 2_147_483_648); try file.close()
+        XCTAssertThrowsError(try ShareInbox.stage(source, inbox: inbox))
+        XCTAssertThrowsError(try ShareInbox.stage(root, inbox: inbox))
+        XCTAssertTrue(try FileManager.default.contentsOfDirectory(at: inbox, includingPropertiesForKeys: nil).isEmpty)
+    }
+    func testSharedInboxPreservesOriginalNamesAndEmptyFiles() throws {
+        let inbox = root.appendingPathComponent("Inbox"); try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: false)
+        let source = root.appendingPathComponent(".å-λ.txt"); try Data().write(to: source)
+        let first = try ShareInbox.stage(source, inbox: inbox), second = try ShareInbox.stage(source, inbox: inbox)
+        XCTAssertNotEqual(first, second); XCTAssertEqual(first.lastPathComponent, source.lastPathComponent)
+        XCTAssertEqual(try ShareInbox.pending(inbox: inbox).count, 2)
+        XCTAssertEqual(try Data(contentsOf: first), Data()); XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+        let link = root.appendingPathComponent("link"); try FileManager.default.createSymbolicLink(at: link, withDestinationURL: source)
+        XCTAssertThrowsError(try ShareInbox.stage(link, inbox: inbox))
+        let folders = try FileManager.default.contentsOfDirectory(at: inbox, includingPropertiesForKeys: nil)
+        XCTAssertEqual(folders.count, 2); XCTAssertFalse(folders.contains { $0.lastPathComponent.hasPrefix(".pending-") })
+    }
+}

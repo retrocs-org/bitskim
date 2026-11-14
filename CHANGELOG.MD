@@ -2,6 +2,8 @@
 
 ## 0.2 — In development
 
+- Experimental source-only iPhone/iPad client with native file import/receive, shared-inbox extension, manual IPv4, optional broadcast discovery, TLS/device trust and transfer history. Device signing and physical-device validation remain pending.
+
 - Windows loads saved device identities at startup so remembered pairing survives restarting.
 - Mac incoming approvals appear on the main window after dismissing Transfer tools or connection sheets.
 - Windows installer blocks upgrades while either 0.1 or 0.2 is running.

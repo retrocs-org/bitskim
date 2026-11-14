@@ -219,11 +219,16 @@ int bsp_size(const char *path,unsigned long *out) {
     *out=(unsigned long)st.st_size; return 1;
 }
 #endif
+#ifndef BS_NO_BROADCAST
 static void broadcast_to(BSSocket s,const void *p,int n,unsigned short port,unsigned long ip) {
     struct sockaddr_in a; memset(&a,0,sizeof(a)); a.sin_family=AF_INET; a.sin_port=htons(port); a.sin_addr.s_addr=ip;
     sendto(s,(const char *)p,n,0,(struct sockaddr *)&a,sizeof(a));
 }
+#endif
 void bsp_broadcast(BSSocket s,const void *p,int n,unsigned short port) {
+#ifdef BS_NO_BROADCAST
+    (void)s; (void)p; (void)n; (void)port;
+#else
 #if !defined(__amigaos__) && !defined(_WIN32) && !defined(__riscos__)
     struct ifaddrs *all=NULL,*i;
     if(getifaddrs(&all)==0) {
@@ -236,6 +241,7 @@ void bsp_broadcast(BSSocket s,const void *p,int n,unsigned short port) {
     bsp_windows_broadcast(s,p,n,port);
 #endif
     broadcast_to(s,p,n,port,INADDR_BROADCAST);
+#endif
 }
 /* The classic client assumes Latin-1 Workbench filenames; unsupported characters
    fail explicitly. Modern clients keep UTF-8 unchanged. */

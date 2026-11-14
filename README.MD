@@ -17,6 +17,7 @@ Send files and folders directly between modern desktops and classic computers. B
 | Atari TOS / MiNTNet | Experimental STinG and MiNTNet builds; transfers unverified |
 | RISC OS | Experimental ARM2 and StrongARM builds; runtime validation pending |
 | Windows Classic | Experimental x86 build for Windows 95/98/Me/XP targets; runtime validation pending |
+| iPhone / iPad | [Experimental source-only client](docs/IOS.md); iOS 16+ target; device validation pending |
 
 See [validation coverage](docs/VALIDATION.md) for the checks completed on each platform.
 

@@ -1,0 +1,89 @@
+name: BitSkim
+options:
+  bundleIdPrefix: org.bitskim
+  deploymentTarget:
+    iOS: '16.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    IPHONEOS_DEPLOYMENT_TARGET: '16.0'
+    TARGETED_DEVICE_FAMILY: '1,2'
+    MARKETING_VERSION: '0.2'
+    CURRENT_PROJECT_VERSION: '2'
+    CODE_SIGN_STYLE: Automatic
+    BITSKIM_ROOT: '$(SRCROOT)/../..'
+    BITSKIM_BUNDLE_ID: org.bitskim.ios
+    BITSKIM_APP_GROUP: 'group.$(BITSKIM_BUNDLE_ID)'
+    BITSKIM_BROADCAST: 'NO'
+    BITSKIM_BROADCAST_DEFINE: BS_NO_BROADCAST
+    BITSKIM_ENTITLEMENTS: '$(BITSKIM_ROOT)/clients/ios/Manual.entitlements'
+    GCC_PREPROCESSOR_DEFINITIONS: ['$(inherited)', BS_OPENSSL, '$(BITSKIM_BROADCAST_DEFINE)']
+    HEADER_SEARCH_PATHS: ['$(BITSKIM_ROOT)/core', '$(BITSKIM_ROOT)/work/openssl-ios-$(PLATFORM_NAME)/include']
+    LIBRARY_SEARCH_PATHS: ['$(BITSKIM_ROOT)/work/openssl-ios-$(PLATFORM_NAME)/lib']
+    SWIFT_STRICT_CONCURRENCY: minimal
+    ENABLE_USER_SCRIPT_SANDBOXING: 'YES'
+    GENERATE_INFOPLIST_FILE: 'NO'
+targets:
+  BitSkim:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes: [Info.plist]
+      - path: Shared
+      - path: ../../core/bitskim.c
+      - path: ../../core/platform.c
+      - path: ../../work/openssl-src/openssl-3.5.9/LICENSE.txt
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: '$(BITSKIM_BUNDLE_ID)'
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_FILE: '$(BITSKIM_ROOT)/clients/ios/App/Info.plist'
+        CODE_SIGN_ENTITLEMENTS: '$(BITSKIM_ENTITLEMENTS)'
+        SWIFT_OBJC_BRIDGING_HEADER: '$(BITSKIM_ROOT)/clients/ios/App/Bridge.h'
+        OTHER_LDFLAGS: ['$(inherited)', '-lssl', '-lcrypto']
+    dependencies:
+      - target: BitSkimShare
+        embed: true
+  BitSkimShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Share
+        excludes: [Info.plist]
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: '$(BITSKIM_BUNDLE_ID).share'
+        INFOPLIST_FILE: '$(BITSKIM_ROOT)/clients/ios/Share/Info.plist'
+        CODE_SIGN_ENTITLEMENTS: '$(BITSKIM_ROOT)/clients/ios/Manual.entitlements'
+        APPLICATION_EXTENSION_API_ONLY: 'YES'
+        SKIP_INSTALL: 'YES'
+  BitSkimCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+      - path: Shared
+      - path: ../../core/bitskim.c
+      - path: ../../core/platform.c
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: '$(BITSKIM_BUNDLE_ID).tests'
+        GENERATE_INFOPLIST_FILE: 'YES'
+        IPHONEOS_DEPLOYMENT_TARGET: '17.0'
+        GCC_PREPROCESSOR_DEFINITIONS: ['$(inherited)', BS_OPENSSL, BS_NO_BROADCAST]
+        SWIFT_OBJC_BRIDGING_HEADER: '$(BITSKIM_ROOT)/clients/ios/App/Bridge.h'
+        OTHER_LDFLAGS: ['$(inherited)', '-lssl', '-lcrypto']
+schemes:
+  BitSkim:
+    build:
+      targets:
+        BitSkim: all
+  BitSkimCoreTests:
+    build:
+      targets:
+        BitSkimCoreTests: all
+    test:
+      targets: [BitSkimCoreTests]
