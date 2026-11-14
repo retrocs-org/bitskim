@@ -102,6 +102,7 @@ final class TransferTests: XCTestCase {
     }
     @MainActor func testStandardFilesImportAllowsMultipleFilesAndCancels() async throws {
         let picker = FileProviderImport.controller()
+        XCTAssertEqual(picker.documentPickerMode, .import)
         XCTAssertNil(picker.directoryURL)
         XCTAssertTrue(picker.allowsMultipleSelection)
         var selected: [URL]?

@@ -2,6 +2,8 @@
 
 ## 0.2 — In development
 
+- iOS selects regular files through copy-based Apple Files import, preserving provider originals.
+
 - iOS persistent themes using the eight desktop palettes or system appearance; Settings with separate Theme and Diagnostics pages.
 - iOS Clients and Files tabs let you browse enabled Files providers before choosing a recipient; opening Files launches Apple’s standard picker without forcing an app folder.
 - Avoid repeated empty-offer notifications while idle, keeping iOS settings responsive.

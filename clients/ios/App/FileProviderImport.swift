@@ -5,7 +5,7 @@ import UIKit
 struct FileProviderImport: UIViewControllerRepresentable {
     let completion: (Result<[URL], Error>) -> Void
     static func controller() -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: false)
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.data], asCopy: true)
         picker.allowsMultipleSelection = true
         return picker
     }
