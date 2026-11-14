@@ -100,9 +100,9 @@ final class TransferTests: XCTestCase {
         delegate.documentPicker(picker, didPickDocumentsAt: [root.appendingPathComponent("copy")])
         XCTAssertEqual(result, true); XCTAssertEqual(try Data(contentsOf: source), bytes)
     }
-    @MainActor func testFilesImportStartsAtCurrentReceivedDirectoryAndCancels() async throws {
-        let picker = FileProviderImport.controller(directory: root)
-        XCTAssertEqual(picker.directoryURL, root)
+    @MainActor func testStandardFilesImportAllowsMultipleFilesAndCancels() async throws {
+        let picker = FileProviderImport.controller()
+        XCTAssertNil(picker.directoryURL)
         XCTAssertTrue(picker.allowsMultipleSelection)
         var selected: [URL]?
         var cancelled = false

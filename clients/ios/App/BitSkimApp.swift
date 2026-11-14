@@ -91,16 +91,12 @@ struct MobileHome: View {
                     Section("Browse files to send") {
                         Button("Browse Files", systemImage: "folder") { client.browseFiles() }
                             .disabled(client.active || client.importing)
-                        Text("Browse local files, iCloud Drive and enabled Dropbox or OneDrive locations. Select files here, then choose a client to send them.").font(.footnote).foregroundStyle(theme?.muted ?? Color.secondary)
                         if client.importing { ProgressView("Preparing files…") }
                     }
                     Section("Ready to send") {
                         ForEach(client.sharedFiles, id: \.self) { file in Label(file.lastPathComponent, systemImage: "doc") }
                         if client.sharedFiles.isEmpty { Text("No files selected.").foregroundStyle(theme?.muted ?? Color.secondary) }
                         else { Button("Choose a client") { selectedTab = "clients" } }
-                    }
-                    Section {
-                        Text("Only files you select are copied into BitSkim. Nothing is sent until you choose a client. Cloud locations appear only when their apps are installed and enabled in Files.").font(.footnote).foregroundStyle(theme?.muted ?? Color.secondary)
                     }
                 }.navigationTitle("Files")
             }.tabItem { Label("Files", systemImage: "folder") }.tag("files")
@@ -137,8 +133,11 @@ struct MobileHome: View {
                 }.navigationTitle("Settings")
             }.tabItem { Label("Settings", systemImage: "gearshape") }.tag("settings")
         }
+        .onChange(of: selectedTab) { tab in
+            if tab == "files", !client.active, !client.importing { client.browseFiles() }
+        }
         .sheet(isPresented: $client.filePicker) {
-            FileProviderImport(directory: client.received) { result in
+            FileProviderImport() { result in
                 client.filePicker = false; client.imported(result)
             }
         }

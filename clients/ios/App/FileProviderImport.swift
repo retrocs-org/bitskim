@@ -3,16 +3,14 @@ import UniformTypeIdentifiers
 import UIKit
 
 struct FileProviderImport: UIViewControllerRepresentable {
-    let directory: URL
     let completion: (Result<[URL], Error>) -> Void
-    static func controller(directory: URL) -> UIDocumentPickerViewController {
+    static func controller() -> UIDocumentPickerViewController {
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: false)
         picker.allowsMultipleSelection = true
-        picker.directoryURL = directory
         return picker
     }
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = Self.controller(directory: directory)
+        let picker = Self.controller()
         picker.delegate = context.coordinator
         return picker
     }

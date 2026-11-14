@@ -3,7 +3,7 @@
 ## 0.2 — In development
 
 - iOS persistent themes using the eight desktop palettes or system appearance; Settings with separate Theme and Diagnostics pages.
-- iOS Clients and Files tabs let you browse enabled Files providers before choosing a recipient; the native importer starts at Received.
+- iOS Clients and Files tabs let you browse enabled Files providers before choosing a recipient; opening Files launches Apple’s standard picker without forcing an app folder.
 - Avoid repeated empty-offer notifications while idle, keeping iOS settings responsive.
 
 - iOS Files-provider import guidance and explicit Save to Files for received files/folders, preserving originals and pausing incoming offers while browsing.
