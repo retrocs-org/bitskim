@@ -35,7 +35,7 @@ Output: `build/macos/BitSkim.app`. A local build defaults to ad-hoc signing. An 
 Use an Apple silicon Mac with full Xcode/iOS SDKs, XcodeGen, Perl, make and curl. Targets iOS 16+; App Group provisioning and development signing are needed to install on a device. Default builds use manual connections; automatic broadcast discovery requires Apple's approved entitlement.
 
 ```sh
-./scripts/build-ios.sh iphoneos
+./scripts/build-ios.sh iphoneos --multicast=off
 ```
 
 Output: unsigned `build/ios-derived/Build/Products/Debug-iphoneos/BitSkim.app` with embedded Share extension. This is source-only development work, outside the desktop/retro release pipeline. See [IOS.md](IOS.md) for local test builds, signing, discovery and unit tests.

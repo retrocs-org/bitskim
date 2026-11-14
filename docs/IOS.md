@@ -26,7 +26,7 @@ Use an Apple silicon Mac, full Xcode with iOS SDKs, XcodeGen, Python 3.9+, Perl,
 ./scripts/build-ios.sh iphonesimulator
 
 # Unsigned arm64 device build
-./scripts/build-ios.sh iphoneos
+./scripts/build-ios.sh iphoneos --multicast=off
 ```
 
 The generated Xcode project is `build/ios/BitSkim.xcodeproj`. Products are under `build/ios-derived/Build/Products/Debug-<sdk>/BitSkim.app`. The Share extension is embedded in the app. The device product is deliberately unsigned and cannot be installed directly until provisioned. These scripts are separate from the desktop/retro release pipeline; no unsigned iOS artifact is uploaded by the release tool.
@@ -47,18 +47,27 @@ Xcode must already have a valid development signing identity and suitable profil
 
 The default build disables outgoing broadcasts at compile time with `BS_NO_BROADCAST`, leaves discovery visibility off, and uses manual IPv4 connections. The receiving device's address is shown in Computers → Receive on this device. Enter that address on the sender. Allow BitSkim's Local Network access when prompted; a denied permission can block manual connections too.
 
-For automatic discovery, obtain Apple's multicast/broadcast entitlement and a matching provisioning profile. Then build with:
+The build switch controls the compiler flag, discovery visibility and signing-entitlements file together. It defaults to **off**:
 
 ```sh
-./scripts/build-ios.sh iphoneos \
-  CODE_SIGNING_ALLOWED=YES \
-  DEVELOPMENT_TEAM=YOUR_TEAM_ID \
-  BITSKIM_BROADCAST=YES \
-  BITSKIM_BROADCAST_DEFINE= \
-  BITSKIM_ENTITLEMENTS="$(pwd)/clients/ios/Discovery.entitlements"
+# No multicast entitlement; manual IPv4 connections only
+./scripts/build-ios.sh iphoneos --multicast=off
+
+# Enable BitSkim's broadcast discovery and request the multicast entitlement
+./scripts/build-ios.sh iphoneos --multicast=on
 ```
 
-Retain any bundle/App Group overrides used for your manual build. `BITSKIM_BROADCAST` controls the UI/visibility and `BITSKIM_BROADCAST_DEFINE` controls the transport; set both consistently. The Share extension only stages files and does not request the multicast entitlement. Do not remove the saved-identity checks to work around signing or network problems.
+The on build still needs Apple's multicast/broadcast entitlement approval and a matching provisioning profile before it can be signed and installed on a device. If approval is unavailable or withdrawn, build with `--multicast=off`; this removes the multicast entitlement and compiles out outgoing broadcast traffic, while retaining manual IPv4 send/receive, TLS and device trust. Local Network consent and App Group provisioning are still needed.
+
+Signing settings can follow the switch:
+
+```sh
+./scripts/build-ios.sh iphoneos --multicast=on \
+  CODE_SIGNING_ALLOWED=YES \
+  DEVELOPMENT_TEAM=YOUR_TEAM_ID
+```
+
+Retain any bundle/App Group overrides used for your manual build. Do not override `BITSKIM_BROADCAST`, `BITSKIM_BROADCAST_DEFINE`, `BITSKIM_ENTITLEMENTS`, `CODE_SIGN_ENTITLEMENTS` or `GCC_PREPROCESSOR_DEFINITIONS` through this script; use the switch so the settings remain consistent. The Share extension only stages files and never requests the multicast entitlement. `--help` prints the available options. Direct Xcode project defaults remain manual-only.
 
 Apple references: [local-network privacy](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy), [broadcast entitlement](https://developer.apple.com/news/?id=0oi77447), [document-import access](https://developer.apple.com/documentation/swiftui/view/fileimporter(ispresented:allowedcontenttypes:oncompletion:)), [background execution](https://developer.apple.com/documentation/uikit/extending-your-app-s-background-execution-time).
 

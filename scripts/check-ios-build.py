@@ -15,8 +15,9 @@ def platform(binary):
   if command==0x32:return struct.unpack_from('<I',data,cursor+8)[0]
   cursor+=size
  raise ValueError('Missing Apple build-platform record')
-def check(sdk):
+def check(sdk,multicast=None):
  if sdk not in ('iphoneos','iphonesimulator'):raise ValueError('Unknown SDK')
+ if multicast is not None and multicast not in ('on','off'):raise ValueError('Use multicast on or off')
  version=(ROOT/'VERSION').read_text().strip()
  app=ROOT/'build/ios-derived/Build/Products'/('Debug-'+sdk)/'BitSkim.app'
  metadata=[]
@@ -27,9 +28,10 @@ def check(sdk):
   expected=ROOT/'clients/ios'/source/'PrivacyInfo.xcprivacy'
   if hashlib.sha256((folder/'PrivacyInfo.xcprivacy').read_bytes()).digest()!=hashlib.sha256(expected.read_bytes()).digest():raise ValueError('Missing/stale privacy manifest: '+source)
   if platform(folder/info['CFBundleExecutable'])!=(2 if sdk=='iphoneos' else 7):raise ValueError('Wrong Apple platform in '+source)
+ if multicast is not None and metadata[0].get('BitSkimBroadcastDiscovery')!=('YES' if multicast=='on' else 'NO'):raise ValueError('Built discovery mode does not match the requested switch')
  if metadata[1]['CFBundleIdentifier']!=metadata[0]['CFBundleIdentifier']+'.share':raise ValueError('Extension identifier must derive from the app identifier')
  if not metadata[0].get('BitSkimAppGroup') or metadata[0]['BitSkimAppGroup']!=metadata[1].get('BitSkimAppGroup') or '$(' in metadata[0]['BitSkimAppGroup']:raise ValueError('App Group configuration is inconsistent')
  print('PASS: iOS version, arm64 platform, iPhone/iPad support, embedded extension, App Group and privacy resources')
 if __name__=='__main__':
- try:check(sys.argv[1])
+ try:check(sys.argv[1],sys.argv[2] if len(sys.argv)>2 else None)
  except (IndexError,KeyError,OSError,ValueError,struct.error) as error:raise SystemExit(str(error))
