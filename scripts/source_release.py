@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Create the current full source ZIP and BitSkim-src.tar.gz, without build tools."""
 from pathlib import Path
+from release_paths import output_dir
 from zipfile import ZipFile,ZIP_DEFLATED
 import datetime,hashlib,io,json,shutil,tarfile,tempfile
 from build_provenance import verify
@@ -8,8 +9,8 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def private_release_file(path):
     name=Path(path).name.lower()
-    return (name=='.env' or name.startswith('.env.') or name in ('release-config.json','id_rsa','id_ed25519')
-            or Path(name).suffix in ('.p12','.pfx','.key','.pem'))
+    return (name=='.env' or name.startswith('.env.') or name in ('release-config.json','local.json','id_rsa','id_ed25519')
+            or Path(name).suffix in ('.p12','.pfx','.key','.pem','.keystore','.jks'))
 
 def write_source(out,targets=('amiga',),root=ROOT):
     records={target:verify(target,root) for target in targets}
@@ -45,8 +46,8 @@ def write_source(out,targets=('amiga',),root=ROOT):
     return zipfile,tarfile_path
 
 def main():
-    paths=write_source(ROOT/'outputs')
-    sums=ROOT/'outputs/SHA256SUMS';lines=sums.read_text().splitlines() if sums.exists() else []
+    paths=write_source(output_dir(ROOT))
+    sums=output_dir(ROOT) / 'SHA256SUMS';lines=sums.read_text().splitlines() if sums.exists() else []
     lines=[line for line in lines if line.split() and line.split()[-1].lstrip('*') not in {p.name for p in paths}]
     (ROOT/'public-web/downloads').mkdir(parents=True,exist_ok=True)
     for path in paths:

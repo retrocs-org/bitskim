@@ -1,148 +1,281 @@
 # Releasing BitSkim
 
-[Website](https://bitskim.retrocs.org) · [Source](https://github.com/retrocs-org/bitskim)
+[Website](https://bitskim.retrocs.org) · [Public source](https://github.com/retrocs-org/bitskim)
 
-Run `python3 scripts/release.py` from the BitSkim project root. A separate universal release-tools checkout is not required. Python 3.9+ and the platform toolchains are required; see [BUILDING.md](BUILDING.md).
+Use Python 3.9+ from the project root. `scripts/release.py` builds once, prepares a manifest and retained upload copies, then publishes those checked bytes. Review notes, destinations, packages and native validation before publication. Manual compilation is documented separately in [BUILDING.md](BUILDING.md).
 
-## External settings
+## Release rules
 
-The default configuration is:
+- BitSkim remains **0.2** until a version change is agreed. VERSION, application metadata, changelog, notes and package names must agree. A tag override does not change application versions.
+- New releases use the unprefixed version tag, `0.2`, and the same release title. Pass `--tag 0.2` explicitly; the default is also `0.2`. Do not publish a new 0.2 build under an older release tag.
+- Both repositories must receive the same annotated tag object and source commit. Published tags are never moved, force-pushed or recreated. Fetch an existing tag locally before resuming from a different checkout.
+- Repository releases are **normal/latest releases**, not prereleases. GitHub uploads through an unpublished draft, then explicitly sets `draft: false`, `prerelease: false` and `make_latest: "true"`. GitLab uses a current release date and checks its latest-release endpoint. Both hosts' latest endpoints must identify the selected tag.
+- Platform validation labels remain factual. A normal release can contain a documented experimental client; it does not certify that client's hardware compatibility. The iOS and Android development clients remain source-only and are excluded from the binary inventory.
+- Do not change reviewed assets or notes during publication. Matching existing bytes can be reused; unknown/different hashes, sizes, descriptions, asset inventories or tag objects stop publication.
+- Publication does not create repositories, push source branches, deploy the PHP website, overwrite conflicting release assets or roll back another service. Source pushing is a separate explicit action. No hosted CI configuration is required.
+
+## Configure outside Git
+
+Default settings file:
 
 ```text
 ~/Development/tools/git-release/projects/bitskim.json
 ```
 
-Keep the release settings JSON at this external location; it is deliberately not shipped in the repository. Configure repository destinations, toolchain paths and credential lookup details there. Override with `--config /path/to/settings.json`, or set `BITSKIM_RELEASE_CONFIG`. Actual settings are not included in Git/source archives. Documentation snippets below use generic placeholders.
+Override with `BITSKIM_RELEASE_CONFIG` or `--config /path/to/settings.json`. Keep real internal destinations, machine paths, signing/profile names and credential selectors outside the public checkout. There is deliberately no real release-settings JSON or template file in the source archive. A minimal configuration shape is:
 
-The JSON holds repository HTTPS and SSH URLs, compiler paths, the signing identity name, notarization keychain profile name, optional Aminet contact and 1Password references. Repository URLs are not authentication secrets, but internal destinations and machine settings stay outside the public checkout.
+```json
+{
+  "github": "https://github.com/retrocs-org/bitskim",
+  "gitlab": "https://gitlab.example.invalid/group/bitskim",
+  "source_branch": "main",
+  "notary_profile": "bitskim",
+  "aminet": false,
+  "uploader": "",
+  "author": "BitSkim contributors",
+  "env": {
+    "BITSKIM_SIGN_IDENTITY": "Developer ID Application: Your Name (TEAMID)"
+  },
+  "credentials": {
+    "github": {"provider": "env", "variable": "GITHUB_TOKEN"},
+    "gitlab": {
+      "provider": "1password",
+      "reference": "op://YourVault/YourItem/YourField"
+    }
+  }
+}
+```
 
-## Credentials from 1Password
+Replace the example internal destination locally. Optional `github_git`/`gitlab_git` select the matching HTTPS or ordinary SSH Git destination; each must identify the same repository as its HTTPS API URL. Empty `source_branch` uses the current branch. Set `aminet: true` and a real public uploader email to generate the separate Aminet submission during preparation. Author/uploader text must be ASCII.
 
-A credential can use an exact copied reference:
+Allowed `env` keys are:
+
+| Purpose | Settings |
+| --- | --- |
+| Python, PHP and Mac signing | `BITSKIM_RELEASE_PYTHON`, `PHP`, `BITSKIM_SIGN_IDENTITY` |
+| Amiga and LHA writer | `AMIGA_CC`, `LHA`, `AMIGA_DEV_BIN` |
+| Modern/classic Windows and installer | `WINDOWS_CC`, `LEGACY_WINDOWS_CC`, `LEGACY_WINDOWS_RC`, `MAKENSIS`, `NSISDIR` |
+| DOS | `WATCOM`, `DOS_RUNNER` |
+| Atari | `ATARI_CC`, `STING_INCLUDE` |
+| RISC OS | `RISCOS_CC`, `RISCOS_SDK_SOURCE` |
+| Optional local distribution mirror | `BITSKIM_BUILDS_DIR` |
+
+Keep installed toolchains under the shared tools directory, not a disposable checkout. See the platform build guides for provisioning. LHA creation needs a compression-capable LHa-for-UNIX writer; Lhasa only extracts. Mac app and DMG publication require Developer ID signing, accepted notarization and stapled tickets. The JSON contains certificate/profile names, not private keys or passwords.
+
+## Credentials
+
+Environment tokens or 1Password are supported. A named-field selector can replace the copied reference:
 
 ```json
 "credentials": {
-  "gitlab": {
-    "provider": "1password",
-    "reference": "op://YourVault/YourItem/YourField",
-    "account": ""
-  },
   "github": {
     "provider": "1password",
     "vault": "YourVault",
     "item": "Your GitHub item",
-    "field": "Your release token field",
+    "field": "your-group/bitskim-rw",
     "account": ""
   }
 }
 ```
 
-Choose either a copied `reference` or `vault`/`item`/`field`. An exact reference is preferred when labels are ambiguous. Optional `account` selects the intended 1Password account. Field names containing slashes work with the named-field form. The installed 1Password CLI must be signed in or connected to the desktop app.
+Choose a copied `reference` **or** `vault`/`item`/`field`, never both. An optional `account` selects the 1Password account. Named fields can contain slashes. The `op` CLI must be signed in or connected to its desktop app; missing, ambiguous or cancelled lookups stop publication without displaying secret output.
 
-The token is retrieved only for selected GitHub/GitLab destinations during publication. Values are captured in memory, never printed or saved to configuration/manifests. Compilation does not fetch API tokens. Cancellation or ambiguous/missing fields stop publication.
+Tokens are resolved only for selected publication services and stay in memory. Source pushes and builds do not fetch API tokens. Known credential environment variables are removed from build children; known values and common token formats are redacted from build logs. Git pushes use ordinary SSH/credential-helper authentication separately. Apple signing/notarization credentials remain in the keychain.
 
-Environment variables remain an alternative:
+GitHub credentials need Contents write access to the exact repository. Helper-generated GitHub App installation tokens can be stored in the same 1Password field: the tool checks repository ID/name against the installation repository list rather than relying on user push-role flags. Installation tokens normally expire after one hour; refresh through the helper before publishing. The helper and release config must use the same vault/item/field. GitLab tokens need `api` scope and suitable project access, normally Developer or higher; protected-tag rules can impose additional requirements.
 
-```json
-"credentials": {
-  "gitlab": {"provider": "env", "variable": "GITLAB_TOKEN"},
-  "github": {"provider": "env", "variable": "GITHUB_TOKEN"}
-}
-```
-
-Git source/tag pushes use ordinary SSH credentials or Git credential helpers; API tokens do not configure SSH. Mac signing/notarization credentials remain in the keychain. The config contains their names, not private keys/passwords.
-
-## 1. Push committed source only
+## Push committed source only
 
 ```sh
 python3 scripts/release.py source --to gitlab,github --dry-run
 python3 scripts/release.py source --to gitlab,github --confirm-push
 ```
 
-This pushes the current committed branch and its history. It does not compile, create release tags or upload packages. All selected pushes are dry-run first; force/mirror/follow-tags are not used. Optional `source_branch` changes the destination branch name; empty means the current branch. An extracted archive needs importing into a Git checkout and committing first. Existing Git history must be preserved. The root check handles macOS path capitalization correctly.
+All selected branch pushes are checked before any real push. Only committed source/history is sent, without force, mirror or follow-tags. This does not compile or upload a release. `.gitignore` controls initial staging, but does not remove already tracked files or secrets in older commits.
 
-For an extracted source folder without `.git`, explicitly create a first local commit:
+For a newly extracted source folder without Git history:
 
 ```sh
 python3 scripts/release.py source --init --to gitlab,github --dry-run
 ```
 
-`--init` first checks every selected remote for any branches/tags/refs. A nonempty or inaccessible remote stops the operation before initialization. It requires a reviewed `.gitignore` and configured Git author identity, initializes a main branch, stages nonignored files and creates the first local commit. The default initial commit message is `Push changes to repository`; override it with `--commit-message`. Existing committed repositories get no additional initial commit. The dry run can therefore change local Git metadata, but never uploads. After review, use the ordinary source command with `--confirm-push`. It never force-pushes or replaces existing history.
+`--init` verifies every selected remote is accessible and has no refs, checks Git identity and `.gitignore`, then initializes/stages/commits locally. Its default commit message is `Push changes to repository`; `--commit-message` changes only this first commit. A dry run with `--init` can therefore change local Git metadata, but never uploads. Inspect the commit before `--confirm-push`. Existing committed repositories get no extra initial commit, and existing history is never replaced.
 
-Only committed files are pushed. Already tracked files are not excluded by later .gitignore rules. This script does not provide comprehensive secret scanning of source/history/packages.
+The tool rejects source-input symbolic links, common credential filenames and token/private-key formats before building, preparing, checking and source publication. This is limited detection of current release inputs, not comprehensive secret or history scanning. Review tracked files and history separately before making a private repository public. Matching values are not printed.
 
-## 2. Compile and package
+## Release notes and changelog
+
+`CHANGELOG.MD` is the historical change list. Its current-version section uses `### Features`, `### Enhancements` and `### Bugs`, with the complete changes for that version. Keep earlier versions there.
+
+`docs/RELEASE-NOTES.md` is the Markdown description sent unchanged to both hosts. It must contain:
+
+```markdown
+# BitSkim 0.2
+
+Short application description.
+
+## Features
+
+Overview of the whole application.
+
+## Installation
+
+Platform downloads, requirements, setup and manual location.
+
+## Source and Licence
+
+Public source, exact tagged release, licence and dependency notices.
+
+## Version Changelog
+
+### 0.2
+
+#### Features
+
+- Complete new functionality from this version's changelog.
+
+#### Enhancements
+
+- Complete improvements from this version's changelog.
+
+#### Bugs
+
+- Complete corrections from this version's changelog.
+```
+
+The three current-version groups must exactly match `CHANGELOG.MD`; preparation rejects missing changes, wrong headings and unfinished placeholders. Do not copy earlier releases into the current release description. The first public release lists initial capabilities rather than pre-release fixes. Use versioned repository asset names, factual validation limits and public URLs; omit internal paths, credential details and development commentary. Aminet metadata headers belong only in the plain-text readme.
+
+Finish notes, changelog, documentation and website-source edits **before building**. They are fingerprinted release inputs. A later documentation edit makes builds stale and requires rebuilding. Review [VALIDATION.md](VALIDATION.md) and [RELEASE-READINESS.md](RELEASE-READINESS.md); a successful compiler check is not native runtime certification.
+
+## Build, check, prepare and publish
+
+After committing the reviewed release inputs and checking source destinations, use one fresh artifact directory consistently:
 
 ```sh
 python3 scripts/release.py plan
-python3 scripts/release.py build
-python3 scripts/release.py check
+python3 scripts/release.py build --output outputs/release-0.2-new --verbose
+python3 scripts/release.py check --output outputs/release-0.2-new
+python3 scripts/release.py prepare --output outputs/release-0.2-new \
+  --tag 0.2 --notes docs/RELEASE-NOTES.md
 ```
 
-The build runs host tests, compiles macOS, Windows, AmigaOS, DOS, RISC OS, Atari and Windows Classic clients; signs/notarizes Mac artifacts; packages the source/website/client downloads; and validates them. Configured local distribution mirrors are refreshed. No repositories or Aminet submissions are published by these commands. Successful test output is buffered so simulated uploads and mocked build plans do not appear in normal build logs. Failures still show their diagnostics. Dependency downloads and Apple notarization use the network.
-
-Finish source/doc/website changes before compiling: provenance records cover release inputs, and packaging rejects stale builds. Runtime and hardware validation remain separate from compilation.
-
-## 3. Prepare and publish a release
+Review the manifest, notes, all packages/checksums and retained copies under `outputs/release-0.2-new/release/`, then explicitly publish:
 
 ```sh
-python3 scripts/release.py prepare --tag 0.2
-# Review outputs/release/manifest.json and its prepared asset copies.
-python3 scripts/release.py publish --tag 0.2 --to gitlab,github --confirm-publish
+python3 scripts/release.py publish --output outputs/release-0.2-new \
+  --tag 0.2 --notes docs/RELEASE-NOTES.md \
+  --to gitlab,github --confirm-publish
 ```
 
-Or prepare and publish the current verified build in one explicit operation:
+Publication uses the notes already bound into the prepared manifest; `--notes` selects input for preparation, not an override of prepared publication notes. `release` combines preparation and publication of an already verified build; it does not compile:
 
 ```sh
-python3 scripts/release.py release --tag 0.2 --to gitlab,github --confirm-publish
+python3 scripts/release.py release --output outputs/release-0.2-new \
+  --tag 0.2 --to gitlab,github --confirm-publish
 ```
 
-`--tag 0.2` means the exact tag/title `0.2`; omitting it defaults to `v0.2`. The application version remains 0.2. Changing a tag does not change embedded versions or package filenames. Existing tags at another commit are never moved.
+These commands are for a new tag, never a way to replace conflicting published assets. Use `--tag-message "BitSkim 0.2 release"` during preparation to choose the annotation; publication uses that prepared annotation. A supplied publication annotation must match. Commit messages, tag names and tag annotations are separate values.
 
-Publication requires a clean, committed Git checkout and current builds. Preparation from an extracted archive is allowed, but publication is blocked without a commit. Source/commit, current settings destinations, archive contents, notarization and hashes are checked again before upload.
+`plan` prints steps without building or uploading. `build` requires a clean committed checkout, runs buffered host tests, compiles the desktop/classic clients, signs/notarizes the Mac artifacts, packages and validates downloads, and optionally refreshes configured local distribution mirrors. It does not compile/publish the mobile development clients. Dependencies and Apple notarization use the network; no release API tokens are fetched.
 
-## Standard release assets
+Builds print stages, elapsed times and package sizes. Detailed redacted output is saved in `<output>/release/build.log`; `--verbose` also streams it. Failed build stages retain `failed-build.log`. Build fingerprints and copies of provenance records remain local, outside the public release asset list.
 
-GitHub and GitLab receive the same platform packages, each with a matching `<filename>.sha256`. The checksum contains SHA-256, two spaces, filename and newline. Release title equals the exact tag.
+Without `--output`, the artifact directory is `outputs/`, with state in `outputs/release/`. Custom destinations must be inside `outputs/`, cannot traverse symbolic links and cannot use the reserved `outputs/release/` directory. A custom build directory must be fresh. A build refuses to overwrite a directory containing publication receipts. Compilation still uses shared `build/` intermediates: use separate checkouts for concurrent versions or independently retained native build trees.
 
-Source-code downloads are supplied by the hosts from the Git tag. Standalone source archives, the website bundle and aggregate SHA256SUMS are still built/validated locally, but are excluded from the default publication list. Required corresponding-source/relink material inside binary packages remains included.
+## Repository asset inventory
 
-Exact copies for upload are staged in `outputs/release/publish/outputs`, bound to the prepared manifest. GitHub uses a draft until expected asset digests match. GitLab stores versioned generic packages, downloads/hash-checks them and links them from the release. No gh/glab installation is needed.
+For 0.2, upload these thirteen packages and one matching `<filename>.sha256` each—**26 uploaded assets** on each host:
 
-## Aminet
+```text
+BitSkim-0.2-macOS-arm64.zip
+BitSkim-0.2-macOS-arm64.dmg
+BitSkim-0.2-Windows10-x64.zip
+BitSkim-0.2-Windows10-x64-Setup.exe
+BitSkim-0.2-AmigaOS.zip
+BitSkim-0.2.lha
+BitSkim-0.2-DOS-mTCP.zip
+BitSkim-0.2-RISCOS3-ARM2.zip
+BitSkim-0.2-RISCOS3-StrongARM.zip
+BitSkim-0.2-Windows-Classic-x86.zip
+BitSkim-0.2-Atari-TOS-STinG-68000.zip
+BitSkim-0.2-Atari-MiNTNet-68000.zip
+BitSkim-0.2-Atari-MiNTNet-68060.zip
+```
 
-Set a real `uploader` contact in the external config before preparing an Aminet submission. Review `outputs/aminet/bitskim.readme` and the LHA, then:
+Checksums contain the SHA-256 digest, two spaces, exact filename and newline. Upload identical package and checksum bytes to both hosts. Required dependency source/relink materials remain inside their respective binary packages.
+
+The hosts supply tagged source ZIP/tar downloads. Local source ZIP/tar, website ZIP and aggregate SHA256SUMS are built/validated but not attached to repository releases. Neither mobile development APKs/apps, logs, settings, manifests nor receipts are public release assets. Deploy the PHP website separately from `public-web/`.
+
+Preparation retains exact upload copies at `<output>/release/publish/outputs/`. Hashes are checked before each destination and each upload. GitHub checks digest and size, reuses only matching assets and publishes its verified draft last. An incomplete existing public release is refused. GitLab uses versioned generic packages, downloads/hash-checks their bytes and links them from the normal release. Unexpected public assets/links and differing notes are refused. API writes reject redirects; credentials are never forwarded to another download origin. `gh`/`glab` are not required.
+
+## Aminet submission
+
+Aminet uses exactly these stable, case-sensitive names, without a version:
+
+```text
+bitskim.lha
+bitskim.readme
+```
+
+The LHA is an unchanged copy of the verified versioned Amiga LHA; renaming must not rebuild it. The readme's Version field identifies the release. Do not upload other clients, the website, source ZIP or checksums as the Aminet application archive.
+
+The generator writes ASCII/LF text, at most 76 columns, with these header fields in order: `Short`, `Author`, `Uploader`, `Type`, `Version`, `Architecture`, `Requires`, `Distribution`, `URL`. BitSkim uses category `comm/tcp` and architecture `m68k-amigaos >= 3.0.0`. The body contains the description, FEATURES, INSTALLATION, SOURCE AND LICENCE, and the full matching VERSION CHANGELOG grouped as Features/Enhancements/Bugs. Markdown syntax and decorative Unicode are removed. The uploader email is public.
+
+With `aminet: true` and uploader configured, ordinary release preparation creates `<output>/aminet/`. Review both files before selecting Aminet explicitly:
 
 ```sh
-python3 scripts/release.py publish --tag 0.2 --to aminet --confirm-publish
+python3 scripts/release.py publish --output outputs/release-0.2-new \
+  --tag 0.2 --to aminet --confirm-publish
 ```
 
-Use `--to gitlab,github,aminet` to select all three. Aminet uses its separate verified adapter and anonymous FTP incoming submission. Successful transfer means awaiting moderator review, not public publication.
-
-## Failure and retry
-
-`outputs/release/receipt.json` binds completed destinations to the manifest. Reuse an unchanged manifest after an interrupted GitHub/GitLab upload; matching existing assets are reused and conflicting hashes/notes stop publication. Never force-move tags or delete receipts to hide an earlier attempt. A partial Aminet attempt requires inspecting its own receipt/incoming server before retrying. There is no automatic network retry or rollback of another successful destination.
-
-Only one tag/manifest is prepared at a time in this project. If an existing publication receipt belongs to a different tag/manifest, stop and preserve/review that release state before beginning another release. The script does not silently overwrite it.
-
-Publication does not create repositories, push source branches automatically or deploy the website. The explicit source action is separate.
-
-## Commit message, tag name and tag annotation
-
-These are three different values. A GitHub commit link displaying "Import BitSkim 0.2" shows the source commit message, not the release tag.
-
-For the first commit in a new repository:
+Use `--to gitlab,github,aminet` for all three services. The standalone Amiga-only route remains available:
 
 ```sh
-python3 scripts/release.py source --init --commit-message "BitSkim 0.2 source release" --to gitlab,github --dry-run
+./scripts/release-amiga.sh
+python3 scripts/aminet_release.py prepare \
+  --uploader "you@example.org" --author "Your ASCII Name"
+python3 scripts/aminet_release.py check
+python3 scripts/aminet_release.py upload --confirm-upload
 ```
 
-For a new annotated release tag:
+The standalone route uses `outputs/aminet/` by default and does not publish GitHub/GitLab releases. A stale Amiga fingerprint requires rebuilding, not editing recorded hashes. `scripts/bootstrap-lha.sh` prepares a writer in shared tools when needed.
+
+### Submit an already published release
+
+If the selected output directory retains a completed GitHub/GitLab publication receipt and its checked upload copies, use the separate path:
 
 ```sh
-python3 scripts/release.py release --tag 0.2 --tag-message "BitSkim 0.2 release" --to gitlab,github --confirm-publish
+python3 scripts/release.py prepare-aminet --output outputs/release-0.2-new --tag 0.2
+python3 scripts/release.py publish --output outputs/release-0.2-new \
+  --tag 0.2 --to aminet --confirm-publish
 ```
 
-The tag name and release title are `0.2`; the tag annotation is `BitSkim 0.2 release`. Neither changes the existing source commit message. With separate prepare/publish, supply the annotation during prepare; publish uses that prepared value. Existing commits and tags are never amended or force-pushed. An existing Git repository gets no extra initial commit from --init. To change an already published commit message would require rewriting history, which this tool does not do.
+This creates `<output>/release/aminet-existing/` from the retained published LHA and `CHANGELOG.MD` at its recorded source commit. Working-tree edits do not rebuild or change that archive. It requires the matching repository-publication receipt and staged hashes; it does not download arbitrary remote assets or accept an unverified local replacement. The same route can submit a retained 0.1 publication by selecting its output directory and `--tag 0.1`.
 
-Build tools should live under a persistent tools directory rather than a temporary source checkout. Configure `MAKENSIS` and `NSISDIR` for the Windows installer compiler; `BITSKIM_RELEASE_PYTHON`, `PHP`, `RISCOS_CC`, `RISCOS_SDK_SOURCE`, `DOS_RUNNER`, `ATARI_CC` and `STING_INCLUDE` likewise accept external locations. Keep these machine-specific paths in the external JSON.
+Repository manifests, packages, tags and receipts stay unchanged. The separate Aminet submission has its own manifest/receipt. Preserve any existing preparation/receipt before considering another submission; automatic retry is refused.
+
+### Incoming protection and moderation
+
+Aminet uses anonymous, unencrypted FTP to `main.aminet.net:21`, `/new`. The incoming listing must be readable and neither stable filename may already exist. The tool checks before publication and again immediately before transfer; it will not knowingly overwrite an unknown pending submission. FTP listing and upload are not an atomic server transaction, so a concurrent uploader can still race this check.
+
+The archive is sent first, readme last. Acknowledgement means **awaiting moderator review**, not public publication. Partial/uncertain uploads preserve their receipt and block automatic retry. Review the incoming server with Aminet administrators before recovery. Stable-name submissions do not automatically remove any older versioned Aminet entries.
+
+## Receipts, retries and corrections
+
+`<output>/release/receipt.json` binds the manifest hash, annotated tag object, completed destinations and current destination. Resume with the same output/tag/manifest after inspecting a failure. Completed services are retained; another service's failure does not roll them back. Network/API failures are not automatically retried. Repository identity, tag conflicts, existing bytes/notes and selected Aminet state are checked before remote mutations; permissions can still change after preflight.
+
+Aminet uses `<output>/aminet/upload-receipt.json`, or its separate `release/aminet-existing/upload-receipt.json`. The receipt is written before the first FTP transfer. `failed-may-be-partial` requires inspection; deleting receipts or changing fingerprints is not recovery. Acknowledged submissions have status `transferred-awaiting-aminet-review`.
+
+Prefer a new patch release for corrected published packages. A reviewed notes-only correction can be made manually without changing tag/package bytes; the normal tool refuses differing prepared notes. Explicitly authorized replacement is a separate recovery operation: retain originals/hashes, verify replacement bytes on every service and preserve a replacement record. Assess whether Aminet needs another submission when its bytes change. Do not bypass conflicts by deleting assets, receipts or tags.
+
+## Testing and practical limits
+
+```sh
+python3 -m unittest discover -s tests -p 'test_release*.py' -b
+python3 -m unittest discover -s tests -p 'test_aminet_release.py' -b
+python3 -m unittest discover -s tests -b
+```
+
+Tests use temporary Git repositories, local artifacts and mocked APIs/FTP. They never publish. Exercise hosted adapters against dedicated test repositories before a production tag. The release tool's checks establish matching source/artifact bytes, not reproducible toolchains or universal native compatibility. Multi-service publication is not atomic; changes between preflight and upload can stop a later destination.
+
+API references: [GitHub releases](https://docs.github.com/en/rest/releases/releases), [GitHub release assets](https://docs.github.com/en/rest/releases/assets), [GitLab releases](https://docs.gitlab.com/api/releases/), [GitLab generic packages](https://docs.gitlab.com/user/packages/generic_packages/).

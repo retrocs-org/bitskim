@@ -18,12 +18,12 @@ class FakeGitHub:
     def __init__(self):
         self.release = None; self.assets = {}; self.fail = None; self.posts = 0
     def request(self, method, path, body=None, file=None, **kwargs):
-        if method == 'GET' and '/releases/tags/' in path: return self.release
+        if method == 'GET' and ('/releases/tags/' in path or path.endswith('/releases/latest')): return self.release
         if method == 'GET' and '/assets?' in path: return list(self.assets.values())
         if method == 'POST' and file:
             self.posts += 1
             if file.name == self.fail: raise RuntimeError('interrupted upload')
-            result = {'name': file.name, 'digest': 'sha256:' + release.digest(file)}
+            result = {'name': file.name, 'digest': 'sha256:' + release.digest(file), 'size': file.stat().st_size}
             self.assets[file.name] = result; return result
         if method == 'POST':
             self.release = dict(body, id=42, html_url='https://github.com/team/app/releases/tag/v0.2',
@@ -44,6 +44,7 @@ class FakeGitLab:
         if method == 'GET': return self.release
         if method == 'POST':
             self.release = body; return body
+        if method == 'PUT':self.release.update(body);return self.release
         raise AssertionError((method, path))
 
 
@@ -136,6 +137,7 @@ class ReleaseTool(unittest.TestCase):
             with patch.object(release, 'clean_commit', return_value=manifest['commit']), \
                  patch.object(release, 'source_hash', return_value='hash'), \
                  patch.object(release, 'check_builds'), \
+                 patch.object(release, 'validate_notes'), \
                  patch.object(release, 'check_source_archive'), \
                  patch.object(release, 'inventory', return_value=manifest['files']), \
                  patch.object(release, 'remote_tag', return_value='wrong'), \

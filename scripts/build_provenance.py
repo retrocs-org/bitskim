@@ -2,6 +2,7 @@
 """Fingerprint source before/after builds; reject stale or modified release payloads."""
 import argparse,hashlib,json,os,shutil,subprocess,sys
 from pathlib import Path
+from release_paths import output_dir
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE_ROOTS=('VERSION','CONTRIBUTING.md','.gitignore','Makefile','README.MD','CHANGELOG.MD','LICENSE','LICENSE.md','THIRD-PARTY-NOTICES.MD','core','clients','assets','scripts','tests','docs','examples','installers','public-web','third_party')
 ARTIFACTS={
@@ -52,13 +53,16 @@ def record_path(root,target,pending=False):return root/'build/provenance'/(targe
 def write_json(path,data):
  path.parent.mkdir(parents=True,exist_ok=True);tmp=path.with_suffix('.tmp');tmp.write_text(json.dumps(data,indent=2)+'\n');tmp.replace(path)
 
+def artifact_paths(target,root=ROOT):
+ return [str((output_dir(root)/Path(name).name).relative_to(Path(root).resolve())) if name.startswith('outputs/') else name for name in ARTIFACTS[target]]
+
 def verify(target,root=ROOT):
  if target not in ARTIFACTS:raise StaleBuild('Unknown target: '+target)
  path=record_path(root,target)
  if not path.is_file():raise StaleBuild(target+': no build fingerprint; rebuild this target')
  data=json.loads(path.read_text())
  if data.get('version')!='0.2' or data.get('target')!=target or data.get('source_sha256')!=source_hash(root):raise StaleBuild(target+': source changed since build; rebuild this target')
- if set(data.get('artifacts',{}))!=set(ARTIFACTS[target]):raise StaleBuild(target+': incomplete artifact inventory; rebuild')
+ if set(data.get('artifacts',{}))!=set(artifact_paths(target,root)):raise StaleBuild(target+': incomplete artifact inventory; rebuild')
  for rel,digest in data['artifacts'].items():
   if tree_hash(root/rel)!=digest:raise StaleBuild(target+': artifact changed: '+rel+'; rebuild')
  for dep in DEPENDENCIES.get(target,[]):
@@ -80,7 +84,7 @@ def finish(target,root=ROOT,tool=None,version_arg='--version'):
  if data['source_sha256']!=source_hash(root):raise StaleBuild(target+': source changed during build; rebuild')
  for dep in DEPENDENCIES.get(target,[]):
   if verify(dep,root)['artifacts']!=data['dependencies'][dep]:raise StaleBuild(target+': dependency changed during build; rebuild')
- data['artifacts']={rel:tree_hash(root/rel) for rel in ARTIFACTS[target]}
+ data['artifacts']={rel:tree_hash(root/rel) for rel in artifact_paths(target,root)}
  if tool:
   resolved=shutil.which(tool) or tool
   result=subprocess.run([resolved,version_arg],capture_output=True,text=True,check=True)

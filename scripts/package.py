@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Package verified local builds without changing the release version."""
 from pathlib import Path
+from release_paths import output_dir
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 import hashlib, shutil, struct, os, time, json, argparse
 from build_provenance import verify,StaleBuild
@@ -19,12 +20,12 @@ if (ROOT/'build/dos/BITSKIM.EXE').exists():checks.append('dos')
 for cpu in (() if args.primary_only else ('arm2','strongarm')):
     if (ROOT/'build/riscos'/cpu/'!BitSkim/!RunImage').exists(): checks.append('riscos-'+cpu)
 for target,name in [('dmg','BitSkim-0.2-macOS-arm64.dmg'),('setup','BitSkim-0.2-Windows10-x64-Setup.exe')]:
-    if (ROOT/'outputs'/name).exists(): checks.append(target)
+    if (output_dir(ROOT)/name).exists(): checks.append(target)
 try:
     for target in checks: verify(target,ROOT)
 except StaleBuild as error:
     raise SystemExit('Packaging refused: '+str(error))
-OUT=ROOT/'outputs'; OUT.mkdir(exist_ok=True)
+OUT=output_dir(ROOT); OUT.mkdir(parents=True,exist_ok=True)
 DOWNLOADS=ROOT/'public-web/downloads'; DOWNLOADS.mkdir(exist_ok=True)
 MAC=ROOT/'build/macos/BitSkim.app'; AMIGA=ROOT/'build/amiga/BitSkim'
 WINDOWS=ROOT/'build/windows/BitSkim.exe'

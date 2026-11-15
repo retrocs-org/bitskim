@@ -8,8 +8,9 @@ if [ -z "${MAKENSIS:-}" ] && ! command -v makensis >/dev/null 2>&1; then
  export NSISDIR
 fi
 python3 scripts/build_provenance.py begin setup
-mkdir -p outputs
-"${MAKENSIS:-makensis}" -V3 installers/windows/BitSkim.nsi
+release_output="$(python3 -c 'import sys;sys.path.insert(0,"scripts");from release_paths import output_dir;from pathlib import Path;print(output_dir(Path.cwd()))')"
+mkdir -p "$release_output"
+"${MAKENSIS:-makensis}" -V3 "-DOUTPUT=$release_output/BitSkim-0.2-Windows10-x64-Setup.exe" installers/windows/BitSkim.nsi
 
 python3 scripts/build_provenance.py finish setup --tool "${MAKENSIS:-makensis}" --version-arg=-VERSION
 

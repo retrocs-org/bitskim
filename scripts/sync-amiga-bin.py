@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Refresh Bin:BitSkim plus the compiled LHA and source tarball; no guest install."""
 from pathlib import Path,PurePosixPath
+from release_paths import output_dir
 from zipfile import ZipFile
 import argparse,datetime,hashlib,json,os,shutil,struct,subprocess,tarfile
 from amiga_release import payload,writer
@@ -10,7 +11,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def sync(destination,root=ROOT):
     verify('amiga',root);destination=Path(destination).expanduser().resolve()
     if not destination.is_dir():raise ValueError('Bin destination must already exist: '+str(destination))
-    out=root/'outputs';names=('BitSkim-0.2.lha','BitSkim-src.tar.gz')
+    out=output_dir(root);names=('BitSkim-0.2.lha','BitSkim-src.tar.gz')
     sums={line.split()[-1].lstrip('*'):line.split()[0] for line in (out/'SHA256SUMS').read_text().splitlines() if line.split()}
     for name in names:
         if hashlib.sha256((out/name).read_bytes()).hexdigest()!=sums.get(name):raise ValueError('Missing/mismatched release checksum: '+name)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """One Amiga payload manifest for ZIP and tested classic LH5/LHA releases."""
 from pathlib import Path
+from release_paths import output_dir
 from zipfile import ZipFile,ZIP_DEFLATED
 import argparse,hashlib,os,shutil,subprocess,tempfile
 from build_provenance import verify
@@ -63,7 +64,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--check-writer',action='store_true');args=parser.parse_args()
     if args.check_writer:writer();return
     if (ROOT/'VERSION').read_text().strip()!='0.2':raise RuntimeError('Version must remain 0.2')
-    out=ROOT/'outputs';lha=write_lha(out/'BitSkim-0.2.lha');zipfile=write_zip(out/'BitSkim-0.2-AmigaOS.zip')
+    out=output_dir(ROOT);lha=write_lha(out/'BitSkim-0.2.lha');zipfile=write_zip(out/'BitSkim-0.2-AmigaOS.zip')
     digest=hashlib.sha256(lha.read_bytes()).hexdigest()
     (out/'BitSkim-0.2.lha.sha256').write_text(digest+'  '+lha.name+'\n')
     sums=out/'SHA256SUMS';lines=sums.read_text().splitlines() if sums.exists() else []

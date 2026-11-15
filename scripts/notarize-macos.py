@@ -2,12 +2,13 @@
 """Notarize/staple a verified local Mac build using a saved keychain profile."""
 import argparse,json,subprocess,sys
 from pathlib import Path
-from build_provenance import ROOT,ARTIFACTS,verify,source_hash,tree_hash,record_path,write_json
+from release_paths import output_dir
+from build_provenance import ROOT,ARTIFACTS,verify,source_hash,tree_hash,record_path,write_json,artifact_paths
 
 def main():
  parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('target',choices=('macos','dmg'));parser.add_argument('--profile',default='bitskim');args=parser.parse_args()
  record=verify(args.target)
- path=ROOT/('build/macos/BitSkim.app' if args.target=='macos' else 'outputs/BitSkim-0.2-macOS-arm64.dmg')
+ path=ROOT/'build/macos/BitSkim.app' if args.target=='macos' else output_dir(ROOT)/'BitSkim-0.2-macOS-arm64.dmg'
  subprocess.run(['codesign','--verify','--deep','--strict',str(path)],check=True)
  signature=subprocess.run(['codesign','-dvv',str(path)],capture_output=True,text=True,check=True)
  if 'Authority=Developer ID Application:' not in signature.stderr:raise RuntimeError('Developer ID signing is required before notarization')
@@ -24,7 +25,7 @@ def main():
  if source_hash(ROOT)!=record['source_sha256']:raise RuntimeError('Source changed during notarization; rebuild before release')
  subprocess.run(['xcrun','stapler','staple',str(path)],check=True)
  subprocess.run(['xcrun','stapler','validate',str(path)],check=True)
- record['artifacts']={name:tree_hash(ROOT/name) for name in ARTIFACTS[args.target]}
+ record['artifacts']={name:tree_hash(ROOT/name) for name in artifact_paths(args.target,ROOT)}
  record['notarization']={'status':'Accepted','submission_id':response['id'],'ticket_stapled':True}
  write_json(record_path(ROOT,args.target),record)
  verify(args.target)

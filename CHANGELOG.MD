@@ -2,47 +2,41 @@
 
 ## 0.2 — In development
 
-- Experimental source-only Android client: native Clients/Files/Received/Settings tabs, standard document-provider selection, review before sending, foreground receiving, TLS/device trust, written-file verification, progress, session diagnostics and Mocha/shared themes.
-- Android build/run/bootstrap commands keep downloaded tools, SDK/NDK, Gradle and custom OpenSSL builds in the external shared tools directory. Physical-device and cloud-provider validation remain pending.
+### Features
 
+- Experimental source-only Android client: native Clients/Files/Received/Settings tabs, standard document-provider selection, review before sending, foreground receiving, TLS/device trust, written-file verification, progress, session diagnostics and Mocha/shared themes.
 - iOS review-before-send with recipient address, filenames, total size and explicit confirmation; changed files require another review.
 - iOS current-file progress, recent speed, remaining-time estimates and overall outgoing batch progress.
 - iOS received-file Quick Look previews, filename search, safe rename, confirmed deletion and multiple-item sharing/export.
-
-- iOS selects regular files through copy-based Apple Files import, preserving provider originals.
-
 - iOS persistent themes using the eight desktop palettes or system appearance; Settings with separate Theme and Diagnostics pages.
 - iOS Clients and Files tabs let you browse enabled Files providers before choosing a recipient; opening Files launches Apple’s standard picker without forcing an app folder.
-- Avoid repeated empty-offer notifications while idle, keeping iOS settings responsive.
-
-- iOS Files-provider import guidance and explicit Save to Files for received files/folders, preserving originals and pausing incoming offers while browsing.
-
-- Mac groups multi-interface devices into one card and menu entry, asks for the selected address, retains identity checks and uses iPhone/iPad device icons.
-
-- iOS groups multi-interface discoveries into one computer with explicit, identity-checked address selection; boot migration messages are distinguished from successful app launches without resetting device data.
-
-- iOS receiving addresses keep port numbers ungrouped in all locales; local launch supports Device Hub and older Simulator app names.
-
 - iOS `--run`, device selection and device listing for local build/install/launch, with a separate test listening port so the Mac desktop client can run alongside it.
-
 - iOS build switch `--multicast=off|on` keeps discovery, compiler flags and entitlements consistent; manual IP connections remain available when disabled.
-
 - Experimental source-only iPhone/iPad client with native file import/receive, shared-inbox extension, manual IPv4, optional broadcast discovery, TLS/device trust and transfer history. Device signing and physical-device validation remain pending.
+- Written-file CRC32 readback verification for incoming files from legacy peers, without changing their receipt protocol.
+- Discovery activity counters, search state, last peer-packet age and network troubleshooting guidance.
+- Consistent peer compatibility hints for folders, filename limits, receiving state, verification and encryption.
 
+### Enhancements
+
+- Release automation enforces complete version notes, identical annotated tags and checked platform assets; publishes normal/latest repository releases; supports separate output directories, redacted logs and stable-name Aminet submissions from retained published archives.
+- Android build/run/bootstrap commands keep downloaded tools, SDK/NDK, Gradle and custom OpenSSL builds in the external shared tools directory. Physical-device and cloud-provider validation remain pending.
+- iOS selects regular files through copy-based Apple Files import, preserving provider originals.
+- iOS Files-provider import guidance and explicit Save to Files for received files/folders, preserving originals and pausing incoming offers while browsing.
+- Mac groups multi-interface devices into one card and menu entry, asks for the selected address, retains identity checks and uses iPhone/iPad device icons.
+- iOS groups multi-interface discoveries into one computer with explicit, identity-checked address selection; boot migration messages are distinguished from successful app launches without resetting device data.
+- Clearer verification results distinguishing successful readback, unconfirmed receiver verification and incomplete transfers.
+
+### Bugs
+
+- Avoid repeated empty-offer notifications while idle, keeping iOS settings responsive.
+- iOS receiving addresses keep port numbers ungrouped in all locales; local launch supports Device Hub and older Simulator app names.
 - Windows loads saved device identities at startup so remembered pairing survives restarting.
 - Mac incoming approvals appear on the main window after dismissing Transfer tools or connection sheets.
 - Windows installer blocks upgrades while either 0.1 or 0.2 is running.
-
 - Windows Transfer tools follows the selected theme, retains report scroll position and selection during live updates, and avoids repainting unchanged labels.
-
 - Windows receivers no longer ask for a second confirmation when destination free space is known to be sufficient; insufficient and unknown-space handling remains explicit.
-
 - Windows startup and Transfer tools layout fitted to high-DPI desktop work areas; scaled controls and reachable footer actions.
-
-- Written-file CRC32 readback verification for incoming files from legacy peers, without changing their receipt protocol.
-- Clearer verification results distinguishing successful readback, unconfirmed receiver verification and incomplete transfers.
-- Discovery activity counters, search state, last peer-packet age and network troubleshooting guidance.
-- Consistent peer compatibility hints for folders, filename limits, receiving state, verification and encryption.
 
 ## 0.1 — Initial release
 

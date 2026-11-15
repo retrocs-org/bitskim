@@ -13,7 +13,7 @@ class AminetRelease(unittest.TestCase):
   for name in ('Short','Uploader','Type','Architecture'):self.assertIn(name,fields)
   self.assertLessEqual(len(fields['Short'].strip()),40)
   self.assertEqual(fields['Version'].strip(),'0.2');self.assertEqual(fields['Type'].strip(),'comm/tcp')
-  self.assertNotIn('Distribution:',text)
+  self.assertIn('Distribution:',text);self.assertIn('VERSION CHANGELOG',text);self.assertNotIn('initial public release',text)
  def test_missing_contact_and_header_injection_are_rejected(self):
   for value in (None,'','not-an-email','a@example.org\nType: bad','a@example.org\x00'):
    with self.assertRaises(ValueError):a.readme(value)
@@ -36,6 +36,7 @@ class AminetRelease(unittest.TestCase):
     def connect(self,*args,**kwargs):calls.append(('connect',args))
     def login(self,*args):calls.append(('login',args))
     def cwd(self,path):calls.append(('cwd',path))
+    def nlst(self):return []
     def storbinary(self,command,stream):calls.append((command,stream.read()))
    a.upload(folder,True,ftp_factory=FTP)
    self.assertEqual([c[0] for c in calls if c[0].startswith('STOR ')],['STOR bitskim.lha','STOR bitskim.readme'])
@@ -58,6 +59,7 @@ class AminetRelease(unittest.TestCase):
     def connect(self,*args,**kwargs):pass
     def login(self,*args):pass
     def cwd(self,*args):pass
+    def nlst(self):return []
     def storbinary(self,command,stream):
      if command.endswith('.readme'):raise OSError('simulated disconnect')
    with self.assertRaisesRegex(RuntimeError,'partial'):a.upload(folder,True,ftp_factory=FTP)
@@ -68,7 +70,7 @@ class AminetRelease(unittest.TestCase):
   try:tool=amiga_release.writer()
   except RuntimeError:self.skipTest('No LHA writer available for extraction integration test')
   with tempfile.TemporaryDirectory() as d,patch.object(a,'verify',return_value={'source_sha256':'source'}):
-   root=Path(d);out=root/'outputs';out.mkdir();stage=root/'stage';(stage/'BitSkim').mkdir(parents=True)
+   root=Path(d);(root/'CHANGELOG.MD').write_text((ROOT/'CHANGELOG.MD').read_text());out=root/'outputs';out.mkdir();stage=root/'stage';(stage/'BitSkim').mkdir(parents=True)
    file=stage/'BitSkim/demo';file.write_bytes(b'fixture payload')
    archive=out/'BitSkim-0.2.lha'
    subprocess.run([tool,'ao5g0q2',str(archive),'BitSkim/demo'],cwd=stage,check=True)
