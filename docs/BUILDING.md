@@ -199,3 +199,7 @@ php -S 127.0.0.1:8765 -t public-web
 Validate the packaged links/assets with `python3 scripts/check-release-site.py` and a PHP CLI in PATH (or selected with `PHP`).
 
 Only regenerate assets when editing their sources. `python3 scripts/generate-themes.py` uses the standard library; `python3 scripts/build-icons.py` and `python3 scripts/build-riscos-icon.py` need Pillow. Generated assets are already included for ordinary builds.
+
+## Local installer drawer
+
+Builds are mirrored by `python3 scripts/sync-builds.py` to `~/Development/builds/BitSkim` by default. The complete Amiga installation drawer is unpacked there, with its sibling `BitSkim.info` and `Install-BitSkim.info` using the shared classic package/installer artwork. Open `Install-BitSkim` from that drawer. Versioned archives and checksums are kept inside `BitSkim/packages/`, rather than cluttering the builds root. Set `BITSKIM_BUILDS_DIR` or pass `--builds-dir` to select another builds parent directory. Matching current Amiga provenance and archive contents are required before refreshing the unpacked installer; unrelated files are preserved.

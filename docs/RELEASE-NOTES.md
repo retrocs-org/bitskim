@@ -46,6 +46,7 @@ BitSkim-owned code is MIT licensed. Third-party components retain their own term
 
 #### Enhancements
 
+- Local builds refresh an unpacked BitSkim installer drawer in the shared builds directory, with matching classic drawer/installer icons and archives kept in its packages subdirectory.
 - Release automation enforces complete version notes, identical annotated tags and checked platform assets; publishes normal/latest repository releases; supports separate output directories, redacted logs and stable-name Aminet submissions from retained published archives.
 - Android build/run/bootstrap commands keep downloaded tools, SDK/NDK, Gradle and custom OpenSSL builds in the external shared tools directory. Physical-device and cloud-provider validation remain pending.
 - iOS selects regular files through copy-based Apple Files import, preserving provider originals.
