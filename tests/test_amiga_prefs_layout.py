@@ -17,12 +17,12 @@ class PreferencesLayout(unittest.TestCase):
 struct StringInfo {char *Buffer;};
 struct Gadget {int Flags;void *SpecialInfo;};
 '''+draft+r'''
-typedef struct {int section;struct Gadget *fields[15];int invalid_limits;PrefDraft draft;} PrefEditor;
+typedef struct {int section;struct Gadget *fields[16];int invalid_limits;PrefDraft draft;} PrefEditor;
 static void copy(char *d,const char *s,size_t n){strncpy(d,s,n-1);d[n-1]=0;}
 static int ui_cycle_value(struct Gadget *g){assert(g);return g->Flags;}
 '''+parser+function+r'''
 int main(void){
- PrefEditor e;struct Gadget g[15];struct StringInfo name={"My Amiga"},folder={"Work:Inbox"},up={"128"},down={"256"};
+ PrefEditor e;struct Gadget g[16];struct StringInfo name={"My Amiga"},folder={"Work:Inbox"},up={"128"},down={"256"};
  memset(&e,0,sizeof e);memset(g,0,sizeof g);
  e.draft.visible=1;e.draft.receiving=0;e.draft.theme=3;
  e.fields[1]=&g[1];g[1].SpecialInfo=&name;
@@ -35,7 +35,7 @@ int main(void){
  assert(e.draft.visible && !e.draft.receiving && e.draft.theme==3);
  memset(e.fields,0,sizeof e.fields);e.section=2;
  e.fields[12]=&g[12];g[12].SpecialInfo=&up;e.fields[13]=&g[13];g[13].SpecialInfo=&down;
- e.fields[2]=&g[2];e.fields[3]=&g[3];g[3].Flags=GFLG_SELECTED;
+ e.fields[15]=&g[15];g[15].Flags=GFLG_SELECTED;e.fields[2]=&g[2];e.fields[3]=&g[3];g[3].Flags=GFLG_SELECTED;
  pref_capture(&e);
  assert(!e.draft.visible && e.draft.receiving && !e.invalid_limits);assert(e.draft.send_limit==128UL*1024 && e.draft.receive_limit==256UL*1024);
  assert(e.draft.automatic && !e.draft.ask && !e.draft.start && e.draft.close_iconify && e.draft.sound);

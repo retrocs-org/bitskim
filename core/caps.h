@@ -3,10 +3,11 @@ void bs_local_capabilities(const BSClient *c,BSCapabilities *out) {
     if(!out)return;
     memset(out,0,sizeof *out);if(!c)return;
     out->send_features=BS_CAP_DIRECTORIES|(BS_CAP_RATE_LIMITS|BS_CAP_SKIP|BS_CAP_DISK_VERIFY)|BS_CAP_DETAILS|BS_CAP_BATCH|BS_CAP_COLLECTION;
+if(c->metadata_enabled)out->send_features|=BS_CAP_RETRO_METADATA;
 #ifdef BS_OPENSSL
     out->send_features|=BS_CAP_TLS;
     if(c->resume_enabled)out->send_features|=BS_CAP_RESUME;
-    if(c->security_mode){out->send_features|=BS_CAP_TLS;if(!c->pairing_set){out->send_features|=BS_CAP_AUTO_TLS;if(c->trust_directory[0])out->send_features|=BS_CAP_DEVICE_TRUST;}}
+    if(c->security_mode){out->send_features|=BS_CAP_TLS;if(!c->pairing_set){out->send_features|=BS_CAP_AUTO_TLS;if(c->trust_directory[0])out->send_features|=BS_CAP_DEVICE_TRUST|BS_CAP_INVITATION;}}
 #endif
     out->receive_features=c->config.receiving?local_features(c):0;
 #ifdef BS_OPENSSL

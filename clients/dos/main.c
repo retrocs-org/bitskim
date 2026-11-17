@@ -63,6 +63,9 @@ static int command(char *line) {
     if(!strcmp(line,"DIAGNOSTICS")){char report[2048];bs_diagnostics(client,report,sizeof report);puts(report);}
     else if(!strcmp(line,"TEST"))ok=bs_network_test(client,argument,0);
     else if(!strcmp(line,"HISTORY")){int i;char report[2048];for(i=0;i<bs_history_count(client);i++){bs_history_text(client,i,report,sizeof report);printf("\n%d: %s\n",i+1,report);}}
+    else if(!strcmp(line,"CONTINUE"))bs_queue_continue(client);
+    else if(!strcmp(line,"PAUSE"))bs_queue_pause(client);
+    else if(!strcmp(line,"CLEARHISTORY")){bs_history_clear(client);bs_state_flush(client);}
     else if(!strcmp(line,"RETRY"))ok=bs_retry_history(client,atoi(argument)-1);
     else if(!strcmp(line,"CONFLICT")){int policy=!strcmp(argument,"SKIP")?1:!strcmp(argument,"REPLACE")?2:0;bs_conflict_policy(client,policy);}
     else if(!strcmp(line,"HELP")) help();
@@ -116,7 +119,7 @@ int main(int argc,char **argv) {
     if(!_fullpath(settings_path,"BITSKIM.CFG",sizeof settings_path)) strcpy(settings_path,"BITSKIM.CFG");
     if(!read_config()) {bs_platform_cleanup();return 1;} client=bs_create(&config,event,NULL);
     if(!client) { puts("Cannot create BitSkim client (memory, config or port error)."); bs_platform_cleanup(); return 1; }
-    {char store[sizeof settings_path],*leaf;strcpy(store,settings_path);leaf=strrchr(store,'\\');if(leaf)strcpy(leaf+1,"BSFOLD.DAT");else strcpy(store,"BSFOLD.DAT");bs_folders_configure(client,store);}
+    {char store[sizeof settings_path],*leaf;strcpy(store,settings_path);leaf=strrchr(store,'\\');if(leaf)strcpy(leaf+1,"BSFOLD.DAT");else strcpy(store,"BSFOLD.DAT");bs_folders_configure(client,store);if(leaf)strcpy(leaf+1,"BSTRANS.DAT");else strcpy(store,"BSTRANS.DAT");bs_state_configure(client,store);}
     if(!batch_receive)bs_batch_enable(client,1);
     if(batch_send) { char cmd[192];
         if(strlen(argv[2])+strlen(argv[3])+9>=sizeof cmd) { bs_destroy(client); bs_platform_cleanup(); return 1; }
@@ -149,5 +152,5 @@ int main(int argc,char **argv) {
         }
     }
     if(batch_send || batch_receive) { int success=bs_transfer_result(client)==BS_RESULT_COMPLETE; bs_destroy(client); bs_platform_cleanup(); return success?0:1; }
-    ui_stop(); bs_cancel(client); bs_destroy(client); bs_platform_cleanup(); puts("\nBitSkim stopped."); return 0;
+    ui_stop(); bs_destroy(client); bs_platform_cleanup(); puts("\nBitSkim stopped."); return 0;
 }

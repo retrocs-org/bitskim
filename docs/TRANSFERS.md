@@ -5,12 +5,14 @@
 The shared engine stores pending paths and incoming file lists in temporary files,
 then streams one file at a time over a separate connection per file. Updated
 receivers browse the complete collection, approve it once and choose one folder.
-Memory use does not grow with the list. Queues are session-only: normal exit
-closes temporary storage, and restarting does not restore queued work. Temporary
+Memory use does not grow with the list. The clients checkpoint outgoing paths and
+the last eight transfer results in private local storage. Restored queues start
+paused: review the recipients/files, then choose Continue. Nothing is resent
+automatically. Pending mobile imports remain available after app restart. Temporary
 storage follows the platform C runtime (for example T: on Amiga); on Amiga T: is
 usually RAM-backed, so very large selections still consume available system RAM.
 A full/unwritable temporary volume reports an error and does not silently drop files.
-Folders and automatic archive creation remain unsupported.
+Folder collections are supported on capable receivers. Automatic archive creation is not provided.
 
 macOS and Windows 10 support multiple selection and multiple file drops.
 Amiga and classic Windows accept multiple file drops, or repeated individual
@@ -150,7 +152,7 @@ still require runtime validation.
 
 Each client provides separate send and receive limits in its Network preferences (KiB/s). Zero means Unlimited; the maximum is 1,048,575 KiB/s. Settings apply to the next connection/file. Limits cover file payload, not discovery, control messages or encryption overhead. Small bounded bursts are permitted. A sender uses the lower of its own upload limit and the recipient’s download limit. Limited reception requires an updated sender; legacy senders are refused before approval when a receive limit is set. Unlimited transfers remain compatible with older clients. DOS also accepts `LIMITS <sendKiB> <receiveKiB>`.
 
-See [Transfer tools](TRANSFER-TOOLS.md) for destination-name adaptation, Rename/Skip/Replace decisions, negotiated disk verification, diagnostics, session history and verified device pairing.
+See [Transfer tools](TRANSFER-TOOLS.md) for destination-name adaptation, Rename/Skip/Replace decisions, negotiated disk verification, diagnostics, saved recent history and verified device pairing.
 
 See [remembered folders, overall progress, cancellation and connection checks](TRANSFER-EXPERIENCE.MD) for current client behavior.
 
@@ -164,3 +166,17 @@ History distinguishes written-file verification from unconfirmed receiver disk v
 Transfer tools show whether discovery searches are paused, probe attempts, valid peer packets and the age of the last peer packet. Probe counts record attempts, not confirmed network delivery. The existing connection test shows a local route address when available. Guest-network isolation, VPN routing and broadcast filtering can prevent discovery while a direct IPv4 connection still works.
 
 Modern peer details show receiving state, folder support, filename limits/mapping, written-file verification and encryption policy. These are discovery hints; capabilities are checked again on connection. Unknown profiles remain explicitly unknown. Retro transfer-tools diagnostics report negotiated compatibility where available.
+
+## Saved work, QR invitations and retro metadata (0.2)
+
+Outgoing queues restore paused after restarting. Use the existing Continue/Retry, Skip and Clear controls to review and manage them. Quitting interrupts the active file; the queue retains its source path for an explicit retry. Completed collection entries are not queued again, but a restarted collection requests fresh consent and may get a new safely renamed root. This is not mid-file pause or automatic collection resume. A corrupt or incompatible local checkpoint is retained and reported in Diagnostics; it is never interpreted as a transfer command. Close BitSkim and move the checkpoint aside if you want a clean state. Checkpoint files contain local paths and recent filenames, not pairing passwords or private keys. They are local ABI-versioned files, not portable exports.
+
+State locations: Mac Application Support/BitSkim/transfers.dat; iOS Application Support/transfers.dat; Android private files/Trust/transfers.dat; Amiga ENVARC:BitSkim/BSTRANS.DAT; RISC OS !BitSkim.Transfers; Windows, DOS and Atari BSTRANS.DAT beside settings. Mobile outgoing staging is private durable app storage. Forced process termination can leave the latest incomplete checkpoint unsaved; the previous complete checkpoint remains available. Never remove staging files needed by a restored queue.
+
+Mac Transfer tools → Invite a phone with QR, Windows More → Connection QR, and the mobile Clients tab can display an invitation. Select an address reachable from the other device. Scan it in the mobile client (or paste a bitskim:// invitation on iOS), then select/review files. Camera access is requested only for scanning. A code expires after five minutes; generating another replaces the previous invitation, and closing the receiving app revokes it. The sender checks the advertised device ID and TLS certificate fingerprint before offering any file. The receiver checks the invitation’s random token and original expiry. A QR code does not save a trust pin or approve incoming files. Certificate encryption is required; shared-key/plaintext connections use the existing connection controls instead. A queue held beyond expiry needs a fresh invitation.
+
+Enable **Preserve retro metadata** on both clients before queuing a transfer. It is off by default. Amiga Preferences → Network includes attributes/comments and companion .info files; RISC OS Preferences → Network includes filetypes. Modern clients expose the option in Settings, Mac Transfer tools, or Windows More. Native Amiga protection flags and comments are restored only on Amiga; RISC OS filetypes only on RISC OS. Other hosts keep an exclusive `<filename>.bskmeta` companion bound to content size and CRC32, allowing an onward transfer with metadata enabled. Keep the file and companion together. Changed content makes the old companion ineligible for forwarding. Companions are never overwritten. Native restore failures fall back to the companion; an inability to preserve either is reported while the verified data file remains available.
+
+When queuing a file or drawer with metadata enabled, an adjacent `.info` is added as a normal, visible file in the collection preview. Folder contents already include icons. Recognized .bskmeta companions are sent as metadata rather than duplicate collection files. Safe conflict handling can rename payload and icon separately; review names after collisions. Only regular-file attributes are supported; directory attributes, timestamps, Mac resource forks and arbitrary RISC OS load/exec addresses are outside this extension. Clients without the negotiated capability receive normal file data. CRC32 detects accidental changes and is not authentication: use a trusted local network or verified TLS device identities.
+
+On mobile, use a received file’s **Send to client** action for onward transfer with its adjacent metadata. Provider imports copy only user-selected files; an unrelated cloud provider cannot supply hidden companion files implicitly. Exporting/renaming a payload separately requires keeping its .bskmeta companion with the matching base name.

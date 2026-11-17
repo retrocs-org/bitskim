@@ -24,6 +24,9 @@ struct MobileHome: View {
     @Environment(\.mobileTheme) private var theme
     @ObservedObject var client: IOSClient
     @State private var address = ""
+    @State private var scanQR=false
+    @State private var clearHistory=false
+    @State private var scannedInvitation=""
     @State private var selectedTab = "clients"
     @AppStorage("appearanceTheme") private var themeID = "mocha"
     var body: some View {
@@ -64,6 +67,10 @@ struct MobileHome: View {
                         ForEach(client.addresses, id: \.self) { ip in Text(verbatim: ConnectionTarget.endpoint(ip, port: client.listeningPort)).monospaced().textSelection(.enabled) }
                         if client.addresses.isEmpty { Text("Connect to Wi-Fi to see a local receiving address.").font(.footnote).foregroundStyle(theme?.muted ?? Color.secondary) }
                         Text("Enter this address on the sending computer. BitSkim must stay open.").font(.footnote).foregroundStyle(theme?.muted ?? Color.secondary)
+                    }
+                    Section("QR connection") {
+                        Button("Scan connection QR"){scanQR=true}.disabled(client.active || client.importing)
+                        NavigationLink("Show my connection QR"){MobileInvitation(client:client)}
                     }
                     Section("Connect by IP") {
                         TextField("192.168.1.20 or 192.168.1.20:46440", text: $address)
@@ -127,6 +134,10 @@ struct MobileHome: View {
                             Link("Files setup guide", destination: URL(string: "https://support.apple.com/en-ie/102238")!)
                         }
                     }
+                    Section("Retro files") {
+                        Toggle("Preserve retro metadata",isOn:Binding(get:{client.retroMetadata},set:{client.setMetadata($0)})).disabled(client.active || client.progress.queued>0)
+                        Text("Retains optional Amiga attributes/comments and RISC OS filetypes in a .bskmeta companion for onward transfer.").font(.footnote)
+                    }
                     Section("Encryption") {
                         Picker("Mode", selection: Binding(get: { client.security }, set: { client.setSecurity($0) })) {
                             Text("Disabled").tag(0); Text("Prefer encryption").tag(1); Text("Require encryption").tag(2)
@@ -134,6 +145,7 @@ struct MobileHome: View {
                         Text("Prefer can use plaintext with older clients. Require rejects plaintext. Compare the full code on both computers before trusting a device.").font(.footnote).foregroundStyle(theme?.muted ?? Color.secondary)
                     }
                     Section {
+                        Button("Clear saved transfer history…",role:.destructive){clearHistory=true}
                         NavigationLink("Diagnostics", destination: MobileDiagnostics(client: client))
                     }
                     Section {
@@ -147,6 +159,10 @@ struct MobileHome: View {
         .onChange(of: selectedTab) { tab in
             if tab == "files", !client.active, !client.importing { client.browseFiles() }
         }
+        .onOpenURL{url in scannedInvitation=url.absoluteString}
+        .onChange(of:scannedInvitation){value in if !value.isEmpty{client.prepare(invitation:value);scannedInvitation=""}}
+        .sheet(isPresented:$scanQR,onDismiss:{if !scannedInvitation.isEmpty{let value=scannedInvitation;scannedInvitation="";client.prepare(invitation:value)}}){MobileQRScanner{value in scanQR=false;DispatchQueue.main.asyncAfter(deadline:.now()+0.5){client.prepare(invitation:value)}}}
+        .confirmationDialog("Clear saved transfer history?",isPresented:$clearHistory,titleVisibility:.visible){Button("Clear history",role:.destructive){client.clearHistory()}}message:{Text("Files and queued transfers are kept.")}
         .sheet(isPresented: $client.filePicker) {
             FileProviderImport() { result in
                 client.filePicker = false; client.imported(result)
@@ -202,7 +218,7 @@ struct MobileDiagnostics: View {
                         Text(entry.integrity).font(.caption).foregroundStyle(theme?.muted ?? Color.secondary)
                     }
                 }
-                if client.history.isEmpty { Text("No transfers in this session.") }
+                if client.history.isEmpty { Text("No saved transfers.") }
             }
             Section("Connection report") {
                 Text(client.diagnostics).font(.system(.caption, design: .monospaced)).textSelection(.enabled)

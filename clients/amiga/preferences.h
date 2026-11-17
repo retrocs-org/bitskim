@@ -6,13 +6,13 @@
 static const char *pref_sections[]={"General","Appearance","Network","About"};
 typedef struct {
     char name[64],folder[512];
-    int visible,receiving,automatic,ask,start,close_iconify,theme,sound;
+    int visible,receiving,automatic,ask,start,close_iconify,theme,sound,metadata;
     unsigned long send_limit,receive_limit;
 } PrefDraft;
 typedef struct {
     struct Window *w;
-    struct Gadget *head,*fields[15];
-    struct Gadget *pages[PREF_SECTION_COUNT],*page_fields[PREF_SECTION_COUNT][15];
+    struct Gadget *head,*fields[16];
+    struct Gadget *pages[PREF_SECTION_COUNT],*page_fields[PREF_SECTION_COUNT][16];
     int section,closing,invalid_limits,obtained[7],editor_obtained[7];
     UWORD pens[7],editor_pens[7];
     char navigation[PREF_SECTION_COUNT][24];
@@ -22,13 +22,13 @@ static void pref_from_globals(PrefDraft *d) {
     copy(d->name,client_name,sizeof d->name); copy(d->folder,download,sizeof d->folder);
     d->send_limit=send_limit;d->receive_limit=receive_limit;
     d->visible=visible; d->receiving=receiving; d->automatic=auto_accept;
-    d->ask=ask_location; d->start=start_iconified; d->close_iconify=close_to_iconify; d->theme=theme_index;d->sound=completion_sound;
+    d->ask=ask_location; d->start=start_iconified; d->close_iconify=close_to_iconify; d->theme=theme_index;d->sound=completion_sound;d->metadata=retro_metadata;
 }
 static void pref_to_globals(const PrefDraft *d) {
     copy(client_name,d->name,sizeof client_name); copy(download,d->folder,sizeof download);
     send_limit=d->send_limit;receive_limit=d->receive_limit;
     visible=d->visible; receiving=d->receiving; auto_accept=d->automatic;
-    ask_location=d->ask; start_iconified=d->start; close_to_iconify=d->close_iconify; theme_index=d->theme;completion_sound=d->sound;
+    ask_location=d->ask; start_iconified=d->start; close_to_iconify=d->close_iconify; theme_index=d->theme;completion_sound=d->sound;retro_metadata=d->metadata;
 }
 static void pref_text(struct RastPort *rp,int x,int y,UWORD pen,const char *text) {
     SetAPen(rp,pen); SetDrMd(rp,JAM1); Move(rp,x,y); Text(rp,(STRPTR)text,strlen(text));
@@ -89,7 +89,8 @@ static void pref_draw(PrefEditor *e) {
     } else if(e->section==2) {
         pref_text(rp,207,65,text,"Visible on network");
         pref_text(rp,207,95,text,"Allow incoming transfers");
-        pref_text(rp,172,126,muted,"Transfer limits (KiB/s; 0 = Unlimited)");
+        pref_text(rp,207,120,text,"Preserve retro attributes and .info");
+        pref_text(rp,172,139,muted,"Transfer limits (KiB/s; 0 = Unlimited)");
         pref_text(rp,172,157,text,"Send");
         pref_text(rp,172,187,text,"Receive");
         pref_text(rp,172,209,muted,"Limits apply starting with the next file.");
@@ -117,6 +118,7 @@ static void pref_capture(PrefEditor *e) {
     } else if(e->section==1) {
         e->draft.theme=ui_cycle_value(f[9]);
     } else if(e->section==2) {
+        e->draft.metadata=(f[15]->Flags&GFLG_SELECTED)!=0;
         e->draft.visible=(f[2]->Flags&GFLG_SELECTED)!=0;
         e->draft.receiving=(f[3]->Flags&GFLG_SELECTED)!=0;
         e->invalid_limits=!bs_limit_parse(((struct StringInfo *)f[12]->SpecialInfo)->Buffer,&e->draft.send_limit) || !bs_limit_parse(((struct StringInfo *)f[13]->SpecialInfo)->Buffer,&e->draft.receive_limit);
@@ -160,6 +162,8 @@ static int pref_build(PrefEditor *e) {
         if(!g) goto failed;
         g=e->fields[3]=add(g,CHECKBOX_KIND,3,172,85,22,14,NULL,GTCB_Checked,e->draft.receiving);
         if(!g) goto failed;
+        g=e->fields[15]=add(g,CHECKBOX_KIND,15,172,110,22,14,NULL,GTCB_Checked,e->draft.metadata);
+        if(!g)goto failed;
         g=e->fields[12]=add(g,STRING_KIND,12,282,145,150,18,NULL,GTST_MaxChars,7);
         if(!g)goto failed;
         g=e->fields[13]=add(g,STRING_KIND,13,282,175,150,18,NULL,GTST_MaxChars,7);
@@ -187,6 +191,7 @@ attach:
     if(e->fields[5]) { if(e->draft.ask) e->fields[5]->Flags|=GFLG_SELECTED; else e->fields[5]->Flags&=~GFLG_SELECTED; }
     if(e->fields[10]) { if(e->draft.start) e->fields[10]->Flags|=GFLG_SELECTED; else e->fields[10]->Flags&=~GFLG_SELECTED; }
     if(e->fields[11]) { if(e->draft.close_iconify) e->fields[11]->Flags|=GFLG_SELECTED; else e->fields[11]->Flags&=~GFLG_SELECTED; }
+    if(e->fields[15]) {if(e->draft.metadata)e->fields[15]->Flags|=GFLG_SELECTED;else e->fields[15]->Flags&=~GFLG_SELECTED;}
     if(e->fields[14]) {if(e->draft.sound)e->fields[14]->Flags|=GFLG_SELECTED;else e->fields[14]->Flags&=~GFLG_SELECTED;}
     pref_background(e);
     AddGList(e->w,e->head,~0UL,-1,NULL);

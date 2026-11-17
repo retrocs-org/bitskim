@@ -27,7 +27,7 @@ Every client retains the existing streamed IEEE CRC-32 and exact-length checks. 
 
 Diagnostics show the selected socket stack, bind address, current local connection address where the socket adapter exposes it, ports, visibility/receiving state, payload caps, negotiated feature masks, file/name limits, peer endpoint and last error. DOS/Atari users should consult their stack settings for the local address. A bind address of all interfaces does not identify a LAN address. Nothing starts or reconfigures the stack, firewall, test system or bridge. Discovery across NAT/subnets may require manual addressing and port mapping.
 
-The last **eight** terminal transfers are retained in a bounded, in-memory session history. It includes success/failure/decline/cancellation/skip, direction, filename, peer, bytes, source/save path and the result message. The history survives another transfer, but not application exit. Retry is for unsuccessful outgoing files and resolves the saved stable peer ID again; it never silently chooses another catalog entry. Source files are rechecked as new outgoing transfers. History is not a persistent queue or automatic resume. macOS and Windows can reveal the recorded file's folder without opening the received file itself. Files that were declined may have no save path.
+The last **eight** terminal transfers are checkpointed in private local storage. It includes success/failure/decline/cancellation/skip, direction, filename, peer, bytes, source/save path and the result message. The history survives normal application restarts. The state file also stores queued outgoing paths; these restore paused and need explicit Continue. Clear saved history in Mac Transfer tools, Windows More, or mobile Settings; DOS also accepts CLEARHISTORY. This keeps files and pending queue entries. Retry is for unsuccessful outgoing files and resolves the saved stable peer ID again; it never silently chooses another catalog entry. Source files are rechecked as new outgoing transfers. Saved queue entries retry from the beginning with fresh consent and capability checks; they do not retain a remote approval or an open connection. macOS and Windows can reveal the recorded file's folder without opening the received file itself. Files that were declined may have no save path.
 
 ## Verified device pairing (macOS and modern Windows)
 
@@ -65,8 +65,7 @@ RAM. The queue supports at most 32,760 entries including directories. Each wire
 relative path is at most 255 UTF-8 bytes and 16 components; native destination
 path limits and the 2 GiB minus one byte per-file limit still apply. Names are
 adapted component by component for the receiver. Links and special files are
-refused. Permissions, timestamps, resource forks, filetypes and other metadata
-are not preserved. Archives are not automatically unpacked.
+refused. Optional retro metadata preservation is described in [TRANSFERS.md](TRANSFERS.md). Timestamps and Mac resource forks are not preserved. Archives are not automatically unpacked.
 
 Cancel stops listing or the active transfer. Completed files and created folders
 remain; an interrupted folder is not recursively deleted. Retrying a remaining

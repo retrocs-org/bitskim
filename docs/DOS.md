@@ -224,6 +224,6 @@ All current builds advertise a versioned BXC1 network capability profile in disc
 
 ## Transfer tools
 
-Open F1 then T (or DIAGNOSTICS / HISTORY in CLI mode) for diagnostics, recent session history and the Rename/Skip/Replace conflict policy. See [Transfer tools](TRANSFER-TOOLS.md) for filename mapping, verification and legacy-peer behavior. Native runtime validation is recorded separately.
+Open F1 then T (or DIAGNOSTICS / HISTORY in CLI mode) for diagnostics, saved recent history and the Rename/Skip/Replace conflict policy. See [Transfer tools](TRANSFER-TOOLS.md) for filename mapping, verification and legacy-peer behavior. Native runtime validation is recorded separately.
 
 Folder transfers and disk-space prompts are described in [Transfer tools](TRANSFER-TOOLS.md). Space tags folders; F5 sends the selected folder, while Enter browses it. Native DOS runtime validation includes nested and empty folders in both directions.

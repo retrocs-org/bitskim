@@ -107,4 +107,4 @@ General and Save to change the permanent preference (Use changes this session).
 
 ## Transfer tools
 
-Open Tools → Transfers / Diagnostics for diagnostics, recent session history and the Rename/Skip/Replace conflict policy. See [Transfer tools](TRANSFER-TOOLS.md) for filename mapping, verification and legacy-peer behavior. Native runtime validation is recorded separately.
+Open Tools → Transfers / Diagnostics for diagnostics, saved recent history and the Rename/Skip/Replace conflict policy. See [Transfer tools](TRANSFER-TOOLS.md) for filename mapping, verification and legacy-peer behavior. Native runtime validation is recorded separately.

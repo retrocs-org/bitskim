@@ -25,14 +25,14 @@ typedef struct { int id; char text[512]; } TextIcon;
 typedef struct { int handle,count; TextIcon icons[MAX_ICONS]; } View;
 typedef struct {
     char name[64],folder[512],id[33];
-    int visible,receiving,automatic,ask,start,close_iconify,theme,bell;
+    int visible,receiving,automatic,ask,start,close_iconify,theme,bell,metadata;
     unsigned long send_limit,receive_limit;
 } Preferences;
 static BSClient *engine;
 static View main_view,pref_view,offer_view,network_view,tools_view;
 static int tools_button,tools_mode=-1,tools_top,tools_lines[10],tools_buttons[7];
 static unsigned long tools_serial,bell_serial;
-static int pref_network,net_send,net_receive,net_save,net_cancel;
+static int pref_network,net_send,net_receive,net_save,net_cancel,net_metadata;
 static int offer_conflict,offer_space;static unsigned long offer_space_clock;
 static void tree_offer_rows(void);
 static int offer_top,offer_previous,offer_next,offer_rows[8];
@@ -120,6 +120,7 @@ static void preferences_load(void) {
         else if(!strcmp(line,"close_iconify")) prefs.close_iconify=atoi(value)!=0;
         else if(!strcmp(line,"send_limit_kib")){if(!bs_limit_parse(value,&prefs.send_limit))prefs.send_limit=0;}
         else if(!strcmp(line,"receive_limit_kib")){if(!bs_limit_parse(value,&prefs.receive_limit))prefs.receive_limit=0;}
+        else if(!strcmp(line,"retro_metadata"))prefs.metadata=atoi(value)!=0;
         else if(!strcmp(line,"bell"))prefs.bell=atoi(value)!=0;
         else if(!strcmp(line,"theme")) { i=atoi(value); if(i>=0 && i<8) prefs.theme=i; }
     }
@@ -128,7 +129,7 @@ static void preferences_load(void) {
 static int preferences_write(void) {
     FILE *f=prefs_path[0]?fopen(prefs_path,"w"):NULL; int ok;
     if(!f) return 0;
-    ok=fprintf(f,"name=%s\nid=%s\nfolder=%s\nvisible=%d\nreceiving=%d\nautomatic=%d\nask=%d\nstart=%d\nclose_iconify=%d\ntheme=%d\nbell=%d\nsend_limit_kib=%lu\nreceive_limit_kib=%lu\n",prefs.name,prefs.id,prefs.folder,prefs.visible,prefs.receiving,prefs.automatic,prefs.ask,prefs.start,prefs.close_iconify,prefs.theme,prefs.bell,prefs.send_limit/1024UL,prefs.receive_limit/1024UL)>=0;
+    ok=fprintf(f,"name=%s\nid=%s\nfolder=%s\nvisible=%d\nreceiving=%d\nautomatic=%d\nask=%d\nstart=%d\nclose_iconify=%d\ntheme=%d\nbell=%d\nsend_limit_kib=%lu\nreceive_limit_kib=%lu\nretro_metadata=%d\n",prefs.name,prefs.id,prefs.folder,prefs.visible,prefs.receiving,prefs.automatic,prefs.ask,prefs.start,prefs.close_iconify,prefs.theme,prefs.bell,prefs.send_limit/1024UL,prefs.receive_limit/1024UL,prefs.metadata)>=0;
     if(fclose(f)) ok=0; return ok;
 }
 static void main_create(void) {
@@ -173,11 +174,11 @@ static void show_network(void){char value[32];if(network_view.handle>=0){open_wi
     make_icon(&network_view,20,20,950,36,"Transfer limits (KiB/s; 0 = Unlimited)",0);
     make_icon(&network_view,20,80,220,36,"Send",0);sprintf(value,"%lu",prefs.send_limit/1024UL);net_send=make_icon(&network_view,260,80,700,40,value,WRITABLE);
     make_icon(&network_view,20,140,220,36,"Receive",0);sprintf(value,"%lu",prefs.receive_limit/1024UL);net_receive=make_icon(&network_view,260,140,700,40,value,WRITABLE);
-    make_icon(&network_view,20,204,950,36,"Next file only. Receive caps require an updated sender.",0);
+    net_metadata=make_icon(&network_view,20,204,950,36,prefs.metadata?"[x] Preserve retro filetypes and metadata":"[ ] Preserve retro filetypes and metadata",BUTTON);
     net_cancel=make_icon(&network_view,580,274,180,44,"Cancel",BUTTON);net_save=make_icon(&network_view,780,274,180,44,"Save",BUTTON);open_window(&network_view,1000,340);
 }
 static void click_network(int icon){int i=clicked(&network_view,icon);unsigned long up,down;Preferences old;
-    if(i==net_cancel){delete_window(&network_view);return;}if(i!=net_save)return;
+    if(i==net_metadata){if(bs_status(engine)->active || bs_queue_count(engine)){report("Finish or clear queued transfers first.");return;}prefs.metadata=!prefs.metadata;bs_metadata_enable(engine,prefs.metadata);preferences_write();icon_set(&network_view,net_metadata,prefs.metadata?"[x] Preserve retro filetypes and metadata":"[ ] Preserve retro filetypes and metadata");return;}if(i==net_cancel){delete_window(&network_view);return;}if(i!=net_save)return;
     if(!bs_limit_parse(network_view.icons[net_send].text,&up) || !bs_limit_parse(network_view.icons[net_receive].text,&down)){report("Enter 0..1048575 KiB/s; zero is Unlimited.");return;}
     old=prefs;prefs.send_limit=up;prefs.receive_limit=down;if(!preferences_write()){prefs=old;report("Cannot save preferences.");return;}
     draft.send_limit=up;draft.receive_limit=down;bs_limits_configure(engine,up,down);delete_window(&network_view);
@@ -283,7 +284,7 @@ static void tools_update(void){int i;char line[81];const char *policy=bs_conflic
 static void show_tools(void){int i;if(tools_view.handle>=0){open_window(&tools_view,1160,620);return;}make_window(&tools_view,"BitSkim transfer tools",1160,620);for(i=0;i<10;i++)tools_lines[i]=make_icon(&tools_view,20,28+i*42,1100,36,"",0);
     tools_buttons[0]=make_icon(&tools_view,20,466,170,42,"Diagnostics",BUTTON);tools_buttons[1]=make_icon(&tools_view,210,466,150,42,"History",BUTTON);tools_buttons[2]=make_icon(&tools_view,380,466,150,42,"Older",BUTTON);tools_buttons[3]=make_icon(&tools_view,550,466,150,42,"Retry",BUTTON);tools_buttons[4]=make_icon(&tools_view,720,466,150,42,"Rename",BUTTON);tools_buttons[5]=make_icon(&tools_view,890,466,210,42,"Next page",BUTTON);
     tools_buttons[6]=make_icon(&tools_view,20,570,240,36,"Test connection",BUTTON);
-    make_icon(&tools_view,20,530,1100,36,"History is session-only. Conflict policy applies to remaining collection files.",0);tools_update();open_window(&tools_view,1160,620);
+    make_icon(&tools_view,20,530,1100,36,"Recent history is saved locally. Conflict policy applies to this collection.",0);tools_update();open_window(&tools_view,1160,620);
 }
 static void click_tools(int icon){int id=clicked(&tools_view,icon);BSHistoryItem h;
     if(id==tools_buttons[6]){if(!bs_network_test(engine,main_view.icons[ip_icon].text,0))report(bs_last_error(engine));tools_mode=-1;tools_top=0;}
@@ -352,8 +353,8 @@ int main(void) {
     memset(&config,0,sizeof(config)); copy(config.name,name,64); copy(config.platform,"RISC OS",32); copy(config.id,prefs.id,33); config.port=config.discovery_port=BS_PORT; config.visible=prefs.visible; config.receiving=prefs.receiving;
     engine=bs_create(&config,callback,NULL);
     if(!engine) { report("Cannot open TCP/UDP port 46440. Check the Internet stack and close other BitSkim instances."); goto done; }
-    {char store[BS_PATH_MAX+1];if(native_to_unix("<BitSkim$Dir>.Folders",store,sizeof store))bs_folders_configure(engine,store);}
-    bs_limits_configure(engine,prefs.send_limit,prefs.receive_limit);bs_batch_enable(engine,1);
+    {char store[BS_PATH_MAX+1];if(native_to_unix("<BitSkim$Dir>.Folders",store,sizeof store))bs_folders_configure(engine,store);if(native_to_unix("<BitSkim$Dir>.Transfers",store,sizeof store))bs_state_configure(engine,store);}
+    bs_limits_configure(engine,prefs.send_limit,prefs.receive_limit);bs_batch_enable(engine,1);bs_metadata_enable(engine,prefs.metadata);
     main_create();
     memset(icon,0,sizeof(icon)); icon[0]=-1; icon[1]=0; icon[2]=0; icon[3]=72; icon[4]=72; icon[5]=2|ICON_HCENTRE|ICON_VCENTRE|ICON_INDIRECT|BUTTON; icon[6]=PTR(icon_name); icon[7]=1; icon[8]=sizeof(icon_name);
     memset(&r,0,sizeof(r)); r.r[1]=PTR(icon); if(call(Wimp_CreateIcon,&r)) iconbar=r.r[0];

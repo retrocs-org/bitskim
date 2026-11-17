@@ -8,12 +8,12 @@ static void history_record(BSClient *c) {
     copystr(h->filename,c->status.filename,sizeof h->filename);copystr(h->peer,c->status.peer_name,sizeof h->peer);
     copystr(h->path,h->incoming?c->dest:c->source,sizeof h->path);copystr(h->message,c->status.message,sizeof h->message);
     copystr(h->peer_id,c->remote_id,sizeof h->peer_id);copystr(h->address,c->status.peer_address,sizeof h->address);h->port=c->remote_port;
-    c->history_next=(c->history_next+1)%BS_HISTORY_MAX;if(c->history_count<BS_HISTORY_MAX)c->history_count++;
+    c->history_next=(c->history_next+1)%BS_HISTORY_MAX;if(c->history_count<BS_HISTORY_MAX)c->history_count++;state_mark(c);
 }
 int bs_history_count(const BSClient *c){return c?c->history_count:0;}
 int bs_history_item(const BSClient *c,int i,BSHistoryItem *out){int slot;if(!c || !out || i<0 || i>=c->history_count)return 0;slot=(c->history_next+BS_HISTORY_MAX-1-i)%BS_HISTORY_MAX;*out=c->history[slot];return 1;}
 int bs_history_find(const BSClient *c,unsigned long serial){int i;BSHistoryItem h;for(i=0;i<bs_history_count(c);i++)if(bs_history_item(c,i,&h) && h.serial==serial)return i;return -1;}
-void bs_history_clear(BSClient *c){if(c){memset(c->history,0,sizeof c->history);c->history_count=c->history_next=0;}}
+void bs_history_clear(BSClient *c){if(c){memset(c->history,0,sizeof c->history);c->history_count=c->history_next=0;state_mark(c);}}
 int bs_history_text(const BSClient *c,int i,char *out,size_t capacity){const BSHistoryItem *h;char text[2048];if(!out || !capacity || !c || i<0 || i>=c->history_count)return 0;h=&c->history[(c->history_next+BS_HISTORY_MAX-1-i)%BS_HISTORY_MAX];
     sprintf(text,"%s: %.255s\nPeer: %.63s\n%lu / %lu bytes\nResult: %.255s\nPath: %.1023s\nIntegrity: %s",h->incoming?"Received":"Sent",h->filename,h->peer,h->transferred,h->total,h->message,h->path,h->result!=BS_RESULT_COMPLETE?"not verified (transfer incomplete)":h->verified?"written file verified (CRC32)":"receiver disk verification not confirmed");copystr(out,text,capacity);return strlen(text)<capacity;}
 int bs_retry_history(BSClient *c,int i){BSHistoryItem h;if(!bs_history_item(c,i,&h) || h.incoming || h.result==BS_RESULT_COMPLETE){if(c)copystr(c->error,"Retry is available for unsuccessful outgoing files only",256);return 0;}
@@ -53,6 +53,8 @@ int bs_diagnostics(const BSClient *c,char *out,size_t capacity){char text[2048],
     if(c->discovery_received){sprintf(report,"\nLast peer packet: %lu seconds ago",bsp_seconds()-c->discovery_last);copystr(text+strlen(text),report,sizeof text-strlen(text));}
     if(!c->peer_count){copystr(text+strlen(text),"\nNo peers: check guest Wi-Fi/client isolation and VPN routing; try a direct IPv4 connection.",sizeof text-strlen(text));}
     if(c->cap_ready){sprintf(report,"\nPeer compatibility: %s; %s; %s",c->remote_caps.receive_features&BS_CAP_DIRECTORIES?"folders supported":"files only",c->remote_caps.receive_features&BS_CAP_DISK_VERIFY?"disk verification":"disk verification unconfirmed",c->remote_caps.receive_features&BS_CAP_TLS?"TLS supported":"plaintext only");copystr(text+strlen(text),report,sizeof text-strlen(text));}
+    if(bs_state_restored(c)){sprintf(report,"\nSaved queue: %d entries restored paused; review before Continue",bs_queue_count(c));copystr(text+strlen(text),report,sizeof text-strlen(text));}
+    if(bs_state_error(c)[0]){copystr(text+strlen(text),"\nSaved state: ",sizeof text-strlen(text));copystr(text+strlen(text),bs_state_error(c),sizeof text-strlen(text));}
     copystr(out,text,capacity);return strlen(text)<capacity;
 }
 

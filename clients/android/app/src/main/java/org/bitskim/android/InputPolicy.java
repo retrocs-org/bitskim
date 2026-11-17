@@ -5,8 +5,9 @@ import java.nio.file.Files;
 final class InputPolicy {
     static final long MAX_FILE = 2147483647L;
     static final class Target {
-        final String id, name, address; final int port;
-        Target(String id,String name,String address,int port) { this.id=id;this.name=name;this.address=address;this.port=port; }
+        final String id, name, address, invitation; final int port;
+        Target(String id,String name,String address,int port) { this.id=id;this.name=name;this.address=address;this.port=port;this.invitation=""; }
+        Target(String id,String name,String address,int port,String invitation){this.id=id;this.name=name;this.address=address;this.port=port;this.invitation=invitation;}
         String endpoint() { return address+":"+port; }
     }
     static Target target(String value) {

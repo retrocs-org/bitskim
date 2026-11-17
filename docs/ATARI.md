@@ -186,7 +186,7 @@ All current builds advertise a versioned BXC1 network capability profile in disc
 
 ## Transfer tools
 
-Open F1 for diagnostics, recent session history and the Rename/Skip/Replace conflict policy. See [Transfer tools](TRANSFER-TOOLS.md) for filename mapping, verification and legacy-peer behavior. Native runtime validation is recorded separately.
+Open F1 for diagnostics, saved recent history and the Rename/Skip/Replace conflict policy. See [Transfer tools](TRANSFER-TOOLS.md) for filename mapping, verification and legacy-peer behavior. Native runtime validation is recorded separately.
 
 ## Amiga feature parity and remaining platform differences
 

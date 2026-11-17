@@ -23,7 +23,7 @@ typedef unsigned long ULONG;
 static char client_name[64],installation[33],download[512];
 static char archive_prefs[1024]="ENVARC:BitSkim.prefs";
 static char live_prefs[1024]="ENV:BitSkim.prefs";
-static int theme_index=BS_THEME_DEFAULT,visible,receiving,auto_accept,ask_location,start_iconified,close_to_iconify,completion_sound;
+static int theme_index=BS_THEME_DEFAULT,visible,receiving,auto_accept,ask_location,start_iconified,close_to_iconify,completion_sound,retro_metadata;
 static unsigned long send_limit,receive_limit;
 static const char *testpath;
 static int installed_paths;

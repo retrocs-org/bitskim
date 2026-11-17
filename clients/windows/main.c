@@ -77,6 +77,7 @@ static HICON app_icon;
 static HFONT font,title_font;
 static HBRUSH base_brush[WIN_THEME_COUNT],surface_brush[WIN_THEME_COUNT];
 static wchar_t ini_path[PATH_CAP];
+static int retro_metadata;
 static int completion_alerts;static unsigned long completion_serial;
 static NOTIFYICONDATAW tray_data;
 static int tray_added,peer_dirty=1,offer_pending,handling_offer,dpi=96;
@@ -190,6 +191,7 @@ static void load_preferences(void) {
     {char number[32];
      GetPrivateProfileStringW(L"BitSkim",L"SendLimitKiB",L"0",value,128,ini_path);if(!utf8(value,number,sizeof number) || !bs_limit_parse(number,&prefs.send_limit))prefs.send_limit=0;
      GetPrivateProfileStringW(L"BitSkim",L"ReceiveLimitKiB",L"0",value,128,ini_path);if(!utf8(value,number,sizeof number) || !bs_limit_parse(number,&prefs.receive_limit))prefs.receive_limit=0;}
+    retro_metadata=GetPrivateProfileIntW(L"BitSkim",L"RetroMetadata",0,ini_path)!=0;
     completion_alerts=GetPrivateProfileIntW(L"BitSkim",L"CompletionAlerts",1,ini_path)!=0;
     prefs.security=(int)GetPrivateProfileIntW(L"BitSkim",L"Security",1,ini_path);
     GetPrivateProfileStringW(L"BitSkim",L"PairingKey",L"",prefs.key,65,ini_path);
@@ -388,6 +390,7 @@ static int check_peer_view(void) {
 }
 #include "../shared/collection-win.h"
 #include "../shared/tools-win.h"
+#include "invitation.h"
 static int check_tools_view(HWND parent){
     HWND saved_report=bs_tools_report,edit;TCHAR before[4096],after[4096];DWORD start,end;int i,first,ok=1;HDC dc;LOGBRUSH brush;
     edit=CreateWindowW(L"EDIT",L"",WS_CHILD|ES_MULTILINE|ES_AUTOVSCROLL|ES_READONLY|WS_VSCROLL,0,0,400,80,parent,NULL,instance,NULL);
@@ -719,7 +722,7 @@ static LRESULT CALLBACK main_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
         main_window=w;
         create_peer_view(w);
         ip_edit=control(w,L"EDIT",L"",WS_TABSTOP|WS_BORDER|ES_AUTOHSCROLL,ID_IP); SendMessageW(ip_edit,EM_SETLIMITTEXT,70,0); SendMessageW(ip_edit,EM_SETCUEBANNER,FALSE,(LPARAM)L"192.168.1.20 or 192.168.1.20:46440");
-        {HMENU bar=CreateMenu();AppendMenuW(bar,MF_STRING,9010,L"Transfer tools");AppendMenuW(bar,MF_STRING,9011,L"Send folder...");AppendMenuW(bar,MF_STRING|(completion_alerts?MF_CHECKED:0),9012,L"Completion alerts");SetMenu(w,bar);}
+        {HMENU bar=CreateMenu();AppendMenuW(bar,MF_STRING,9010,L"Transfer tools");AppendMenuW(bar,MF_STRING,9011,L"Send folder...");AppendMenuW(bar,MF_STRING|(completion_alerts?MF_CHECKED:0),9012,L"Completion alerts");{HMENU more=CreatePopupMenu();AppendMenuW(more,MF_STRING,9013,L"Connection QR...");AppendMenuW(more,MF_STRING,9014,L"Clear saved history...");AppendMenuW(more,MF_STRING|(retro_metadata?MF_CHECKED:0),9015,L"Preserve retro metadata");AppendMenuW(bar,MF_POPUP,(UINT_PTR)more,L"More");}SetMenu(w,bar);}
         button(w,L"Refresh",ID_REFRESH); button(w,L"Send file...",ID_SEND); button(w,L"Preferences",ID_PREFS); button(w,L"Cancel",ID_CANCEL); button(w,L"Hide to tray",ID_HIDE);
         status_text=control(w,L"STATIC",L"Ready on your local network",SS_ENDELLIPSIS,0);
         amount_text=control(w,L"STATIC",L"",SS_ENDELLIPSIS,0); speed_text=control(w,L"STATIC",L"",0,0);
@@ -752,6 +755,9 @@ static LRESULT CALLBACK main_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
         case ID_PREFS: show_preferences(); break;
         case 9011:send_folder();break;
         case 9010:bs_tools_open(main_window,instance,client);break;
+        case 9013:show_invitation();break;
+        case 9014:if(MessageBoxW(w,L"Clear saved transfer history? Files and queued transfers are kept.",L"BitSkim",MB_YESNO|MB_ICONQUESTION)==IDYES){bs_history_clear(client);if(!bs_state_flush(client))error_box(w,L"Could not save cleared history. Check private storage.");}break;
+        case 9015:if(bs_status(client)->active || bs_queue_count(client)){error_box(w,L"Finish or clear queued transfers before changing metadata preservation.");break;}retro_metadata=!retro_metadata;bs_metadata_enable(client,retro_metadata);WritePrivateProfileStringW(L"BitSkim",L"RetroMetadata",retro_metadata?L"1":L"0",ini_path);CheckMenuItem(GetMenu(w),9015,MF_BYCOMMAND|(retro_metadata?MF_CHECKED:MF_UNCHECKED));break;
         case 9012:completion_alerts=!completion_alerts;WritePrivateProfileStringW(L"BitSkim",L"CompletionAlerts",completion_alerts?L"1":L"0",ini_path);CheckMenuItem(GetMenu(w),9012,MF_BYCOMMAND|(completion_alerts?MF_CHECKED:MF_UNCHECKED));break;
         case ID_CANCEL: bs_cancel(client); break;
         case ID_HIDE: if((HWND)lp && prefs.tray && tray_added) ShowWindow(w,SW_HIDE); else show_main(); break;
@@ -846,6 +852,8 @@ int WINAPI wWinMain(HINSTANCE h,HINSTANCE previous,PWSTR command,int show) {
       if(!utf8(prefs.key,key,sizeof key) || !bs_security_configure(client,prefs.security,key)) {core_error();bs_destroy(client);bs_platform_cleanup();return 1;}
       SecureZeroMemory(key,sizeof key);bs_limits_configure(client,prefs.send_limit,prefs.receive_limit);bs_resume_enable(client,prefs.resume);bs_batch_enable(client,1);
     }
+    bs_metadata_enable(client,retro_metadata);
+    {char store[BS_PATH_MAX+1],*slash;if(utf8(ini_path,store,sizeof store)){slash=strrchr(store,92);if(slash && (size_t)(store+sizeof store-slash-1)>strlen("BSTRANS.DAT")){strcpy(slash+1,"BSTRANS.DAT");if(!bs_state_configure(client,store))error_box(NULL,L"Saved transfers could not be loaded; the existing state file was retained.");}}}
     dc=GetDC(NULL); dpi=GetDeviceCaps(dc,LOGPIXELSY); ReleaseDC(NULL,dc);
     font=CreateFontW(-S(13),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");
     title_font=CreateFontW(-S(22),0,0,0,FW_SEMIBOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");

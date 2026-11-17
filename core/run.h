@@ -34,7 +34,7 @@ static void retry_tick(BSClient *c){BSRetry *s=c->retry;int budget=8;
  copystr(dir.path,path,sizeof dir.path);copystr(dir.relative,relative,sizeof dir.relative);dir.kind=1;dir.total=0;dir.report=0;if(!retry_append(c,&dir))goto failed;copystr(s->previous[i],relative,256);for(k=i+1;k<16;k++)s->previous[k][0]=0;
  }}else{s->group=0;memset(s->previous,0,sizeof s->previous);}if(!retry_append(c,&q))goto failed;
  }
- if(s->cursor==c->run_count){int folder_errors=s->folder_errors;if(!s->count){copystr(c->error,"Only folder entries failed. Queue those folders again explicitly.",256);goto failed;}if(fflush(s->stage))goto failed;c->queue_file=s->stage;s->stage=NULL;c->queue_head=0;c->queue_count=s->count;c->queue_processed=0;c->queue_paused=0;retry_free(c);message(c,folder_errors?"Failed files queued; failed folder entries need manual requeue":"Failed-only files queued; completed and skipped files excluded");}return;
+ if(s->cursor==c->run_count){int folder_errors=s->folder_errors;if(!s->count){copystr(c->error,"Only folder entries failed. Queue those folders again explicitly.",256);goto failed;}if(fflush(s->stage))goto failed;c->queue_file=s->stage;s->stage=NULL;c->queue_head=0;c->queue_count=s->count;state_mark(c);c->queue_processed=0;c->queue_paused=0;retry_free(c);message(c,folder_errors?"Failed files queued; failed folder entries need manual requeue":"Failed-only files queued; completed and skipped files excluded");}return;
 failed:if(!c->error[0])copystr(c->error,"Cannot build failed-only list; check temporary disk space",256);retry_free(c);copystr(c->status.message,c->error,256);notify(c,BS_EVENT_ERROR);
 }
 /* Directory totals come from the disk manifest, including skipped entries. */

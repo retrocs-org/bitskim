@@ -26,6 +26,10 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan a BitSkim connection invitation to check the receiving device’s identity.</string>
+	<key>CFBundleURLTypes</key>
+	<array><dict><key>CFBundleURLSchemes</key><array><string>bitskim</string></array></dict></array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>BitSkim connects to computers on your local network to send and receive files.</string>
 	<key>UIFileSharingEnabled</key>

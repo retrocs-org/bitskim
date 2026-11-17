@@ -63,6 +63,7 @@ static struct AppWindow *app_window;
 static struct AppIcon *app_icon;
 static struct DiskObject *app_disk_object;
 static unsigned long send_limit=0,receive_limit=0;
+static int retro_metadata;
 static int completion_sound;static unsigned long completion_serial;
 static int start_iconified=0, close_to_iconify=0, iconified=0, iconify_pending=0;
 static int restore_ui(void);
@@ -115,7 +116,7 @@ static void trim(char *s) { char *p=strchr(s,'\n'); if(p) *p=0; p=strchr(s,'\r')
 static void load_prefs(void) {
     FILE *f; char line[600],old_shared[1024],*v; int i,theme_defaults=0;
     /* Missing opt-in settings must not retain an earlier live reload's values. */
-    start_iconified=0; close_to_iconify=0;completion_sound=0;send_limit=receive_limit=0;
+    start_iconified=0; close_to_iconify=0;completion_sound=0;retro_metadata=0;send_limit=receive_limit=0;
     if(!client_name[0]) copy(client_name,"Amiga",sizeof(client_name));
     new_installation_id(installation);
     f=fopen(live_prefs,"r"); if(!f) f=fopen(archive_prefs,"r"); if(!f && amiga_install_path("shared.path",old_shared,sizeof old_shared) && AddPart(old_shared,"Config/BitSkim.prefs",sizeof old_shared)) f=fopen(old_shared,"r"); if(!f && strcmp(live_prefs,"ENV:BitSkim.prefs")) f=fopen("ENV:BitSkim.prefs","r"); if(!f && strcmp(archive_prefs,"ENVARC:BitSkim.prefs")) f=fopen("ENVARC:BitSkim.prefs","r"); if(!f) return;
@@ -127,6 +128,7 @@ static void load_prefs(void) {
         else if(!strcmp(line,"receiving")) receiving=atoi(v)!=0;
         else if(!strcmp(line,"auto_accept")) auto_accept=atoi(v)!=0;
         else if(!strcmp(line,"ask_location")) ask_location=atoi(v)!=0;
+        else if(!strcmp(line,"retro_metadata"))retro_metadata=atoi(v)!=0;
         else if(!strcmp(line,"completion_sound"))completion_sound=atoi(v)!=0;
         else if(!strcmp(line,"start_iconified")) start_iconified=atoi(v)!=0;
         else if(!strcmp(line,"close_to_iconify")) close_to_iconify=atoi(v)!=0;
@@ -144,7 +146,7 @@ static void load_prefs(void) {
 static int write_prefs(const char *path) {
     FILE *f=fopen(path,"w"); int ok;
     if(!f) return 0;
-    ok=fprintf(f,"name=%s\nid=%s\nvisible=%ld\nreceiving=%ld\nauto_accept=%ld\nask_location=%ld\ndownload=%s\ntheme=%s\ntheme_defaults=1\nstart_iconified=%ld\nclose_to_iconify=%ld\ncompletion_sound=%ld\nsend_limit_kib=%lu\nreceive_limit_kib=%lu\n",client_name,installation,(long)visible,(long)receiving,(long)auto_accept,(long)ask_location,download,bs_themes[theme_index].id,(long)start_iconified,(long)close_to_iconify,(long)completion_sound,send_limit/1024UL,receive_limit/1024UL)>=0;
+    ok=fprintf(f,"name=%s\nid=%s\nvisible=%ld\nreceiving=%ld\nauto_accept=%ld\nask_location=%ld\ndownload=%s\ntheme=%s\ntheme_defaults=1\nstart_iconified=%ld\nclose_to_iconify=%ld\ncompletion_sound=%ld\nsend_limit_kib=%lu\nreceive_limit_kib=%lu\nretro_metadata=%ld\n",client_name,installation,(long)visible,(long)receiving,(long)auto_accept,(long)ask_location,download,bs_themes[theme_index].id,(long)start_iconified,(long)close_to_iconify,(long)completion_sound,send_limit/1024UL,receive_limit/1024UL,(long)retro_metadata)>=0;
     if(fclose(f)) ok=0;
     return ok;
 }
@@ -351,7 +353,8 @@ int main(int argc,char **argv) {
     if(!app_port) { alert("Could not create the Workbench message port."); goto cleanup; }
     if(!start_iconified || !iconify_ui()) { if(!open_ui()) goto cleanup; }
     rexx_open();
-    bs_batch_enable(client,1);
+    bs_batch_enable(client,1);bs_metadata_enable(client,retro_metadata);
+    if(!bs_state_configure(client,"ENVARC:BitSkim/BSTRANS.DAT"))alert(bs_state_error(client));
     async_ready=1;
     save_prefs();
     while(running) {
@@ -361,7 +364,7 @@ int main(int argc,char **argv) {
         if(SetSignal(0,SIGBREAKF_CTRL_C)&SIGBREAKF_CTRL_C) quit_pending=1;
         if(reload_pending && !bs_status(client)->active) {
             int previous=theme_index;
-            load_prefs();bs_limits_configure(client,send_limit,receive_limit);
+            load_prefs();bs_limits_configure(client,send_limit,receive_limit);bs_metadata_enable(client,retro_metadata);
             if(bs_to_utf8(client_name,wire_name,sizeof(wire_name))) bs_configure(client,wire_name,visible,receiving);
             if(previous!=theme_index && !iconified) theme_pending=1;
             reload_pending=0;

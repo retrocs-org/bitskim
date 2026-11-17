@@ -7,8 +7,12 @@
 #include <time.h>
 #ifdef BS_OPENSSL
 #include <openssl/evp.h>
+#include <openssl/rand.h>
 #include <openssl/crypto.h>
 #endif
+#define RETRO_METADATA 31
+#define INVITATION 32
+#define INVITATION_SENDING 20
 #define HELLO 1
 #define OFFER 2
 #define ACCEPT 3
@@ -90,13 +94,18 @@ typedef struct {unsigned char token[16];int count,refs,streamed,tree;void *wire_
 typedef struct BSTreeScan BSTreeScan;
 typedef struct BSTreePlan BSTreePlan;
 typedef struct {BSBatch *manifest;char peer[33],address[48],folder[BS_PATH_MAX+1];unsigned short port;int next,encrypted;unsigned long last_seen;BSTreePlan *plan;} BSBatchApproval;
-typedef struct {char id[33],address[48],path[BS_PATH_MAX+1];unsigned short port;unsigned long total,group;int kind;unsigned long report;char relative[256];} BSQueued;
+typedef struct {char id[33],address[48],path[BS_PATH_MAX+1];unsigned short port;unsigned long total,group,invitation_expires;unsigned char invitation_pin[32],invitation_token[16];int kind;unsigned long report;char relative[256];} BSQueued;
 typedef struct BSRetry BSRetry;
 typedef struct {unsigned long complete,folders,skipped,failed,cancelled;int lost;} BSRun;
 typedef struct {BSQueued q;int result;} BSRunRecord;
 typedef struct {unsigned long rate,credit,stamp,fraction;} BSBucket;
 typedef struct BSFolders BSFolders;
+struct BSState;
 struct BSClient {
+    struct BSState *saved_state;
+    unsigned long issued_expires;unsigned char issued_token[16];
+    unsigned long invitation_expires;unsigned char invitation_pin[32],invitation_token[16];int invitation_sent,invitation_received;
+    int metadata_enabled,metadata_sent,metadata_received,metadata_outcome;unsigned char metadata[184];
     BSFolders *folders;
     BSSocket check_socket;int check_pending;unsigned long check_start;
     char check_result[160],check_local[48];
@@ -173,6 +182,13 @@ static void put16(unsigned char *p,unsigned short v) { p[0]=(unsigned char)(v>>8
 static void notify(BSClient *,BSEvent);
 #include "netcheck.h"
 static void history_record(BSClient *c);
+static int metadata_companion(const char *path);
+static void state_mark(BSClient *);
+static int invitation_check(BSClient *);
+static int invitation_frame(BSClient *,const unsigned char *,int);
+static int invitation_send(BSClient *,const BSQueued *);
+static void state_tick(BSClient *);
+static void state_close(BSClient *);
 static void run_record(BSClient *,int);
 static void incoming_record(BSClient *);
 static void retry_free(BSClient *);
@@ -359,7 +375,10 @@ static unsigned local_features(const BSClient *c) {
     if(c->resume_enabled)flags|=BS_CAP_RESUME;
     if(c->security_mode){flags|=BS_CAP_TLS;if(!c->pairing_set){flags|=BS_CAP_AUTO_TLS;if(c->trust_directory[0])flags|=BS_CAP_DEVICE_TRUST;}}
 #endif
-    return flags;
+    #ifdef BS_OPENSSL
+    if(c->trust_directory[0] && c->security_mode && !c->pairing_set)flags|=BS_CAP_INVITATION;
+#endif
+    return flags|(c->metadata_enabled?BS_CAP_RETRO_METADATA:0);
 }
 #include "caps.h"
 static unsigned greeting_features(const unsigned char *p,int n) {
@@ -391,6 +410,8 @@ static void reset_status(BSClient *c,int incoming,const char *ip) {
     batch_free(c->in_batch);c->in_batch=NULL;c->in_batch_index=0;c->out_batch=NULL;c->out_batch_index=0;
     c->transfer_serial=(c->transfer_serial+1)&0xffffffffUL; if(!c->transfer_serial) c->transfer_serial=1;
     c->active_send_limit=c->send_limit;c->active_receive_limit=c->receive_limit;c->peer_receive_limit=0;limits_reset(c);
+    c->invitation_expires=0;c->invitation_sent=c->invitation_received=0;memset(c->invitation_pin,0,sizeof c->invitation_pin);memset(c->invitation_token,0,sizeof c->invitation_token);
+    c->metadata_sent=c->metadata_received=c->metadata_outcome=0;memset(c->metadata,0,sizeof c->metadata);
     c->verified=0;c->replace_pending=0;c->dest[0]=0;
     c->transfer_result=BS_RESULT_NONE;c->remote_features=0;c->last_encrypted=0;c->cap_ready=0;c->upgrade_id[0]=0;memset(&c->remote_caps,0,sizeof c->remote_caps);
 #ifdef BS_OPENSSL
@@ -445,7 +466,7 @@ BSClient *bs_create(const BSConfig *config,BSCallback cb,void *context) {
     if(c->udp==BS_INVALID_SOCKET) { bs_destroy(c); return NULL; }
     copystr(c->status.message,"Ready on your local network",256); bs_refresh(c); return c;
 }
-void bs_destroy(BSClient *c) { int i; if(!c) return;if(c->check_pending)bsp_close(c->check_socket);retry_free(c);if(c->run_file)fclose(c->run_file);if(c->incoming_results)fclose(c->incoming_results);tree_scan_free(c); if(c->queue_file)fclose(c->queue_file);batch_free(c->queue_batch);batch_free(c->in_batch);batch_revoke(c); cleanup_transfer(c); for(i=0;i<LINGER_MAX;i++) if(c->linger[i]!=BS_INVALID_SOCKET) bsp_close(c->linger[i]); if(c->listener!=BS_INVALID_SOCKET) bsp_close(c->listener); if(c->udp!=BS_INVALID_SOCKET) bsp_close(c->udp); 
+void bs_destroy(BSClient *c) { int i; if(!c) return;state_close(c);if(c->check_pending)bsp_close(c->check_socket);retry_free(c);if(c->run_file)fclose(c->run_file);if(c->incoming_results)fclose(c->incoming_results);tree_scan_free(c); if(c->queue_file)fclose(c->queue_file);batch_free(c->queue_batch);batch_free(c->in_batch);batch_revoke(c); cleanup_transfer(c); for(i=0;i<LINGER_MAX;i++) if(c->linger[i]!=BS_INVALID_SOCKET) bsp_close(c->linger[i]); if(c->listener!=BS_INVALID_SOCKET) bsp_close(c->listener); if(c->udp!=BS_INVALID_SOCKET) bsp_close(c->udp);
 #ifdef BS_OPENSSL
     OPENSSL_cleanse(c->pairing_key,32);
 #endif
@@ -658,6 +679,7 @@ static void negotiation_ready(BSClient *c) {
 #endif
         if(!bs_transfer_encrypted(c) && ((c->status.incoming && c->security_mode==BS_SECURITY_REQUIRED && (!c->remote_caps.security_mode || !(c->remote_caps.send_features&BS_CAP_TLS))) || (!c->status.incoming && c->remote_caps.security_mode==BS_SECURITY_REQUIRED))) {finish_error(c,FRAME_ERROR,"Encryption is required; enable Prefer or Force encryption on both clients");return;}
         if((!c->status.incoming || bs_transfer_encrypted(c)) && !trust_check(c))return;
+        if(!c->status.incoming && c->invitation_expires && !c->invitation_sent){unsigned char token[20];if(!(c->remote_features&BS_CAP_INVITATION)){finish_error(c,FRAME_ERROR,"Receiver cannot validate this invitation");return;}put32(token,c->invitation_expires);memcpy(token+4,c->invitation_token,16);frame(c,INVITATION,token,20);c->invitation_sent=1;c->state=INVITATION_SENDING;return;}
         begin_offer(c);return;
 }
 static int commit_received(BSClient *c) {
@@ -696,9 +718,11 @@ int bs_accept_conflict(BSClient *c,const char *path){
     {char wire[256];if(!bs_to_utf8(leaf,wire,sizeof wire) || !bs_suggest_destination(folder,wire,0,unique,sizeof unique)){copystr(c->error,"Cannot choose a unique destination",256);return 0;}}
     return bs_accept(c,unique);
 }
+#include "retro-metadata.h"
 static void receive_verified(BSClient *c) {
         if(commit_received(c)!=0) { finish_error(c,FRAME_ERROR,"Destination exists or cannot be finalized; nothing overwritten"); return; }
         c->transfer_result=BS_RESULT_COMPLETE; c->temp[0]=0;
+        c->metadata_outcome=metadata_finish(c);
         if(c->in_batch && c->batch_approval) {
             c->batch_approval->next=c->in_batch_index+1;c->batch_approval->last_seen=bsp_seconds();
             if(c->batch_approval->next>=c->in_batch->count)batch_revoke(c);
@@ -706,10 +730,11 @@ static void receive_verified(BSClient *c) {
 #ifdef BS_OPENSSL
         if(c->resume_cache){bsp_remove_file(c->resume_meta);c->resume_meta[0]=0;c->resume_cache=0;}
 #endif
-        frame(c,COMPLETE,NULL,0); c->state=CLOSING; message(c,"File received; written file verified (CRC32)"); notify(c,BS_EVENT_COMPLETE); return;
+        frame(c,COMPLETE,NULL,0); c->state=CLOSING; message(c,c->metadata_outcome<0?"File verified; metadata could not be preserved":c->metadata_outcome==2?"File verified; retro metadata preserved in companion file":c->metadata_outcome==1?"File verified; native retro metadata restored":"File received; written file verified (CRC32)"); notify(c,BS_EVENT_COMPLETE); return;
 }
 static void handle_frame(BSClient *c,int type,const unsigned char *p,int n) {
     BSPeer peer; unsigned long size; char filename[256]; int len;
+    if(type==INVITATION){if(!invitation_frame(c,p,n))finish_error(c,FRAME_ERROR,"Invitation expired or replaced; scan a fresh code");return;}
     if(type==VERIFY_WAIT && n==0 && c->state==FINISHING && (c->remote_features&BS_CAP_DISK_VERIFY))return;
     if(type==SKIP_FILE && n==0 && c->state==DECISION && !c->status.incoming && (c->remote_features&BS_CAP_SKIP)) {
         c->transfer_result=BS_RESULT_SKIPPED;cleanup_transfer(c);message(c,"Recipient skipped existing file");notify(c,BS_EVENT_COMPLETE);return;
@@ -783,6 +808,10 @@ static void handle_frame(BSClient *c,int type,const unsigned char *p,int n) {
     if(type==ACCEPT && c->state==DECISION && !c->status.incoming && n==0) {
         c->file=bsp_open_file(c->source,"rb"); if(!c->file) { fail(c,"Source file is no longer readable"); return; }
         c->state=SENDING; message(c,"Sending file..."); return;
+    }
+    if(type==RETRO_METADATA){
+        if(c->state!=RECEIVING || c->status.transferred!=c->status.total || c->metadata_received || !c->metadata_enabled || !(c->remote_features&BS_CAP_RETRO_METADATA) || !metadata_valid(p,n) || (get32(p+16)!=c->crc || get32(p+20)!=c->status.total)){fail(c,"Invalid or unnegotiated retro metadata");return;}
+        memcpy(c->metadata,p,184);c->metadata_received=1;return;
     }
     if(type==DATA && c->state==RECEIVING && n>0 && (unsigned long)n<=c->status.total-c->status.transferred) {
         if(fwrite(p,1,(size_t)n,c->file)!=(size_t)n) { fail(c,"Could not write file; check free disk space"); return; }
@@ -893,6 +922,7 @@ static void tick(BSClient *c) {
     resume_tick(c,now);if(c->state==IDLE)return;
 #endif
 #ifdef BS_OPENSSL
+    if(c->state==INVITATION_SENDING && !c->tx_count)begin_offer(c);
     if(c->state==TLS_SERVER && !c->tx_count) {
         if(c->rx_count){fail(c,"Unexpected data before TLS upgrade");return;}
         if(!bsp_tls_upgrade(c->sock)){fail(c,"Cannot enable encrypted transport");return;}
@@ -942,6 +972,9 @@ static void tick(BSClient *c) {
             if(count!=(size_t)length) { fail(c,"Source file changed or could not be read"); return; }
             c->crc=bs_crc32(c->crc,c->tx+HEADER,count); frame(c,DATA,NULL,(int)count);
         } else {
+            if(!c->metadata_sent && c->metadata_enabled && (c->remote_features&BS_CAP_RETRO_METADATA)){
+                c->metadata_sent=1;if(metadata_source(c)){frame(c,RETRO_METADATA,c->metadata,184);flush(c);continue;}
+            }
             if(fgetc(c->file)!=EOF || ferror(c->file)) { fail(c,"Source file changed while sending"); return; }
             fclose(c->file); c->file=NULL; put32(c->tx+HEADER,c->crc); frame(c,END,NULL,4); c->state=FINISHING; message(c,"Verifying delivery...");
         }
@@ -956,6 +989,7 @@ static void tick(BSClient *c) {
 void bs_tick(BSClient *c) {
     tick(c);
     queue_tick(c);
+    state_tick(c);
     /* One progress notification per tick, however many chunks moved. */
     if(c->status_dirty) { c->status_dirty=0; if(c->status.active) notify(c,BS_EVENT_STATUS); }
 }
@@ -1048,3 +1082,7 @@ unsigned bs_peer_features(const BSClient *c,const char *id) {int i;unsigned flag
 #include "activity.h"
 
 #include "trust.h"
+
+#include "saved-state.h"
+
+#include "invitations.h"

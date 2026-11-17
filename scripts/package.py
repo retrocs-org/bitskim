@@ -56,7 +56,7 @@ with ZipFile(winzip,'w',ZIP_DEFLATED) as z:
     z.write(ROOT/'build/provenance/windows.json','BitSkim/BUILD-PROVENANCE.json')
     z.write(WINDOWS,'BitSkim/BitSkim.exe')
     z.write(ROOT/'build/windows/BitSkim-CoreCheck.exe','BitSkim/Tools/BitSkim-CoreCheck.exe')
-    for source, target in [('docs/TRANSFER-TOOLS.md','TRANSFER-TOOLS.md'),('docs/TRANSFERS.md','TRANSFERS.md'),('assets/licenses/OpenSSL-LICENSE','OpenSSL-LICENSE'),('docs/WINDOWS.md','README.MD'),('LICENSE','LICENSE'),('THIRD-PARTY-NOTICES.MD','THIRD-PARTY-NOTICES.MD'),('assets/themes/CATPPUCCIN-LICENSE','CATPPUCCIN-LICENSE')]:
+    for source, target in [('docs/TRANSFER-TOOLS.md','TRANSFER-TOOLS.md'),('docs/TRANSFERS.md','TRANSFERS.md'),('assets/licenses/OpenSSL-LICENSE','OpenSSL-LICENSE'),('assets/licenses/QRCODEGEN-LICENSE','QRCODEGEN-LICENSE'),('docs/WINDOWS.md','README.MD'),('LICENSE','LICENSE'),('THIRD-PARTY-NOTICES.MD','THIRD-PARTY-NOTICES.MD'),('assets/themes/CATPPUCCIN-LICENSE','CATPPUCCIN-LICENSE')]:
         z.write(ROOT/source,'BitSkim/'+target)
 from source_release import write_source
 sourcezip,sourcetar=write_source(OUT,checks,ROOT)

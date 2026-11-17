@@ -47,3 +47,9 @@ STiNG 1.26's external transprt.h SDK is fetched from th-otto/STinG commit ab065d
 ## Android development client
 
 The Android client uses AndroidX Core 1.17.0 and its transitive AndroidX components from Google Maven, Copyright The Android Open Source Project, under Apache License 2.0. See https://developer.android.com/jetpack/androidx and the corresponding Maven POM/license notices. AndroidX FileProvider grants access only to explicitly shared received files. The APK includes third-party notices, the project license, the Catppuccin license and the full Apache 2.0 text in OPENSSL-LICENSE.txt. Google Android SDK/NDK, Gradle and JDK are external build dependencies and are not included in the source archive.
+
+## QR connections
+
+Windows uses Project Nayuki’s QR Code generator (MIT), pinned at commit bcfe1b018cec5f1f91b5705eca5bb4cdd34e9f8d. Unmodified sources, hashes and the full license are in third_party/qrcodegen; QRCODEGEN-LICENSE accompanies Windows distributions. Source: https://github.com/nayuki/QR-Code-generator . Apple clients use the native Core Image and AVFoundation frameworks.
+
+Android uses ZXing Android Embedded 4.3.0 (Journey Mobile, contributors) and ZXing core 3.5.4 (ZXing authors), both Apache-2.0, plus AndroidX Activity 1.2.0 (Android Open Source Project, Apache-2.0). Source: https://github.com/journeyapps/zxing-android-embedded and https://github.com/zxing/zxing . Original LICENSE/COPYING and NOTICE files are retained under assets/licenses/ZXING-* and copied into the APK assets, together with this notice. AndroidX and its transitive components use Apache-2.0; the same license text is included. No cloud barcode-scanning service is used.

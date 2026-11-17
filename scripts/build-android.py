@@ -54,6 +54,7 @@ def main():
   if args.discovery=='off':command.insert(1,'-DBS_NO_BROADCAST')
   subprocess.run(command,env=env,check=True)
  assets=ROOT/'build/android/assets';assets.mkdir(parents=True,exist_ok=True);shutil.copyfile(tools/'openssl-src'/('openssl-'+OPENSSL)/'LICENSE.txt',assets/'OPENSSL-LICENSE.txt')
+ for source in (ROOT/'assets/licenses').glob('ZXING-*'):shutil.copyfile(source,assets/source.name)
  for notice in ['THIRD-PARTY-NOTICES.MD','LICENSE.md']:shutil.copyfile(ROOT/notice,assets/notice)
  key=tools/'debug.keystore'
  if not key.exists():subprocess.run([str(Path(env['JAVA_HOME'])/'bin/keytool'),'-genkeypair','-keystore',str(key),'-storepass','android','-keypass','android','-alias','androiddebugkey','-keyalg','RSA','-keysize','2048','-validity','10000','-dname','CN=Android Debug,O=Android,C=US'],env=env,check=True)

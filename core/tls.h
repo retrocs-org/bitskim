@@ -134,6 +134,7 @@ int bsp_pairing_key(char out[65]) {unsigned char key[32];static const char hex[]
 
 int bsp_network_wouldblock(void) {return bsp_raw_wouldblock();}
 
+int bsp_tls_local_pin(unsigned char out[32]){unsigned n=0;return tls_auto_identity() && X509_pubkey_digest(tls_certificate,EVP_sha256(),out,&n)==1 && n==32;}
 int bsp_tls_peer_pin(BSSocket socket,unsigned char out[32]){BSTLS *t=tls_find(socket);X509 *cert;unsigned n=0;int ok;
     if(!t || !t->ready || t->failed || t->paired)return 0;
     cert=SSL_get1_peer_certificate(t->ssl);if(!cert)return 0;

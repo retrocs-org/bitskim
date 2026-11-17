@@ -14,7 +14,11 @@ mtcp=drive/'mtcp'
 if mtcp.exists():shutil.rmtree(mtcp)
 shutil.copytree(ROOT/'third_party/mtcp/src',mtcp)
 for obj in stage.glob('*.obj'):obj.unlink()
-for name in ('bitskim.c','bitskim.h','platform.h','dos-net.h','queue.h','folders.h','netcheck.h','batch.h','caps.h','rate.h','activity.h','trust.h','fs.h','storage.h','run.h','treeq.h','tree.h','resume.h','tls-api.h'):shutil.copy2(ROOT/'core'/name,stage/name)
+header_names={'retro-metadata.h':'retromet.h','saved-state.h':'savstate.h','invitations.h':'invites.h'}
+for name in ('bitskim.c','bitskim.h','platform.h','dos-net.h','queue.h','folders.h','netcheck.h','batch.h','caps.h','rate.h','activity.h','trust.h','fs.h','storage.h','run.h','treeq.h','tree.h','resume.h','tls-api.h','retro-metadata.h','saved-state.h','invitations.h'):shutil.copy2(ROOT/'core'/name,stage/header_names.get(name,name))
+source=(stage/'bitskim.c').read_text()
+for original,short in header_names.items():source=source.replace('\"'+original+'\"','\"'+short+'\"')
+(stage/'bitskim.c').write_text(source)
 for path in (ROOT/'clients/dos').iterdir():
  if path.is_file():shutil.copy2(path,stage/path.name)
 units=('packet','arp','eth','ip','tcp','tcpsockm','udp','utils','timer','trace')

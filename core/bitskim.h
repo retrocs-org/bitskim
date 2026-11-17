@@ -27,6 +27,10 @@
 #define BS_CAP_SKIP 512
 #define BS_CAP_DISK_VERIFY 1024
 #define BS_CAP_DEVICE_TRUST 2048
+#define BS_CAP_RETRO_METADATA 4096
+#define BS_CAP_INVITATION 8192
+typedef struct BSMetadata {unsigned long protection,filetype;unsigned char kind;char comment[160];} BSMetadata;
+
 #define BS_CONFLICT_RENAME 0
 #define BS_CONFLICT_SKIP 1
 #define BS_CONFLICT_REPLACE 2
@@ -42,6 +46,9 @@ typedef struct {
 } BSCapabilities;
 /* The core is single-threaded. Call all functions from the same event loop. */
 typedef struct BSClient BSClient;
+void bs_metadata_enable(BSClient *,int);
+int bs_metadata_enabled(const BSClient *);
+int bs_metadata_seed(const char *path,const BSMetadata *);
 typedef struct {
     char id[33], name[64], platform[32], address[48];
     unsigned short port;
@@ -129,6 +136,10 @@ const char *bs_last_folder(const BSClient *,int incoming);
 int bs_queue_peer(BSClient *,const char *id,const char *path);
 int bs_queue_peer_address(BSClient *,const char *id,const char *address,unsigned short port,const char *path);
 int bs_queue_address(BSClient *,const char *address,unsigned short port,const char *path);
+typedef struct {char address[48],id[33];unsigned char pin[32],token[16];unsigned short port;unsigned long expires;} BSInvitation;
+int bs_invitation_create(BSClient *,const char *address,char *out,size_t capacity);
+int bs_invitation_parse(const char *,BSInvitation *);
+int bs_queue_invitation(BSClient *,const char *invitation,const char *path);
 typedef struct { char path[BS_PATH_MAX+1]; unsigned long total; int active,paused; } BSQueueItem;
 /* Copy a bounded queue snapshot. Paths are local native encoding, not wire UTF-8.
    Total is the enqueue-time size; the engine rechecks before sending. */
@@ -208,6 +219,12 @@ int bs_history_count(const BSClient *);
 int bs_history_find(const BSClient *,unsigned long serial);
 int bs_history_item(const BSClient *,int newest_first,BSHistoryItem *);
 void bs_history_clear(BSClient *);
+/* Private local state; restored outgoing work is always paused until Continue.
+   Local ABI-versioned format; never exchange these files between devices. */
+int bs_state_configure(BSClient *,const char *path);
+int bs_state_flush(BSClient *);
+const char *bs_state_error(const BSClient *);
+int bs_state_restored(const BSClient *);
 /* Bounded text for local diagnostic/history UI; never includes secrets. */
 /* Nonblocking TCP reachability only, no file offer; outcome is in diagnostics.
    NULL address tests the last remote address or first discovered peer. */

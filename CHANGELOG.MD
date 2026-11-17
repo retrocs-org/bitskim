@@ -4,6 +4,11 @@
 
 ### Features
 
+- Saved outgoing queues and eight recent results; restored work stays paused until explicit Continue, with mobile staging retained across restart.
+- Android approved active transfers continue while minimized through a visible foreground notification with Cancel. Idle receiving still needs the app open.
+- Five-minute QR connection invitations on modern desktop/mobile clients, mobile scanning, TLS fingerprint/device checks and receiver-validated tokens before file offers.
+- Opt-in Amiga attributes/comments and RISC OS filetypes, native restoration, content-bound companions for onward transfers and adjacent .info inclusion in queued collections.
+
 - Experimental source-only Android client: native Clients/Files/Received/Settings tabs, standard document-provider selection, review before sending, foreground receiving, TLS/device trust, written-file verification, progress, session diagnostics and Mocha/shared themes.
 - iOS review-before-send with recipient address, filenames, total size and explicit confirmation; changed files require another review.
 - iOS current-file progress, recent speed, remaining-time estimates and overall outgoing batch progress.

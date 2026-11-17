@@ -6,6 +6,9 @@ final class Native {
     static native String tick(long handle);
     static native boolean action(long handle, int command, long serial, String argument);
     static native boolean queue(long handle, String id, String address, int port, String path);
+    static native String invitation(long handle,String address);
+    static native String parseInvitation(String text);
+    static native boolean queueInvitation(long handle,String invitation,String path);
     static native String selfTest(String root);
     private Native() {}
 }

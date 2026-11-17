@@ -30,6 +30,7 @@ struct ReceivedFiles: View {
                         Spacer(); Text("\(selected.count) selected").font(.caption)
                     }
                     Menu("Selected file actions") {
+                        Menu("Send to client"){ForEach(client.peers){peer in Button(peer.name+" · "+peer.address){client.forward(selectedFiles,to:peer)}}}.disabled(client.peers.isEmpty)
                         Button("Share selected", systemImage: "square.and.arrow.up") { open(selectedFiles, action: "share") }
                         Button("Save to Files", systemImage: "folder") { open(selectedFiles, action: "export") }
                         Button("Delete selected", systemImage: "trash", role: .destructive) { deleting = selectedFiles; deletePrompt = true }
@@ -47,7 +48,7 @@ struct ReceivedFiles: View {
                     Spacer()
                     if !editMode.isEditing {
                         Menu {
-                            if !isFolder(file) { Button("Preview", systemImage: "eye") { open([file], action: "preview") } }
+                            if !isFolder(file) { Menu("Send to client"){ForEach(client.peers){peer in Button(peer.name+" · "+peer.address){client.forward([file],to:peer)}}}.disabled(client.peers.isEmpty);Button("Preview", systemImage: "eye") { open([file], action: "preview") } }
                             Button("Save to Files", systemImage: "folder") { open([file], action: "export") }
                             Button("Share", systemImage: "square.and.arrow.up") { open([file], action: "share") }
                             Button("Rename", systemImage: "pencil") { renameText = file.lastPathComponent; renaming = file; renamePrompt = true }

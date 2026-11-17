@@ -93,7 +93,7 @@ All current builds advertise a versioned BXC1 network capability profile in disc
 
 ## Transfer tools
 
-Open Tools... in the main window for diagnostics, recent session history and the Rename/Skip/Replace conflict policy. See [Transfer tools](TRANSFER-TOOLS.md) for filename mapping, verification and legacy-peer behavior. Native runtime validation is recorded separately.
+Open Tools... in the main window for diagnostics, saved recent history and the Rename/Skip/Replace conflict policy. See [Transfer tools](TRANSFER-TOOLS.md) for filename mapping, verification and legacy-peer behavior. Native runtime validation is recorded separately.
 
 ## Filer integration
 

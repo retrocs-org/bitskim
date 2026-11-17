@@ -12,7 +12,7 @@ def payload(root=ROOT):
            'BitSkim/BUILD-PROVENANCE.json':root/'build/provenance/amiga.json'}
     for name in ('BitSkim','BitSkimPrefs','BitSkim.info','BitSkimPrefs.info','Install-BitSkim','Install-BitSkim.info','StartInstaller','StartBitSkim','StopBitSkim','BitSkim.guide','BitSkim.guide.info'):
         files['BitSkim/'+name]=root/'build/amiga'/name
-    for source,target in [('docs/TRANSFER-TOOLS.md','TRANSFER-TOOLS.md'),('README.MD','README.MD'),('LICENSE','LICENSE'),('THIRD-PARTY-NOTICES.MD','THIRD-PARTY-NOTICES.MD'),('docs/INSTALLATION.md','INSTALLATION.md'),('assets/themes/CATPPUCCIN-LICENSE','CATPPUCCIN-LICENSE'),('assets/licenses/NOVADOCK-LICENSE','NOVADOCK-LICENSE'),('docs/AMIGA-AREXX.md','ARexx/README.MD'),('docs/NOVADOCK.md','ARexx/NOVADOCK.md')]:
+    for source,target in [('docs/TRANSFER-TOOLS.md','TRANSFER-TOOLS.md'),('docs/TRANSFERS.md','TRANSFERS.md'),('README.MD','README.MD'),('LICENSE','LICENSE'),('THIRD-PARTY-NOTICES.MD','THIRD-PARTY-NOTICES.MD'),('docs/INSTALLATION.md','INSTALLATION.md'),('assets/themes/CATPPUCCIN-LICENSE','CATPPUCCIN-LICENSE'),('assets/licenses/NOVADOCK-LICENSE','NOVADOCK-LICENSE'),('docs/AMIGA-AREXX.md','ARexx/README.MD'),('docs/NOVADOCK.md','ARexx/NOVADOCK.md')]:
         files['BitSkim/'+target]=root/source
     for path in sorted((root/'examples/arexx').glob('*.rexx')):files['BitSkim/ARexx/'+path.name]=path
     for name in ('SettingsDrawer.info','BitSkim.prefs.info','Startup.info'):files['BitSkim/InstallAssets/'+name]=root/'build/amiga/InstallAssets'/name

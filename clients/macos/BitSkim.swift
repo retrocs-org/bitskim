@@ -1,6 +1,8 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import CoreImage.CIFilterBuiltins
+import Darwin
 
 private func text<T>(_ value: T) -> String {
     var copy = value
@@ -89,6 +91,12 @@ final class ClientModel: ObservableObject {
     @Published var receiveLimitKiB: String
     @Published var securityMode: Int
     @Published var pairingKey: String
+    @Published var retroMetadata = false
+    @Published var invitationOpen = false
+    @Published var invitationAddress = ""
+    @Published var invitationText = ""
+    @Published var invitationImage: NSImage?
+    @Published var invitationExpires = Date.distantPast
     @Published var resumable: Bool
     @Published var manual = false
     @Published var selected: String?
@@ -148,6 +156,19 @@ final class ClientModel: ObservableObject {
         return String(cString: bytes)
     }
     var historyCount: Int { engine.map { Int(bs_history_count($0)) } ?? 0 }
+    func clearHistory() { guard let engine else{return};let alert=NSAlert();alert.messageText="Clear saved transfer history?";alert.informativeText="Received files and queued transfers are kept.";alert.addButton(withTitle:"Clear history");alert.addButton(withTitle:"Cancel");if alert.runModal() == .alertFirstButtonReturn {bs_history_clear(engine);_ = bs_state_flush(engine);objectWillChange.send()} }
+    var invitationAddresses: [String] {
+        var first: UnsafeMutablePointer<ifaddrs>?;guard getifaddrs(&first)==0 else{return []};defer{freeifaddrs(first)};var result=Set<String>();var entry=first
+        while let item=entry {defer{entry=item.pointee.ifa_next};guard let address=item.pointee.ifa_addr,address.pointee.sa_family==UInt8(AF_INET),(item.pointee.ifa_flags & UInt32(IFF_UP)) != 0,(item.pointee.ifa_flags & UInt32(IFF_LOOPBACK))==0 else{continue};var host=[CChar](repeating:0,count:Int(NI_MAXHOST));if getnameinfo(address,socklen_t(address.pointee.sa_len),&host,socklen_t(host.count),nil,0,NI_NUMERICHOST)==0{result.insert(String(cString:host))}}
+        return result.sorted()
+    }
+    func makeInvitation() {
+        guard let engine else{return};var bytes=[CChar](repeating:0,count:256)
+        guard bs_invitation_create(engine,invitationAddress,&bytes,bytes.count) != 0 else{error("Enable receiving and certificate encryption, then choose a reachable LAN address.");return}
+        invitationText=String(cString:bytes);invitationExpires=Date().addingTimeInterval(300)
+        let filter=CIFilter.qrCodeGenerator();filter.message=Data(invitationText.utf8);filter.correctionLevel="M"
+        if let output=filter.outputImage,let cg=CIContext().createCGImage(output.transformed(by:CGAffineTransform(scaleX:8,y:8)),from:output.extent.applying(CGAffineTransform(scaleX:8,y:8))){invitationImage=NSImage(cgImage:cg,size:NSSize(width:300,height:300))}
+    }
     func historyText(_ index: Int) -> String {
         guard let engine else { return "" }; var bytes = [CChar](repeating: 0, count: 2048)
         _ = bs_history_text(engine, Int32(index), &bytes, bytes.count); return String(cString: bytes)
@@ -182,6 +203,7 @@ final class ClientModel: ObservableObject {
     private let defaults = UserDefaults.standard
 
     init() {
+        retroMetadata = defaults.bool(forKey: "retroMetadata")
         sendLimitKiB = defaults.string(forKey: "sendLimitKiB") ?? "0"
         receiveLimitKiB = defaults.string(forKey: "receiveLimitKiB") ?? "0"
         securityMode = (defaults.object(forKey: "securityMode") as? Int) ?? 1
@@ -203,7 +225,10 @@ final class ClientModel: ObservableObject {
         defaults.set(id, forKey: "installationID")
         platformReady = bs_platform_init() != 0
         if platformReady { engine = bs_create_app(wireName, "macOS", id, visible ? 1 : 0, receiving ? 1 : 0) }
-        if let engine { configureFolders(engine) }
+        if let engine {
+            configureFolders(engine)
+
+        }
         if let engine {
             let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("BitSkim/Trust", isDirectory: true)
             do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -214,10 +239,14 @@ final class ClientModel: ObservableObject {
                 bs_destroy(engine); self.engine = nil
             }
             if self.engine != nil {
+            let saved = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("BitSkim", isDirectory: true)
+            do { try FileManager.default.createDirectory(at: saved, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+                if bs_state_configure(engine,saved.appendingPathComponent("transfers.dat").path)==0 { startupError=String(cString:bs_state_error(engine)) }
+            } catch { startupError=error.localizedDescription }
                 var up: UInt = 0, down: UInt = 0
                 if bs_limit_parse(sendLimitKiB,&up) == 0 || bs_limit_parse(receiveLimitKiB,&down) == 0 {sendLimitKiB="0";receiveLimitKiB="0";up=0;down=0}
                 bs_limits_configure(engine,up,down)
-                bs_resume_enable(engine, resumable ? 1 : 0); bs_batch_enable(engine, 1) }
+                bs_metadata_enable(engine,retroMetadata ? 1 : 0); bs_resume_enable(engine, resumable ? 1 : 0); bs_batch_enable(engine, 1) }
         }
         if engine == nil {
             if startupError.isEmpty { startupError = "Cannot listen on port \(BS_PORT). Close any other BitSkim instance, then reopen the app." }
@@ -259,7 +288,8 @@ final class ClientModel: ObservableObject {
             defaults.set(pairingKey, forKey: "pairingKey")
             defaults.set(resumable, forKey: "resumable")
         }
-        if let engine {bs_limits_configure(engine,up,down)}
+        if let engine {bs_limits_configure(engine,up,down);if !active {bs_metadata_enable(engine,retroMetadata ? 1 : 0)}}
+        defaults.set(retroMetadata,forKey:"retroMetadata")
         defaults.set(sendLimitKiB, forKey: "sendLimitKiB"); defaults.set(receiveLimitKiB, forKey: "receiveLimitKiB")
         defaults.set(name, forKey: "name"); defaults.set(visible, forKey: "visible")
         defaults.set(completionSound, forKey: "completionSound")
@@ -857,6 +887,9 @@ struct TransferToolsView: View {
                         Button("Trust device") { model.trustDevice() }
                     } else { Text("Pair during an encrypted connection. Shared-key connections use the existing key instead. Retro clients without TLS cannot pair.") }
                     Button("Forget current or last device") { model.forgetDevice() }
+                    Button("Invite a phone with QR") { model.invitationAddress=model.invitationAddresses.first ?? "";model.invitationText="";model.invitationImage=nil;model.invitationOpen=true }
+                    Toggle("Preserve retro metadata and companion .info files",isOn:$model.retroMetadata).disabled(model.active || model.queued>0).onChange(of:model.retroMetadata){_ in model.savePreferences()}
+                    Text("Optional Amiga attributes/comments and RISC OS filetypes. Other systems retain a bound .bskmeta companion for onward transfer.").font(.caption)
                     Divider(); Text("Network status").font(.headline)
                     HStack { TextField("IPv4 address or IPv4:port", text: $model.testAddress); Button("Test connection") { model.testConnection() } }
                     Text(model.diagnostics()).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
@@ -869,7 +902,8 @@ struct TransferToolsView: View {
                             }
                         }
                     }
-                    Divider(); Text("Recent transfers (this session)").font(.headline)
+                    Divider(); Text("Saved recent transfers").font(.headline)
+                    Button("Clear saved history…"){model.clearHistory()}.disabled(model.historyCount==0)
                     if model.historyCount == 0 { Text("No transfers yet.") }
                     ForEach(0..<model.historyCount, id: \.self) { index in
                         let serial=model.historySerial(index)
@@ -881,5 +915,6 @@ struct TransferToolsView: View {
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
         }.padding(20).frame(width: 600, height: 600).foregroundStyle(model.theme.text).background(model.theme.base)
+        .sheet(isPresented:$model.invitationOpen){VStack(spacing:14){Text("Connect a phone").font(.title2);Picker("LAN address",selection:$model.invitationAddress){ForEach(model.invitationAddresses,id:\.self){Text($0).tag($0)}};Button("Generate invitation"){model.makeInvitation()};TimelineView(.periodic(from:.now,by:1)){context in if context.date<model.invitationExpires,let image=model.invitationImage {Image(nsImage:image).interpolation(.none).resizable().frame(width:300,height:300).padding(16).background(Color.white);Text("Expires in \(Int(model.invitationExpires.timeIntervalSince(context.date))) seconds")}else if !model.invitationText.isEmpty {Text("Invitation expired. Generate a new code.")}};Text("Scan in BitSkim. The code checks this device’s identity; you still approve incoming files.").font(.caption);Button("Close"){model.invitationOpen=false;model.invitationImage=nil;model.invitationText=""}}.padding(24).frame(width:400)}
     }
 }

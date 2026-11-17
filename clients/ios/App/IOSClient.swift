@@ -38,6 +38,8 @@ struct MobileHistory: Identifiable, Equatable {
     private var reviewLease = false
     private var reviewCopies: [URL] = []
     private var sendPlan: [SendFile] = []
+    @Published var retroMetadata = UserDefaults.standard.bool(forKey:"retroMetadata")
+    private var invitationText: String?
     @Published var security = UserDefaults.standard.object(forKey: "security") as? Int ?? 1
     private var fileBrowserRequests = 0
     private var importBrowserOpen = false
@@ -66,7 +68,7 @@ struct MobileHistory: Identifiable, Equatable {
         let fm = FileManager.default
         received = fm.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Received", isDirectory: true)
         support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        imports = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("Outgoing", isDirectory: true)
+        imports = support.appendingPathComponent("Outgoing", isDirectory: true)
     }
     func start() {
         guard engine == nil else { return }
@@ -97,6 +99,12 @@ struct MobileHistory: Identifiable, Equatable {
             guard bs_trust_configure(client, trust.path) != 0, bs_security_configure(client, Int32(security), "") != 0 else {
                 throw messageError("Cannot initialize saved device identities and encryption.")
             }
+            let saved = trust.deletingLastPathComponent().appendingPathComponent("transfers.dat")
+            if bs_state_configure(client,saved.path)==0 { self.error=String(cString:bs_state_error(client)) }
+            sending=(0..<Int(bs_queue_count(client))).compactMap { index in
+                var item=BSQueueItem();guard bs_queue_item(client,Int32(index),&item) != 0 else{return nil};return URL(fileURLWithPath:wireText(item.path))
+            }
+            bs_metadata_enable(client,retroMetadata ? 1:0)
             bs_conflict_policy(client, BS_CONFLICT_RENAME)
             bs_batch_enable(client, 1)
             bs_resume_enable(client, 0)
@@ -114,10 +122,10 @@ struct MobileHistory: Identifiable, Equatable {
         closeReview()
         generation &+= 1
         timer?.invalidate(); timer = nil
-        if let client = engine { bs_cancel(client); updateHistory(client); bs_destroy(client) }
+        if let client = engine { _ = bs_state_flush(client); updateHistory(client); bs_destroy(client) }
         engine = nil
         if platformReady { bs_platform_cleanup(); platformReady = false }
-        cleanupSending(); offer = nil; filePicker = false; displayedOffer = 0; active = false; peers = []; code = ""; trusted = false
+        sending = []; offer = nil; filePicker = false; displayedOffer = 0; active = false; peers = []; code = ""; trusted = false
         status = "Receiving paused while BitSkim is in the background. Open the app to reconnect."
     }
     private func tick() {
@@ -188,6 +196,11 @@ struct MobileHistory: Identifiable, Equatable {
             return MobileHistory(id: item.serial, name: wireText(item.filename), message: wireText(item.message), integrity: integrity)
         }
         if history != next { history = next }
+        var queued=Set<String>()
+        for index in 0..<Int(bs_queue_count(client)){var item=BSQueueItem();if bs_queue_item(client,Int32(index),&item) != 0{queued.insert(wireText(item.path))}}
+        var completed=[URL]()
+        for index in 0..<Int(bs_history_count(client)){var item=BSHistoryItem();if bs_history_item(client,Int32(index),&item) != 0,item.incoming==0,item.result==BS_RESULT_COMPLETE.rawValue{let path=wireText(item.path);if !queued.contains(path){completed.append(URL(fileURLWithPath:path))}}}
+        removeOwned(completed);sending.removeAll{completed.contains($0)}
     }
     private func matches(_ serial: UInt) -> Bool {
         guard let client = engine else { return false }
@@ -224,16 +237,26 @@ struct MobileHistory: Identifiable, Equatable {
         guard let client = engine, !active, bs_queue_count(client) == 0 else { return }
         if bs_security_configure(client, Int32(value), "") != 0 { security = value; defaults.set(value, forKey: "security") }
     }
+    func clearHistory(){guard let client=engine else{return};bs_history_clear(client);if bs_state_flush(client)==0{error=String(cString:bs_state_error(client))};updateHistory(client)}
+    func setMetadata(_ value:Bool){guard let client=engine,!active,bs_queue_count(client)==0 else{return};retroMetadata=value;defaults.set(value,forKey:"retroMetadata");bs_metadata_enable(client,value ? 1:0)}
+    func invitation(address:String)->String?{guard let client=engine else{return nil};var out=[CChar](repeating:0,count:256);guard bs_invitation_create(client,address,&out,out.count) != 0 else{error="Enable receiving and certificate encryption before inviting.";return nil};return String(cString:out)}
+    func prepare(invitation:String){guard !active,!importing,review==nil else{return};var target=BSInvitation();guard bs_invitation_parse(invitation,&target) != 0 else{error="Invalid or expired invitation. Scan a fresh BitSkim QR code.";return};guard security != 0 else{error="Enable encryption in Settings before using a QR invitation.";return};invitationText=invitation;browseBeforeRecipient=false;destination=(wireText(target.id),wireText(target.address),target.port,"Invited client");chooseFiles()}
+    func forward(_ files:[URL],to peer:MobilePeer){
+        guard !active,!importing,review==nil,!files.isEmpty else{return}
+        let base=received.resolvingSymlinksInPath().standardizedFileURL.path+"/"
+        guard files.allSatisfy({$0.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(base) && (try? $0.resourceValues(forKeys:[.isRegularFileKey]).isRegularFile)==true}) else{error="Choose regular received files to forward.";return}
+        invitationText=nil;destination=(peer.deviceID,peer.address,peer.port,peer.name);presentReview(files)
+    }
     func prepare(peer: MobilePeer) {
         guard review == nil, !active, !importing else { return }
         browseBeforeRecipient = false
-        destination = (peer.deviceID, peer.address, peer.port, peer.name); chooseFiles()
+        invitationText=nil;destination = (peer.deviceID, peer.address, peer.port, peer.name); chooseFiles()
     }
     func prepare(address: String) {
         guard let target = ConnectionTarget(address) else { error = "Enter an IPv4 address, optionally followed by :port."; return }
         guard review == nil, !active, !importing else { return }
         browseBeforeRecipient = false
-        destination = (nil, target.address, target.port, ConnectionTarget.endpoint(target.address, port: target.port)); chooseFiles()
+        invitationText=nil;destination = (nil, target.address, target.port, ConnectionTarget.endpoint(target.address, port: target.port)); chooseFiles()
     }
     private func chooseFiles() {
         guard engine != nil, !active, !importing else { return }
@@ -332,7 +355,7 @@ struct MobileHistory: Identifiable, Equatable {
     private func enqueue(_ files: [URL]) {
         guard let client = engine, let destination else { removeOwned(files); return }
         for (index, file) in files.enumerated() {
-            let ok = destination.peer.map { bs_queue_peer_address(client, $0, destination.address, destination.port, file.path) } ?? bs_queue_address(client, destination.address, destination.port, file.path)
+            let ok = invitationText.map{bs_queue_invitation(client,$0,file.path)} ?? destination.peer.map { bs_queue_peer_address(client, $0, destination.address, destination.port, file.path) } ?? bs_queue_address(client, destination.address, destination.port, file.path)
             if ok == 0 {
                 error = String(cString: bs_last_error(client))
                 let unsentImports = files[index...].filter { $0.standardizedFileURL.path.hasPrefix(imports.standardizedFileURL.path + "/") }

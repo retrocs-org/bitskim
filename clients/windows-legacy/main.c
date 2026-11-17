@@ -240,7 +240,7 @@ int WINAPI WinMain(HINSTANCE h,HINSTANCE old,LPSTR cmd,int show) {
     memset(&config,0,sizeof config); strcpy(config.name,name); strcpy(config.id,identity); strcpy(config.platform,"Windows Classic"); config.port=config.discovery_port=BS_PORT; config.visible=visible; config.receiving=receiving;
     client=bs_create(&config,changed,NULL); if(!client) { MessageBoxA(NULL,"Cannot listen on port 46440. Close any other BitSkim instance.","BitSkim",MB_OK); bs_platform_cleanup(); return 1; }
     {char store[BS_PATH_MAX+1],*slash;
-        if(from_ansi(ini,store,sizeof store)) {slash=strrchr(store,92);if(slash)strcpy(slash+1,"BSFOLD.DAT");bs_folders_configure(client,store);}
+        if(from_ansi(ini,store,sizeof store)) {slash=strrchr(store,92);if(slash)strcpy(slash+1,"BSFOLD.DAT");bs_folders_configure(client,store);if(slash)strcpy(slash+1,"BSTRANS.DAT");bs_state_configure(client,store);}
     }
     bs_limits_configure(client,send_limit,receive_limit);bs_batch_enable(client,1);
     memset(&wc,0,sizeof wc); wc.hInstance=h; wc.hCursor=LoadCursor(NULL,IDC_ARROW); wc.hIcon=LoadIconA(h,MAKEINTRESOURCEA(1)); wc.hbrBackground=(HBRUSH)(COLOR_BTNFACE+1); wc.lpfnWndProc=procedure; wc.lpszClassName="BitSkimLegacy"; RegisterClassA(&wc); wc.lpfnWndProc=prefproc; wc.lpszClassName="BitSkimLegacyPrefs"; RegisterClassA(&wc);wc.lpfnWndProc=network_proc;wc.lpszClassName="BitSkimLegacyNetwork";RegisterClassA(&wc);

@@ -81,6 +81,9 @@ void *bsp_dir_open(const char *);
 int bsp_dir_next(void *,char *name,size_t capacity);
 void bsp_dir_close(void *);
 int bsp_disk_free(const char *,unsigned long *high,unsigned long *low,unsigned long *allocation_unit);
+struct BSMetadata;
+int bsp_metadata_get(const char *,struct BSMetadata *);
+int bsp_metadata_apply(const char *,const struct BSMetadata *);
 int bsp_commit(const char *temporary, const char *destination);
 void bsp_broadcast(BSSocket sock, const void *bytes, int length, unsigned short port);
 /* Wait for readability of reads[], writability of writer (may be invalid), a

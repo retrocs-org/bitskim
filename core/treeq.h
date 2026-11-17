@@ -18,7 +18,7 @@ static int tree_scan_tick(BSClient *c,const BSQueued *target){BSTreeScan *s;int 
         if(s->copying){BSQueued q;
             if(s->cursor<c->queue_count){if(s->count+c->queue_count-1>BS_QUEUE_MAX || !queue_read(c,s->cursor++,&q) || fwrite(&q,sizeof q,1,s->file)!=1)goto failed;continue;}
             if(fflush(s->file))goto failed;
-            fclose(c->queue_file);c->queue_file=s->file;s->file=NULL;c->queue_head=0;c->queue_count=s->count+c->queue_count-1;
+            fclose(c->queue_file);c->queue_file=s->file;s->file=NULL;c->queue_head=0;c->queue_count=s->count+c->queue_count-1;state_mark(c);
             batch_free(c->queue_batch);c->queue_batch=NULL;c->queue_batch_index=0;tree_scan_free(c);message(c,"Folder listed; preparing complete preview...");return 1;
         }
         if(!s->depth){s->copying=1;s->cursor=1;continue;}
@@ -27,7 +27,7 @@ static int tree_scan_tick(BSClient *c,const BSQueued *target){BSTreeScan *s;int 
             if(!next){bsp_dir_close(f->handle);f->handle=NULL;s->depth--;continue;}
             if(!bs_to_utf8(name,wire,sizeof wire) || !bs_safe_name(wire) || !path_join(path,sizeof path,f->path,name))goto failed;
             len=strlen(f->relative);if(len+strlen(wire)+2>sizeof relative)goto failed;strcpy(relative,f->relative);strcat(relative,wire);
-            kind=bsp_path_kind(path);if(kind!=1 && kind!=2)goto failed;
+            kind=bsp_path_kind(path);if(c->metadata_enabled && kind==1 && metadata_companion(path))continue;if(kind!=1 && kind!=2)goto failed;
             if(kind==2){if(s->depth>=TREE_DEPTH)goto failed;strcat(relative,"/");if(!tree_scan_append(c,path,relative,1))goto failed;
                 f=&s->frames[s->depth];copystr(f->path,path,sizeof f->path);copystr(f->relative,relative,sizeof f->relative);f->handle=bsp_dir_open(path);if(!f->handle)goto failed;s->depth++;
             }else if(!tree_scan_append(c,path,relative,0))goto failed;

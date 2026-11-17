@@ -10,8 +10,8 @@
 #include "bitskim.h"
 #include "platform.h"
 
-typedef struct { BSClient *client;char received[BS_PATH_MAX+1];int discovery; } AndroidClient;
-typedef struct { char data[65536];size_t used;int failed; } Json;
+typedef struct { BSClient *client;char received[BS_PATH_MAX+1],name[64];int discovery; } AndroidClient;
+typedef struct { char data[131072];size_t used;int failed; } Json;
 static void put(Json *j,const char *format,...) {int n;va_list args;if(j->failed)return;va_start(args,format);n=vsnprintf(j->data+j->used,sizeof(j->data)-j->used,format,args);va_end(args);if(n<0 || (size_t)n>=sizeof(j->data)-j->used){j->failed=1;return;}j->used+=(size_t)n;}
 static void quote(Json *j,const char *text) {const unsigned char *p=(const unsigned char *)text;put(j,"\"");for(;*p;p++){if(*p=='"' || *p=='\\')put(j,"\\%c",*p);else if(*p<32)put(j,"\\u%04x",*p);else put(j,"%c",*p);}put(j,"\"");}
 static int java_text(JNIEnv *env,jstring value,char *out,size_t capacity) {
@@ -27,12 +27,13 @@ static AndroidClient *handle(jlong h) {return (AndroidClient *)(uintptr_t)h;}
 JNIEXPORT jlong JNICALL Java_org_bitskim_android_Native_create(JNIEnv *env,jclass cls,jstring name,jstring id,jstring trust,jstring received,jint port,jboolean discovery,jint security) {
  AndroidClient *a;BSConfig config;char directory[BS_PATH_MAX+1];(void)cls;memset(&config,0,sizeof(config));a=(AndroidClient *)calloc(1,sizeof(*a));if(!a){error(env,"Out of memory");return 0;}
  if(port<1 || port>65535 || !java_text(env,name,config.name,sizeof(config.name)) || !java_text(env,id,config.id,sizeof(config.id)) || !java_text(env,trust,directory,sizeof(directory)) || !java_text(env,received,a->received,sizeof(a->received))){free(a);error(env,"Invalid Android client configuration");return 0;}
- strcpy(config.platform,"Android");config.port=(unsigned short)port;config.discovery_port=BS_PORT;config.visible=discovery?1:0;config.receiving=1;a->discovery=discovery?1:0;
+ strcpy(a->name,config.name);strcpy(config.platform,"Android");config.port=(unsigned short)port;config.discovery_port=BS_PORT;config.visible=discovery?1:0;config.receiving=1;a->discovery=discovery?1:0;
  if(!bs_platform_init() || !(a->client=bs_create(&config,NULL,NULL))){free(a);error(env,"Cannot open the local network listener");return 0;}
  if(!bs_trust_configure(a->client,directory) || !bs_security_configure(a->client,security,"")){bs_destroy(a->client);free(a);error(env,"Cannot initialize encryption or device identity storage");return 0;}
+ {char saved[BS_PATH_MAX+1];if(strlen(directory)+15>=sizeof saved){bs_destroy(a->client);free(a);error(env,"State path too long");return 0;}strcpy(saved,directory);strcat(saved,"/transfers.dat");bs_state_configure(a->client,saved);}
  bs_batch_enable(a->client,1);bs_resume_enable(a->client,0);bs_conflict_policy(a->client,BS_CONFLICT_RENAME);return (jlong)(uintptr_t)a;
 }
-JNIEXPORT void JNICALL Java_org_bitskim_android_Native_destroy(JNIEnv *env,jclass cls,jlong h) {AndroidClient *a=handle(h);(void)env;(void)cls;if(a){bs_cancel(a->client);bs_destroy(a->client);free(a);bs_platform_cleanup();}}
+JNIEXPORT void JNICALL Java_org_bitskim_android_Native_destroy(JNIEnv *env,jclass cls,jlong h) {AndroidClient *a=handle(h);(void)env;(void)cls;if(a){bs_destroy(a->client);free(a);bs_platform_cleanup();}}
 JNIEXPORT jboolean JNICALL Java_org_bitskim_android_Native_action(JNIEnv *env,jclass cls,jlong h,jint cmd,jlong serial,jstring argument) {
  AndroidClient *a=handle(h);char text[BS_PATH_MAX+1],dest[BS_PATH_MAX+1];const BSStatus *s;(void)cls;if(!a || !java_text(env,argument,text,sizeof(text)))return JNI_FALSE;s=bs_status(a->client);
  switch(cmd){
@@ -42,7 +43,10 @@ JNIEXPORT jboolean JNICALL Java_org_bitskim_android_Native_action(JNIEnv *env,jc
  case 4:if(s->awaiting_decision && bs_transfer_serial(a->client)==(unsigned long)serial){bs_decline(a->client);return JNI_TRUE;}return JNI_FALSE;
  case 5:return bs_trust_current(a->client,text)?JNI_TRUE:JNI_FALSE;
  case 6:return bs_security_configure(a->client,(int)serial,"")?JNI_TRUE:JNI_FALSE;
- case 7:if(s->active)return JNI_FALSE;bs_configure(a->client,NULL,a->discovery,(int)serial);return JNI_TRUE;
+ case 7:if(s->active)return JNI_FALSE;bs_configure(a->client,a->name,a->discovery,(int)serial);return JNI_TRUE;
+ case 12:return bs_limits_configure(a->client,0,(unsigned long)serial)?JNI_TRUE:JNI_FALSE;
+ case 11:if(s->active)return JNI_FALSE;bs_metadata_enable(a->client,serial!=0);return JNI_TRUE;
+ case 10:bs_history_clear(a->client);return bs_state_flush(a->client)?JNI_TRUE:JNI_FALSE;
  case 8:bs_queue_continue(a->client);return JNI_TRUE;
  case 9:bs_service(a->client,4);return JNI_TRUE;
  }return JNI_FALSE;
@@ -55,7 +59,7 @@ JNIEXPORT jstring JNICALL Java_org_bitskim_android_Native_tick(JNIEnv *env,jclas
  AndroidClient *a=handle(h);Json *j;const BSStatus *s;char report[8192],code[20];unsigned long position=0,count=0;int i,n; jstring result;(void)cls;if(!a)return string(env,"{}");bs_service(a->client,4);s=bs_status(a->client);j=(Json *)calloc(1,sizeof(*j));if(!j){error(env,"Out of memory");return NULL;}
  bs_queue_progress(a->client,&position,&count);put(j,"{\"active\":%s,\"incoming\":%s,\"awaiting\":%s,\"serial\":%lu,\"total\":%lu,\"done\":%lu,\"rate\":%lu,\"position\":%lu,\"count\":%lu,\"queued\":%d,\"paused\":%s,\"encrypted\":%s,\"trusted\":%s,\"filename\":",s->active?"true":"false",s->incoming?"true":"false",s->awaiting_decision?"true":"false",bs_transfer_serial(a->client),s->total,s->transferred,bs_transfer_rate(a->client),position,count,bs_queue_count(a->client),bs_queue_paused(a->client)?"true":"false",bs_transfer_encrypted(a->client)?"true":"false",bs_trust_status(a->client)==1?"true":"false");quote(j,s->filename);put(j,",\"status\":");quote(j,s->message);put(j,",\"peer\":");quote(j,s->peer_name);put(j,",\"error\":");quote(j,bs_last_error(a->client));code[0]=0;bs_pairing_code(a->client,code);put(j,",\"code\":");quote(j,code);
  bs_progress_summary(a->client,report,sizeof(report));put(j,",\"summary\":");quote(j,report);bs_diagnostics(a->client,report,sizeof(report));put(j,",\"diagnostics\":");quote(j,report);
- put(j,",\"peers\":[");n=bs_peer_count(a->client);for(i=0;i<n;i++){const BSPeer *p=bs_peer(a->client,i);if(i)put(j,",");put(j,"{\"id\":");quote(j,p->id);put(j,",\"name\":");quote(j,p->name);put(j,",\"platform\":");quote(j,p->platform);put(j,",\"address\":");quote(j,p->address);put(j,",\"port\":%u}",(unsigned)p->port);}put(j,"],\"history\":[");n=bs_history_count(a->client);for(i=0;i<n;i++){if(i)put(j,",");bs_history_text(a->client,i,report,sizeof(report));quote(j,report);}put(j,"],\"manifestCount\":%d,\"manifest\":[",bs_batch_count(a->client));n=bs_batch_count(a->client);for(i=0;i<n && i<20;i++){const BSBatchItem *item=bs_batch_item(a->client,i);if(i)put(j,",");quote(j,item?item->filename:"");}put(j,"]}");result=string(env,j->failed?"{\"error\":\"Report exceeds display capacity\"}":j->data);free(j);return result;
+ put(j,",\"completedPaths\":[");{int comma=0;n=bs_history_count(a->client);for(i=0;i<n;i++){BSHistoryItem item;if(bs_history_item(a->client,i,&item) && !item.incoming && item.result==BS_RESULT_COMPLETE){if(comma++)put(j,",");quote(j,item.path);}}}put(j,"]");put(j,",\"queuedPaths\":[");n=bs_queue_count(a->client);for(i=0;i<n;i++){BSQueueItem item;if(!bs_queue_item(a->client,i,&item))break;if(i)put(j,",");quote(j,item.path);}put(j,"]");put(j,",\"savedStateError\":");quote(j,bs_state_error(a->client));put(j,",\"restored\":%d",bs_state_restored(a->client));put(j,",\"peers\":[");n=bs_peer_count(a->client);for(i=0;i<n;i++){const BSPeer *p=bs_peer(a->client,i);if(i)put(j,",");put(j,"{\"id\":");quote(j,p->id);put(j,",\"name\":");quote(j,p->name);put(j,",\"platform\":");quote(j,p->platform);put(j,",\"address\":");quote(j,p->address);put(j,",\"port\":%u}",(unsigned)p->port);}put(j,"],\"history\":[");n=bs_history_count(a->client);for(i=0;i<n;i++){if(i)put(j,",");bs_history_text(a->client,i,report,sizeof(report));quote(j,report);}put(j,"],\"manifestCount\":%d,\"manifest\":[",bs_batch_count(a->client));n=bs_batch_count(a->client);for(i=0;i<n && i<20;i++){const BSBatchItem *item=bs_batch_item(a->client,i);if(i)put(j,",");quote(j,item?item->filename:"");}put(j,"]}");result=string(env,j->failed?"{\"error\":\"Report exceeds display capacity\"}":j->data);free(j);return result;
 }
 static unsigned short free_port(void) {int fd=socket(AF_INET,SOCK_STREAM,0);struct sockaddr_in addr;socklen_t size=sizeof(addr);memset(&addr,0,sizeof(addr));addr.sin_family=AF_INET;addr.sin_addr.s_addr=htonl(INADDR_LOOPBACK);if(fd<0 || bind(fd,(struct sockaddr *)&addr,sizeof(addr))){if(fd>=0)close(fd);return 0;}if(getsockname(fd,(struct sockaddr *)&addr,&size)){close(fd);return 0;}close(fd);return ntohs(addr.sin_port);}
 JNIEXPORT jstring JNICALL Java_org_bitskim_android_Native_selfTest(JNIEnv *env,jclass cls,jstring folder) {
@@ -64,8 +68,17 @@ JNIEXPORT jstring JNICALL Java_org_bitskim_android_Native_selfTest(JNIEnv *env,j
  snprintf(source,sizeof(source),"%s/Möte.txt",root);snprintf(dest,sizeof(dest),"%s/received.txt",root);f=fopen(source,"wb");if(!f)return string(env,failure);fwrite(bytes,1,sizeof(bytes)-1,f);fclose(f);
  memset(&ac,0,sizeof(ac));memset(&bc,0,sizeof(bc));strcpy(ac.id,"11111111111111111111111111111111");strcpy(bc.id,"22222222222222222222222222222222");strcpy(ac.name,"Android test sender");strcpy(bc.name,"Android test receiver");ac.port=free_port();bc.port=free_port();ac.receiving=bc.receiving=1;ac.discovery_port=bc.discovery_port=BS_PORT;
  if(!bs_platform_init() || !ac.port || !bc.port || !(a=bs_create(&ac,NULL,NULL)) || !(b=bs_create(&bc,NULL,NULL)))goto done;
- failure="FAIL queue send";if(!bs_send(a,"127.0.0.1",bc.port,source))goto done;start=bsp_millis();failure="FAIL transfer timeout";
+ {char invitation[256],saved[BS_PATH_MAX+1];BSMetadata metadata;
+ snprintf(saved,sizeof saved,"%s/state.dat",root);failure="FAIL saved-state setup";if(!bs_state_configure(b,saved))goto done;
+ failure="FAIL invitation setup";if(!bs_trust_configure(a,root) || !bs_trust_configure(b,root) || !bs_invitation_create(b,"127.0.0.1",invitation,sizeof invitation))goto done;
+ memset(&metadata,0,sizeof metadata);metadata.kind=1;metadata.protection=16;strcpy(metadata.comment,"Android metadata round trip");bs_metadata_enable(a,1);bs_metadata_enable(b,1);failure="FAIL metadata seed";if(!bs_metadata_seed(source,&metadata))goto done;
+ failure="FAIL invitation queue send";if(!bs_queue_invitation(a,invitation,source))goto done;}
+ start=bsp_millis();failure="FAIL transfer timeout";
  while((bsp_millis()-start)<10000UL){bs_service(a,4);bs_service(b,4);if(bs_status(b)->awaiting_decision && !accepted){accepted=bs_accept(b,dest);if(!accepted){failure="FAIL acceptance";goto done;}}if(accepted && !bs_status(a)->active && !bs_status(b)->active)break;usleep(1000);}
  failure="FAIL receipt verification";if(bs_transfer_result(a)!=BS_RESULT_COMPLETE || bs_transfer_result(b)!=BS_RESULT_COMPLETE)goto done;f=fopen(dest,"rb");if(!f)goto done;memset(readback,0,sizeof(readback));ok=fread(readback,1,sizeof(readback),f)==sizeof(bytes)-1 && !memcmp(readback,bytes,sizeof(bytes)-1);fclose(f);if(ok){BSHistoryItem item;ok=bs_history_item(b,0,&item) && item.verified && item.encrypted;}
- done:if(a)bs_destroy(a);if(b)bs_destroy(b);return string(env,ok?"PASS Android native TLS transfer, Unicode filename and written-file CRC32 verification":failure);
+ if(ok){char saved[BS_PATH_MAX+1],sidecar[BS_PATH_MAX+1];snprintf(sidecar,sizeof sidecar,"%s.bskmeta",dest);failure="FAIL metadata receipt";ok=access(sidecar,F_OK)==0;snprintf(saved,sizeof saved,"%s/state.dat",root);bs_destroy(b);b=bs_create(&bc,NULL,NULL);failure="FAIL saved receipt restart";ok=ok && b && bs_state_configure(b,saved) && bs_history_count(b)==1;}
+ done:if(a)bs_destroy(a);if(b)bs_destroy(b);return string(env,ok?"PASS Android TLS invitation, Unicode filename, written-file CRC32, metadata and saved history":failure);
 }
+JNIEXPORT jstring JNICALL Java_org_bitskim_android_Native_invitation(JNIEnv *env,jclass cls,jlong h,jstring ip){AndroidClient *a=handle(h);char address[48],out[256];(void)cls;if(!a || !java_text(env,ip,address,sizeof address) || !bs_invitation_create(a->client,address,out,sizeof out))return string(env,"");return string(env,out);}
+JNIEXPORT jstring JNICALL Java_org_bitskim_android_Native_parseInvitation(JNIEnv *env,jclass cls,jstring text){char input[256];BSInvitation invitation;Json json;(void)cls;if(!java_text(env,text,input,sizeof input) || !bs_invitation_parse(input,&invitation)){error(env,"Invalid or expired BitSkim invitation");return NULL;}memset(&json,0,sizeof json);put(&json,"{\"address\":");quote(&json,invitation.address);put(&json,",\"id\":");quote(&json,invitation.id);put(&json,",\"port\":%u,\"expires\":%lu}",(unsigned)invitation.port,invitation.expires);return string(env,json.data);}
+JNIEXPORT jboolean JNICALL Java_org_bitskim_android_Native_queueInvitation(JNIEnv *env,jclass cls,jlong h,jstring text,jstring path){AndroidClient *a=handle(h);char invitation[256],file[BS_PATH_MAX+1];(void)cls;if(!a || !java_text(env,text,invitation,sizeof invitation) || !java_text(env,path,file,sizeof file))return JNI_FALSE;return bs_queue_invitation(a->client,invitation,file)?JNI_TRUE:JNI_FALSE;}

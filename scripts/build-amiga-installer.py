@@ -6,7 +6,7 @@ out=ROOT/'build/amiga';out.mkdir(parents=True,exist_ok=True)
 app_files=['BitSkim','BitSkim.info']
 prefs_files=['BitSkimPrefs','BitSkimPrefs.info']
 guide_files=['BitSkim.guide','BitSkim.guide.info']
-shared_files=['BUILD-PROVENANCE.json','README.MD','LICENSE','CATPPUCCIN-LICENSE','THIRD-PARTY-NOTICES.MD','NOVADOCK-LICENSE','INSTALLATION.md','ARexx/README.MD','ARexx/NOVADOCK.md']
+shared_files=['BUILD-PROVENANCE.json','README.MD','LICENSE','CATPPUCCIN-LICENSE','THIRD-PARTY-NOTICES.MD','NOVADOCK-LICENSE','INSTALLATION.md','TRANSFER-TOOLS.md','TRANSFERS.md','ARexx/README.MD','ARexx/NOVADOCK.md']
 shared_files+=['ARexx/'+p.name for p in sorted((ROOT/'examples/arexx').glob('*.rexx'))]
 legacy=['BitSkim.prefs-path','BitSkimPrefs.guide-path']
 script=r'''; BitSkim 0.2 - Commodore Installer V42+ (AmigaOS 3.x).
@@ -16,7 +16,7 @@ script=r'''; BitSkim 0.2 - Commodore Installer V42+ (AmigaOS 3.x).
 (if (= @icon "") (set #src (expandpath "")) (set #src (pathonly (expandpath @icon))))
 (if (= #src "") (set #src (expandpath "")))
 (welcome)
-(message "Close BitSkimPrefs first. Updates automatically close running BitSkim clients, cancel active transfers and discard waiting queues, then restart the installed app.\nSettings and received files are preserved. The installer stays in this unpacked package.")
+(message "Close BitSkimPrefs first. Updates automatically close running BitSkim clients, interrupt active transfers and restore saved queues paused, then restart the installed app.\nSettings and received files are preserved. The installer stays in this unpacked package.")
 ; BEGIN installation discovery
 (set #selected-level @user-level)
 (set #novice (= @user-level 0))

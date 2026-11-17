@@ -12,6 +12,10 @@ import android.os.*;
 import android.view.*;
 import android.widget.*;
 import androidx.core.content.FileProvider;
+import com.journeyapps.barcodescanner.ScanContract;
+import com.journeyapps.barcodescanner.ScanOptions;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.qrcode.QRCodeWriter;
 import org.json.*;
 import java.io.*;
 import java.util.*;
@@ -29,26 +33,32 @@ public final class MainActivity extends Activity implements ClientService.Listen
     private boolean pickerOpen,importing,permissionRequested,started;
     private File receivedFolder,exportSource;
     private InputPolicy.Target target;
+    private List<File> forwarding=new ArrayList<>();
     private WifiManager.MulticastLock multicast;
     private final Handler ui=new Handler(Looper.getMainLooper());
 
     @Override public void onCreate(Bundle state) {
-        super.onCreate(state);client=new ClientService(this,this);receivedFolder=client.received;
+        super.onCreate(state);client=ClientService.shared(this);client.attach(this);receivedFolder=client.received;
         if(state!=null){tab=state.getInt("tab",0);addressDraft=state.getString("address","");}
         render();handleSharedIntent(getIntent());
     }
     @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);state.putInt("tab",tab);state.putString("address",addressDraft);}
     @Override public void onConfigurationChanged(android.content.res.Configuration config){super.onConfigurationChanged(config);render();}
-    @Override protected void onStart(){super.onStart();started=true;client.foreground=true;render();ensureNetwork(false);if(!deferredError.isEmpty()){String message=deferredError;deferredError="";error(message);}}
-    @Override protected void onStop(){started=false;client.foreground=false;if(!pickerOpen){dismissDialogs();offeredSerial=0;client.stop();releaseMulticast();}super.onStop();}
-    @Override protected void onDestroy(){client.close();releaseMulticast();super.onDestroy();}
+    @Override protected void onStart(){super.onStart();started=true;client.foreground=true;render();ensureNetwork(false);ensureNotifications(false);if(!deferredError.isEmpty()){String message=deferredError;deferredError="";error(message);}}
+    @Override protected void onStop(){started=false;client.foreground=false;if(!pickerOpen){dismissDialogs();offeredSerial=0;client.leaveForeground();releaseMulticast();}super.onStop();}
+    @Override protected void onDestroy(){client.detach(this);releaseMulticast();super.onDestroy();}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleSharedIntent(intent);}
     private boolean networkAllowed(){return Build.VERSION.SDK_INT<37||checkSelfPermission(LOCAL_NETWORK)==PackageManager.PERMISSION_GRANTED;}
     private void ensureNetwork(boolean explicit){
         if(networkAllowed()){client.start();acquireMulticast();}
         else if(explicit||!permissionRequested){permissionRequested=true;requestPermissions(new String[]{LOCAL_NETWORK},41);}
     }
-    @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results){super.onRequestPermissionsResult(code,permissions,results);if(code==41){if(networkAllowed()){client.start();acquireMulticast();}else error("Local network access is needed to discover clients and transfer files. Files can still be selected locally.");render();}}
+    @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results){super.onRequestPermissionsResult(code,permissions,results);if(code==42){client.preferences.edit().putBoolean("backgroundTransfers",results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED).apply();render();return;}if(code==41){if(networkAllowed()){client.start();acquireMulticast();ensureNotifications(false);}else error("Local network access is needed to discover clients and transfer files. Files can still be selected locally.");render();}}
+    private void ensureNotifications(boolean explicit){
+        if(Build.VERSION.SDK_INT<33)return;
+        if(checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)return;
+        if(explicit||(!client.preferences.getBoolean("askedNotifications",false)&&networkAllowed())){client.preferences.edit().putBoolean("askedNotifications",true).apply();requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},42);}
+    }
     private void acquireMulticast(){
         if(!BuildConfig.DISCOVERY||multicast!=null)return;
         try{WifiManager wifi=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);if(wifi!=null){multicast=wifi.createMulticastLock("BitSkim discovery");multicast.setReferenceCounted(false);multicast.acquire();}}catch(SecurityException e){error("Wi-Fi discovery lock unavailable. Manual connections remain available.");}
@@ -77,9 +87,10 @@ public final class MainActivity extends Activity implements ClientService.Listen
     }
     private void clientsPage(){
         if(!networkAllowed())body.addView(button("Allow local network access",()->ensureNetwork(true)));
-        body.addView(label("Keep BitSkim open to receive. Transfers stop when you leave the app.",14,muted));
+        body.addView(label("Keep BitSkim open for new offers. Approved transfers can continue with a notification.",14,muted));
         section("Nearby clients");peerRows=new LinearLayout(this);peerRows.setOrientation(LinearLayout.VERTICAL);body.addView(peerRows);
         if(BuildConfig.DISCOVERY)body.addView(button("Refresh clients",()->client.command(1,0,"")));else body.addView(label("This build uses manual connections.",14,muted));
+        body.addView(button("Scan connection QR",this::scanInvitation));body.addView(button("Show my connection QR",this::showInvitation));
         section("Connect by IP");EditText address=input("192.168.1.20 or 192.168.1.20:46440");address.setText(addressDraft);body.addView(address);body.addView(button("Choose client",()->{addressDraft=address.getText().toString();try{choose(InputPolicy.target(addressDraft));}catch(Exception e){error(e.getMessage());}}));
         section("Receive on this device");body.addView(label(ClientService.addresses(),14,muted));
         section("Transfer");status=label("Starting local network…",16,text);body.addView(status);details=label("",14,muted);body.addView(details);
@@ -96,13 +107,13 @@ public final class MainActivity extends Activity implements ClientService.Listen
     }
     private void choose(InputPolicy.Target selected){
         if(importing){error("Wait for the selected files to finish preparing.");return;}
-        target=selected;if(client.selectedFiles().isEmpty())pickFiles(selected);else review(selected);
+        target=selected;if(client.selectedFiles().isEmpty()&&forwarding.isEmpty())pickFiles(selected);else review(selected);
     }
     private void pickFiles(InputPolicy.Target selected){
         if(importing)return;target=selected;client.pauseForUi(()->{pickerOpen=true;Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("*/*");intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);try{startActivityForResult(intent,11);}catch(ActivityNotFoundException e){pickerOpen=false;client.releaseUi();error("No Android document picker is installed.");}});
     }
     private void handleSharedIntent(Intent intent){
-        if(intent==null)return;String action=intent.getAction();List<Uri> uris=new ArrayList<>();
+        if(intent==null)return;if(Intent.ACTION_VIEW.equals(intent.getAction())&&intent.getData()!=null){openInvitation(intent.getData().toString());setIntent(new Intent(this,MainActivity.class));return;}String action=intent.getAction();List<Uri> uris=new ArrayList<>();
         if(Intent.ACTION_SEND.equals(action)){Uri uri=intent.getParcelableExtra(Intent.EXTRA_STREAM);if(uri!=null)uris.add(uri);}
         else if(Intent.ACTION_SEND_MULTIPLE.equals(action)){ArrayList<Uri> list=intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);if(list!=null)uris.addAll(list);}else return;
         target=null;if(!uris.isEmpty())importUris(uris);setIntent(new Intent(this,MainActivity.class));
@@ -111,16 +122,17 @@ public final class MainActivity extends Activity implements ClientService.Listen
         importing=true;client.importFiles(uris,()->{importing=false;if(!started)return;if(target!=null)review(target);else{tab=1;render();}});
     }
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);pickerOpen=false;
+        if(request==13){client.releaseUi();String value=new ScanContract().parseResult(result,data).getContents();if(value!=null)openInvitation(value);return;}
         if(request==11){if(result==RESULT_OK&&data!=null){List<Uri> uris=new ArrayList<>();if(data.getClipData()!=null)for(int i=0;i<data.getClipData().getItemCount();i++)uris.add(data.getClipData().getItemAt(i).getUri());else if(data.getData()!=null)uris.add(data.getData());importUris(uris);}else client.releaseUi();}
         else if(request==12){File source=exportSource;exportSource=null;client.releaseUi();if(result==RESULT_OK&&data!=null&&data.getData()!=null&&source!=null){Uri uri=data.getData();new Thread(()->{try(InputStream input=new FileInputStream(source);OutputStream out=getContentResolver().openOutputStream(uri)){if(out==null)throw new IOException("Provider could not open destination.");copyStream(input,out);ui.post(()->Toast.makeText(this,"Copy handed to the document provider",Toast.LENGTH_LONG).show());}catch(Exception e){ui.post(()->error(e.getMessage()));}},"BitSkim export").start();}}
     }
     private void review(InputPolicy.Target selected){
-        List<File> files=new ArrayList<>(client.selectedFiles());if(files.isEmpty()){error("Choose files first.");return;}
+        List<File> files=new ArrayList<>(forwarding.isEmpty()?client.selectedFiles():forwarding);if(files.isEmpty()){error("Choose files first.");return;}
         client.pauseForUi(()->{try{
             long[] sizes=new long[files.size()];long total=0;StringBuilder message=new StringBuilder((selected.id.isEmpty()?"Manual client":selected.name)+"\n"+selected.endpoint()+"\n\n");for(int i=0;i<files.size();i++){File file=files.get(i);if(!file.isFile()||file.length()>InputPolicy.MAX_FILE)throw new IOException("A selected file is unavailable or too large.");sizes[i]=file.length();total+=sizes[i];message.append(file.getName()).append(" · ").append(size(sizes[i])).append('\n');}
             message.append("\nTotal: ").append(size(total)).append("\nThe recipient must approve. Keep BitSkim open.");
             int security=client.preferences.getInt("security",1);message.append(security==2?"\nEncryption required.":security==1?"\nEncryption preferred; older clients may use plaintext.":"\nEncryption disabled.");
-            reviewDialog=new AlertDialog.Builder(this).setTitle("Review transfer").setMessage(message).setPositiveButton("Send",(dialog,which)->client.send(selected,files,sizes,()->{tab=0;render();})).setNegativeButton("Cancel",(dialog,which)->client.releaseUi()).create();reviewDialog.setOnCancelListener(dialog->client.releaseUi());reviewDialog.show();
+            reviewDialog=new AlertDialog.Builder(this).setTitle("Review transfer").setMessage(message).setPositiveButton("Send",(dialog,which)->client.send(selected,files,sizes,()->{forwarding.clear();tab=0;render();})).setNegativeButton("Cancel",(dialog,which)->client.releaseUi()).create();reviewDialog.setOnCancelListener(dialog->client.releaseUi());reviewDialog.show();
         }catch(Exception e){client.releaseUi();error(e.getMessage());}});
     }
     private void receivedPage(){
@@ -132,9 +144,10 @@ public final class MainActivity extends Activity implements ClientService.Listen
     }
     private void fileActions(File file){
         client.pauseForUi(()->{
-            fileDialog=new AlertDialog.Builder(this).setTitle(file.getName()).setItems(new String[]{"Preview","Share","Save to Files","Rename","Delete"},(dialog,which)->{
+            fileDialog=new AlertDialog.Builder(this).setTitle(file.getName()).setItems(new String[]{"Preview","Share","Save to Files","Rename","Delete","Send to a client"},(dialog,which)->{
                 if(which==0||which==1){try{InputPolicy.child(client.received,file);Uri uri=FileProvider.getUriForFile(this,getPackageName()+".files",file);String mime=getContentResolver().getType(uri);if(mime==null)mime="application/octet-stream";Intent intent=new Intent(which==0?Intent.ACTION_VIEW:Intent.ACTION_SEND);if(which==0)intent.setDataAndType(uri,mime);else{intent.setType(mime);intent.putExtra(Intent.EXTRA_STREAM,uri);}intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);intent.setClipData(ClipData.newRawUri("BitSkim file",uri));startActivity(which==0?intent:Intent.createChooser(intent,"Share received file"));}catch(Exception e){error("No compatible viewer or sharing app is available.");}finally{client.releaseUi();}}
                 else if(which==2){exportSource=file;pickerOpen=true;Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/octet-stream");intent.putExtra(Intent.EXTRA_TITLE,file.getName());try{startActivityForResult(intent,12);}catch(ActivityNotFoundException e){pickerOpen=false;client.releaseUi();error("No Android document picker is installed.");}}
+                else if(which==5){forwarding.clear();forwarding.add(file);client.releaseUi();tab=0;render();Toast.makeText(this,"Choose a client to forward this file",Toast.LENGTH_LONG).show();}
                 else if(which==3){EditText name=input("Filename including extension");name.setText(file.getName());fileDialog=new AlertDialog.Builder(this).setTitle("Rename").setView(name).setPositiveButton("Rename",(d,w)->{String value=name.getText().toString();client.manageFiles(()->InputPolicy.rename(client.received,file,value),this::render);}).setNegativeButton("Cancel",(d,w)->client.releaseUi()).create();fileDialog.setOnCancelListener(d->client.releaseUi());fileDialog.show();}
                 else{fileDialog=new AlertDialog.Builder(this).setTitle("Delete permanently?").setMessage("This cannot be undone.").setPositiveButton("Delete",(d,w)->{client.manageFiles(()->InputPolicy.delete(client.received,file),this::render);}).setNegativeButton("Cancel",(d,w)->client.releaseUi()).create();fileDialog.setOnCancelListener(d->client.releaseUi());fileDialog.show();}
             }).create();fileDialog.setOnCancelListener(d->client.releaseUi());fileDialog.show();
@@ -143,6 +156,10 @@ public final class MainActivity extends Activity implements ClientService.Listen
     private void settingsPage(){
         section("Appearance");List<String> ids=new ArrayList<>(),names=new ArrayList<>();ids.add("system");names.add("Follow system");try(InputStream in=getAssets().open("palettes.json")){JSONArray palettes=new JSONArray(readText(in));for(int i=0;i<palettes.length();i++){ids.add(palettes.getJSONObject(i).getString("id"));names.add(palettes.getJSONObject(i).getString("name"));}}catch(Exception ignored){}
         Spinner themes=new Spinner(this);ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names);themes.setAdapter(adapter);themes.setSelection(Math.max(0,ids.indexOf(client.preferences.getString("theme","mocha"))));themes.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int position,long id){String choice=ids.get(position);if(!choice.equals(client.preferences.getString("theme","mocha"))){client.preferences.edit().putString("theme",choice).apply();render();}}});body.addView(themes);
+        section("Transfers");Switch background=new Switch(this);background.setText("Continue active transfers while minimized");background.setTextColor(text);background.setChecked(client.backgroundEnabled());background.setOnCheckedChangeListener((v,on)->{client.preferences.edit().putBoolean("backgroundTransfers",on).apply();if(on)ensureNotifications(true);});body.addView(background);
+        body.addView(button("Clear saved history",()->{new AlertDialog.Builder(this).setTitle("Clear transfer history?").setMessage("Received files and waiting transfers are kept.").setPositiveButton("Clear",(d,w)->client.command(10,0,"")).setNegativeButton("Cancel",null).show();}));
+        Switch metadata=new Switch(this);metadata.setText("Preserve retro metadata and companion icons");metadata.setTextColor(text);metadata.setChecked(client.preferences.getBoolean("retroMetadata",false));metadata.setOnCheckedChangeListener((v,on)->client.command(11,on?1:0,""));body.addView(metadata);
+        body.addView(label("Opt in on both devices. Amiga attributes and RISC OS filetypes are restored natively or retained in CRC-bound .bskmeta companions. Older clients receive ordinary files only.",14,muted));
         section("Encryption");String[] modes={"Disabled","Prefer encryption","Require encryption"};for(int i=0;i<modes.length;i++){final int mode=i;body.addView(button((client.preferences.getInt("security",1)==mode?"✓ ":"")+modes[i],()->{client.command(6,mode,"");ui.postDelayed(this::render,200);}));}
         body.addView(label("Prefer can use plaintext with older clients. Require rejects plaintext. Compare the full code on both devices before trusting.",14,muted));
         section("Device pairing");pairing=label("Pair during an encrypted transfer.",14,text);pairing.setTextIsSelectable(true);body.addView(pairing);EditText code=input("Code from the other device");body.addView(code);body.addView(button("Trust matching code",()->client.command(5,0,code.getText().toString().trim().toUpperCase(Locale.ROOT))));
@@ -169,6 +186,9 @@ public final class MainActivity extends Activity implements ClientService.Listen
         LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(12),0,dp(12),0);TextView identity=label(state.optBoolean("encrypted")?(state.optString("code").isEmpty()?"Encrypted connection; verification code unavailable.":"Verify: "+state.optString("code")+ (state.optBoolean("trusted")?" · Saved identity matches":"")):"Unencrypted connection",14,text);content.addView(identity);EditText code=input("Code from the other device");content.addView(code);
         offerDialog=new AlertDialog.Builder(this).setTitle("Incoming transfer").setMessage(message).setView(content).setPositiveButton("Accept",(d,w)->client.command(3,serial,"")).setNegativeButton("Decline",(d,w)->client.command(4,serial,"")).setNeutralButton("Trust code",null).create();offerDialog.setCanceledOnTouchOutside(false);offerDialog.setOnCancelListener(d->client.command(4,serial,""));offerDialog.setOnShowListener(d->{offerDialog.getButton(AlertDialog.BUTTON_NEUTRAL).setEnabled(!state.optString("code").isEmpty());offerDialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->client.command(5,0,code.getText().toString().trim().toUpperCase(Locale.ROOT)));});offerDialog.show();
     }
+    private void scanInvitation(){client.pauseForUi(()->{pickerOpen=true;ScanOptions options=new ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Scan the other device's BitSkim invitation").setBeepEnabled(false).setOrientationLocked(false);try{startActivityForResult(new ScanContract().createIntent(this,options),13);}catch(RuntimeException failure){pickerOpen=false;client.releaseUi();error("Camera scanning is unavailable. Paste the invitation instead.");}});}
+    private void openInvitation(String value){try{JSONObject info=new JSONObject(Native.parseInvitation(value));String address=info.getString("address");int port=info.getInt("port");InputPolicy.Target next=new InputPolicy.Target(info.getString("id"),"Invited client",address,port,value);new AlertDialog.Builder(this).setTitle("Use this connection invitation?").setMessage(next.endpoint()+"\nRequires encryption and the matching device identity. No file is sent until you review and confirm.").setPositiveButton("Use invitation",(d,w)->choose(next)).setNegativeButton("Cancel",null).show();}catch(Exception failure){error("Invalid or expired invitation. Scan a fresh BitSkim QR code.");}}
+    private void showInvitation(){String[] addresses=ClientService.addresses().split("\n");if(addresses.length==0||addresses[0].isEmpty()){error("Connect to a local network first.");return;}String[] ips=new String[addresses.length];for(int i=0;i<addresses.length;i++)ips[i]=addresses[i].split(":")[0];new AlertDialog.Builder(this).setTitle("Choose receiving address").setItems(ips,(d,w)->client.showInvitation(ips[w],value->{try{com.google.zxing.common.BitMatrix matrix=new QRCodeWriter().encode(value,BarcodeFormat.QR_CODE,640,640);android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(640,640,android.graphics.Bitmap.Config.ARGB_8888);for(int y=0;y<640;y++)for(int x=0;x<640;x++)bitmap.setPixel(x,y,matrix.get(x,y)?Color.BLACK:Color.WHITE);ImageView image=new ImageView(this);image.setImageBitmap(bitmap);new AlertDialog.Builder(this).setTitle("Scan to connect · 5 minutes").setMessage("Keep BitSkim open. Incoming transfers still need approval.").setView(image).setPositiveButton("Close",null).show();}catch(Exception failure){error("Cannot create connection QR code.");}})).show();}
     private static void copyStream(InputStream in,OutputStream out) throws IOException {byte[] buffer=new byte[65536];int n;while((n=in.read(buffer))!=-1)out.write(buffer,0,n);}
     private static String readText(InputStream in) throws IOException {ByteArrayOutputStream out=new ByteArrayOutputStream();copyStream(in,out);return new String(out.toByteArray(),java.nio.charset.StandardCharsets.UTF_8);}
     private static String size(long value){if(value<1024)return value+" B";if(value<1048576)return String.format(Locale.ROOT,"%.1f KiB",value/1024.0);if(value<1073741824L)return String.format(Locale.ROOT,"%.1f MiB",value/1048576.0);return String.format(Locale.ROOT,"%.2f GiB",value/1073741824.0);}

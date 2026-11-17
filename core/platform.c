@@ -300,3 +300,5 @@ FILE *bsp_resume_file(const char *path,unsigned long expected) {
 #endif
 
 #include "fs.h"
+
+#include "metadata-platform.h"
