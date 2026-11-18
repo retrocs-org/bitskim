@@ -27,6 +27,8 @@
 
 ### Enhancements
 
+- Mobile send reviews keep Send/Cancel visible while folder contents scroll, wrap full paths, support large text and provide explicit accessibility labels and keyboard cancellation.
+- Isolated native Mac view/startup checks and Windows installer wizard acceptance tools support review of packaged applications without changing existing user profiles.
 - Mobile folder reviews use bounded manifests and background hashing; changed content requires a new review, and provider copy failures leave originals untouched.
 - Standalone Linux build/install commands, checked desktop/CLI tar.gz packages and optional coordinated Linux builds; public download links appear automatically when Linux assets are released.
 - Local builds refresh an unpacked BitSkim installer drawer in the shared builds directory, with matching classic drawer/installer icons and archives kept in its packages subdirectory.
@@ -40,6 +42,9 @@
 
 ### Bugs
 
+- Mac disk images preserve the signed app metadata and validate the mounted/copied app; HFS hybrid metadata no longer invalidates the installed bundle signature.
+- Full 0.2 releases require all intended Linux desktop/CLI archives for both architectures; missing packages are named and cannot silently reduce the publication inventory.
+- Release inventory and iOS folder/background documentation now match the current application behavior.
 - Mobile staging cleanup waits for the whole queue instead of deleting folder children after the first completed item; restored queues retain their owned roots.
 - Android status reports bound queued path previews so large folder queues cannot overflow the display report.
 - Aminet preparation honors the configured LHA extraction reader for archive verification.

@@ -54,7 +54,7 @@ def main():
  if not apk.is_file():raise SystemExit('Build the Android app first: ./scripts/build-android.sh')
  print(run('-s',serial,'install','-r',apk).stdout,end='')
  if args.test:
-  for suite,expected in [('RuntimeChecks','PASS Android runtime checks'),('FolderChecks','PASS native folder provider')]:
+  for suite,expected in [('RuntimeChecks','PASS Android runtime checks'),('FolderChecks','PASS native folder provider'),('ReviewAccessibilityChecks','PASS native mobile review')]:
    run('-s',serial,'shell','am','force-stop','org.bitskim.android')
    result=run('-s',serial,'shell','am','instrument','-w','-r','org.bitskim.android/.'+suite,check=False)
    print(result.stdout,end='');print(result.stderr,end='')

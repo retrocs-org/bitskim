@@ -8,7 +8,7 @@ mkdir -p build/macos/BitSkim.app/Contents/MacOS build/macos/BitSkim.app/Contents
 export CLANG_MODULE_CACHE_PATH="$PWD/build/module-cache"
 clang -std=c89 -Os -Wall -Wextra -mmacosx-version-min=13.0 -DBS_OPENSSL -Iwork/openssl-macos/include -Icore -c core/bitskim.c -o build/macos/bitskim.o
 clang -std=c89 -Os -Wall -Wextra -mmacosx-version-min=13.0 -DBS_OPENSSL -Iwork/openssl-macos/include -Icore -c core/platform.c -o build/macos/platform.o
-swiftc -parse-as-library -swift-version 5 -O -target arm64-apple-macos13.0 -module-cache-path build/module-cache -Icore -import-objc-header clients/macos/Bridge.h clients/macos/Themes.swift clients/macos/BitSkim.swift clients/macos/AppController.swift build/macos/bitskim.o build/macos/platform.o work/openssl-macos/lib/libssl.a work/openssl-macos/lib/libcrypto.a -o build/macos/BitSkim.app/Contents/MacOS/BitSkim
+swiftc -parse-as-library -swift-version 5 -O -target arm64-apple-macos13.0 -module-cache-path build/module-cache -Icore -import-objc-header clients/macos/Bridge.h clients/macos/Themes.swift clients/macos/BitSkim.swift clients/macos/AppController.swift clients/macos/StartupReview.swift build/macos/bitskim.o build/macos/platform.o work/openssl-macos/lib/libssl.a work/openssl-macos/lib/libcrypto.a -o build/macos/BitSkim.app/Contents/MacOS/BitSkim
 cp work/openssl-src/openssl-3.5.9/LICENSE.txt build/macos/BitSkim.app/Contents/Resources/OpenSSL-LICENSE.txt
 cp clients/macos/Info.plist build/macos/BitSkim.app/Contents/Info.plist
 if [ -f assets/icons/BitSkim.icns ]; then cp assets/icons/BitSkim.icns build/macos/BitSkim.app/Contents/Resources/BitSkimRetro.icns; fi

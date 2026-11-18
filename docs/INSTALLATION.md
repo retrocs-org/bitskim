@@ -59,7 +59,7 @@ Build the applications first. `scripts/build-amiga.sh` also compiles StartInstal
 
 Windows setup requires NSIS (makensis): run `scripts/build-windows-installer.sh`. Override MAKENSIS/NSISDIR for an isolated toolchain. The script uses the NSIS Modern UI and current-user registry/shortcuts. See the [official NSIS scripting reference](https://nsis.sourceforge.io/Docs/Chapter4.html).
 
-The DMG requires macOS hdiutil, Python 3 with ds-store. Run `python3 scripts/build-macos-dmg.py`. Its Finder layout settings and build script live in installers/macos and scripts. The image contains the unchanged signed application bundle, Applications shortcut and local installation/license documents. No app is installed by building the image.
+The DMG requires macOS hdiutil, Python 3 with ds-store. Run `python3 scripts/build-macos-dmg.py`. Its Finder layout settings and build script live in installers/macos and scripts. The APFS image contains the unchanged signed application bundle, Applications shortcut and local installation/license documents. The builder validates the mounted and copied application signatures. No app is installed by building the image.
 
 Finally run `python3 scripts/package.py` to refresh portable ZIPs, source, website downloads and SHA256SUMS. It includes already-built setup/DMG artifacts when present. Version remains 0.2. See VALIDATION.md for build checks versus actual native installation testing.
 

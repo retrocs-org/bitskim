@@ -23,6 +23,17 @@ from zipfile import ZipFile
 from build_provenance import ROOT, SOURCE_ROOTS, source_hash, verify, write_json
 
 TARGETS = ('macos', 'windows', 'amiga', 'dos', 'riscos-arm2', 'riscos-strongarm', 'setup', 'dmg', 'windows-legacy', 'atari-sting', 'atari-mintnet', 'atari-mintnet060')
+LINUX_ARCHES = ('arm64', 'x86_64')
+TARGETS += tuple('linux-' + arch + suffix for arch in LINUX_ARCHES for suffix in ('', '-cli'))
+REPOSITORY_PACKAGES = frozenset({
+    'BitSkim-0.2-macOS-arm64.zip', 'BitSkim-0.2-macOS-arm64.dmg',
+    'BitSkim-0.2-Windows10-x64.zip', 'BitSkim-0.2-Windows10-x64-Setup.exe',
+    'BitSkim-0.2-AmigaOS.zip', 'BitSkim-0.2.lha', 'BitSkim-0.2-DOS-mTCP.zip',
+    'BitSkim-0.2-RISCOS3-ARM2.zip', 'BitSkim-0.2-RISCOS3-StrongARM.zip',
+    'BitSkim-0.2-Windows-Classic-x86.zip', 'BitSkim-0.2-Atari-TOS-STinG-68000.zip',
+    'BitSkim-0.2-Atari-MiNTNet-68000.zip', 'BitSkim-0.2-Atari-MiNTNet-68060.zip',
+} | {'BitSkim-0.2-Linux-' + kind + arch + '.tar.gz' for arch in LINUX_ARCHES for kind in ('', 'CLI-')})
+LOCAL_ARCHIVES = frozenset({'BitSkim-0.2-source.zip', 'BitSkim-src.tar.gz', 'BitSkim-0.2-website.zip'})
 DEFAULTS = {'github': 'https://github.com/retrocs-org/bitskim', 'gitlab': '',
             'github_git': 'git@github.com:retrocs-org/bitskim.git', 'gitlab_git': '',
             'notary_profile': 'bitskim', 'uploader': '', 'author': 'BitSkim contributors',
@@ -207,13 +218,7 @@ def linux_asset_names():
 
 
 def release_targets(root=ROOT):
-    targets=list(TARGETS)
-    for arch in ('arm64','x86_64'):
-        desktop=(output_dir(root)/('BitSkim-0.2-Linux-'+arch+'.tar.gz')).is_file()
-        cli=(output_dir(root)/('BitSkim-0.2-Linux-CLI-'+arch+'.tar.gz')).is_file()
-        if desktop: targets.append('linux-'+arch)
-        if desktop or cli: targets.append('linux-'+arch+'-cli')
-    return tuple(targets)
+    return TARGETS
 
 
 def inventory(root=ROOT):
@@ -226,17 +231,14 @@ def inventory(root=ROOT):
         if not path.is_file() or path.is_symlink() or digest(path) != match[1]:
             raise ValueError('Missing or changed release asset: ' + match[2])
         files[match[2]] = match[1]
-    required = {'BitSkim-0.2-source.zip', 'BitSkim-src.tar.gz', 'BitSkim-0.2.lha',
-                'BitSkim-0.2-macOS-arm64.zip', 'BitSkim-0.2-macOS-arm64.dmg',
-                'BitSkim-0.2-Windows10-x64.zip', 'BitSkim-0.2-Windows10-x64-Setup.exe',
-                'BitSkim-0.2-AmigaOS.zip', 'BitSkim-0.2-DOS-mTCP.zip',
-                'BitSkim-0.2-RISCOS3-ARM2.zip', 'BitSkim-0.2-RISCOS3-StrongARM.zip',
-                'BitSkim-0.2-website.zip', 'BitSkim-0.2-Windows-Classic-x86.zip',
-                'BitSkim-0.2-Atari-TOS-STinG-68000.zip', 'BitSkim-0.2-Atari-MiNTNet-68000.zip',
-                'BitSkim-0.2-Atari-MiNTNet-68060.zip'}
-    required.update(name for name in linux_asset_names() if (output_dir(root)/name).is_file())
-    if required != files.keys():
-        raise ValueError('Incomplete release; build/package every release target first')
+    required = REPOSITORY_PACKAGES | LOCAL_ARCHIVES
+    missing = required - files.keys()
+    unexpected = files.keys() - required
+    if missing or unexpected:
+        details = []
+        if missing: details.append('missing: ' + ', '.join(sorted(missing)))
+        if unexpected: details.append('unexpected: ' + ', '.join(sorted(unexpected)))
+        raise ValueError('Incomplete release; ' + '; '.join(details))
     files['SHA256SUMS'] = digest(output_dir(root) / 'SHA256SUMS')
     return files
 
@@ -617,15 +619,15 @@ def build(config, root=ROOT, plan=False, verbose=False):
                 ['./scripts/build-atari.sh'], ['./scripts/build-windows-legacy.sh'],
                 ['./scripts/build-windows-installer.sh'], [py, 'scripts/build-macos-dmg.py'],
                 [py, 'scripts/notarize-macos.py', 'dmg', '--profile', config['notary_profile']],
+                [py, 'scripts/check-macos-dmg.py', '--require-notarization'],
                 [py, 'scripts/package.py'], [py, 'scripts/check-release-site.py']]
-    if env.get('BITSKIM_LINUX_INSTANCE'):
-        arches=env.get('BITSKIM_LINUX_ARCHES','arm64,x86_64').split(',')
-        if not arches or len(set(arches))!=len(arches) or any(a not in ('arm64','x86_64') for a in arches):
-            raise ValueError('BITSKIM_LINUX_ARCHES must list arm64 and/or x86_64 once')
-        position=next(i for i,c in enumerate(commands) if 'scripts/package.py' in c)
-        commands[position:position]=[[py,'scripts/build-linux-lima.py','--instance',env['BITSKIM_LINUX_INSTANCE'],'--arch',arch,'--test'] for arch in arches]
-    elif env.get('BITSKIM_LINUX_ARCHES'):
-        raise ValueError('Set BITSKIM_LINUX_INSTANCE for the configured Linux builds')
+    if not env.get('BITSKIM_LINUX_INSTANCE'):
+        raise ValueError('Set BITSKIM_LINUX_INSTANCE; a full 0.2 release requires Linux arm64 and x86_64 desktop/CLI packages')
+    arches = env.get('BITSKIM_LINUX_ARCHES', ','.join(LINUX_ARCHES)).split(',')
+    if len(arches) != len(LINUX_ARCHES) or set(arches) != set(LINUX_ARCHES):
+        raise ValueError('A full 0.2 release requires BITSKIM_LINUX_ARCHES=arm64,x86_64; use the standalone Linux build scripts for individual targets')
+    position = next(i for i,c in enumerate(commands) if 'scripts/package.py' in c)
+    commands[position:position] = [[py, 'scripts/build-linux-lima.py', '--instance', env['BITSKIM_LINUX_INSTANCE'], '--arch', arch, '--test'] for arch in arches]
     if env.get('AMIGA_DEV_BIN') or (root / 'work/amiga-dev-bin.txt').exists():
         commands.append([py, 'scripts/sync-amiga-bin.py'])
     if plan:

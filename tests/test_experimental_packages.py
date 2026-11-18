@@ -26,7 +26,7 @@ class ExperimentalPackages(unittest.TestCase):
    root=Path(tmp);records=root/'build/provenance';records.mkdir(parents=True)
    for target in release.TARGETS:(records/(target+'.json')).write_text('{}')
    with patch.object(release,'run') as run,patch.object(release,'clean_commit'),patch.object(release,'source_hash',return_value='hash'),patch.object(release,'check_builds'),patch.object(release,'inventory',return_value={}),patch.object(release,'check_source_archive'):
-    release.build({'env':{'BITSKIM_SIGN_IDENTITY':'test'},'notary_profile':'test'},root=root)
+    release.build({'env':{'BITSKIM_SIGN_IDENTITY':'test','BITSKIM_LINUX_INSTANCE':'test-linux'},'notary_profile':'test'},root=root)
   commands=[args[0][0] for args in run.call_args_list]
   package=next(i for i,c in enumerate(commands) if 'scripts/package.py' in c)
   for script in ['./scripts/build-atari.sh','./scripts/build-windows-legacy.sh']:

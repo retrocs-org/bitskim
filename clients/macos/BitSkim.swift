@@ -121,7 +121,7 @@ final class ClientModel: ObservableObject {
     var preferencesChanged: (() -> Void)?
     var theme: AppTheme { AppTheme.find(themeID) }
     var transportMode: Int { engine.map { Int(bs_security_mode($0)) } ?? 0 }
-    fileprivate var engine: OpaquePointer?
+    private(set) var engine: OpaquePointer?
     private var timer: Timer?
     private var deciding = false
     private var decisionSerial: UInt = 0
@@ -135,7 +135,7 @@ final class ClientModel: ObservableObject {
     @Published var progressSummary = ""
     @Published var testAddress = ""
     func configureFolders(_ client: OpaquePointer) {
-        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("BitSkim")
+        let directory = storageDirectory
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             _ = bs_folders_configure(client, directory.appendingPathComponent("folders.dat").path)
@@ -200,9 +200,12 @@ final class ClientModel: ObservableObject {
         alert.addButton(withTitle: "Forget"); alert.addButton(withTitle: "Cancel")
         if alert.runModal() == .alertFirstButtonReturn { _ = bs_forget_current(engine); objectWillChange.send() }
     }
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
+    private let storageDirectory: URL
 
-    init() {
+    init(defaults: UserDefaults = .standard, storageDirectory: URL? = nil) {
+        self.defaults = defaults
+        self.storageDirectory = storageDirectory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("BitSkim", isDirectory: true)
         retroMetadata = defaults.bool(forKey: "retroMetadata")
         sendLimitKiB = defaults.string(forKey: "sendLimitKiB") ?? "0"
         receiveLimitKiB = defaults.string(forKey: "receiveLimitKiB") ?? "0"
@@ -230,7 +233,7 @@ final class ClientModel: ObservableObject {
 
         }
         if let engine {
-            let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("BitSkim/Trust", isDirectory: true)
+            let directory = self.storageDirectory.appendingPathComponent("Trust", isDirectory: true)
             do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
                 if bs_trust_configure(engine, directory.path) == 0 { startupError = "Cannot initialize saved device identities." }
             } catch { startupError = "Cannot open the device trust folder: \(error.localizedDescription)" }
@@ -239,7 +242,7 @@ final class ClientModel: ObservableObject {
                 bs_destroy(engine); self.engine = nil
             }
             if self.engine != nil {
-            let saved = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("BitSkim", isDirectory: true)
+            let saved = self.storageDirectory
             do { try FileManager.default.createDirectory(at: saved, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
                 if bs_state_configure(engine,saved.appendingPathComponent("transfers.dat").path)==0 { startupError=String(cString:bs_state_error(engine)) }
             } catch { startupError=error.localizedDescription }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a drag-to-Applications HFS+ DMG without mounting or automating Finder."""
+"""Build a drag-to-Applications APFS DMG without automating Finder."""
 from pathlib import Path
 from release_paths import output_dir
 import importlib.util,os,shutil,subprocess
@@ -28,15 +28,17 @@ with DSStore.open(str(stage/'.DS_Store'),'w+') as d:
  d['.']['icvl']=(b'type',b'icnv')
  d['.']['icvp']={'viewOptionsVersion':1,'backgroundType':1,'backgroundColorRed':layout.BACKGROUND[0],'backgroundColorGreen':layout.BACKGROUND[1],'backgroundColorBlue':layout.BACKGROUND[2],'iconSize':96.0,'textSize':13.0,'gridOffsetX':0.0,'gridOffsetY':0.0,'gridSpacing':100.0,'arrangeBy':'none','showIconPreview':False,'showItemInfo':False,'labelOnBottom':True,'scrollPositionX':0.0,'scrollPositionY':0.0}
  for name,location in layout.LOCATIONS.items():d[name]['Iloc']=location
-# makehybrid creates HFS metadata in user space; no virtual device mount is needed.
-raw=ROOT/'build/BitSkim-0.2-macOS-uncompressed.dmg';out=output_dir(ROOT) / 'BitSkim-0.2-macOS-arm64.dmg';out.parent.mkdir(parents=True,exist_ok=True)
-subprocess.run(['hdiutil','makehybrid','-hfs','-hfs-volume-name',layout.VOLUME,'-hfs-openfolder',str(stage),'-ov','-o',str(raw),str(stage)],check=True)
-subprocess.run(['hdiutil','convert',str(raw),'-format','UDZO','-ov','-o',str(out)],check=True)
+# Native APFS creation preserves the signed bundle without HFS catalog FinderInfo.
+out=output_dir(ROOT) / 'BitSkim-0.2-macOS-arm64.dmg';out.parent.mkdir(parents=True,exist_ok=True)
+subprocess.run(['hdiutil','create','-fs','APFS','-srcfolder',str(stage),'-volname',layout.VOLUME,'-format','UDZO','-ov',str(out)],check=True)
 subprocess.run(['hdiutil','verify',str(out)],check=True)
 identity=os.environ.get('BITSKIM_SIGN_IDENTITY')
 if identity:
     subprocess.run(['codesign','--force','--timestamp','--sign',identity,str(out)],check=True)
     subprocess.run(['codesign','--verify','--strict',str(out)],check=True)
+from runpy import run_path
+checker=run_path(str(ROOT/'scripts/check-macos-dmg.py'))
+checker['check_image'](out,ROOT/'work/macos-package-review')
 finish('dmg',ROOT,tool='hdiutil',version_arg='help')
 print('Built',out)
 

@@ -82,6 +82,18 @@ targets:
         GCC_PREPROCESSOR_DEFINITIONS: ['$(inherited)', BS_OPENSSL, BS_NO_BROADCAST]
         SWIFT_OBJC_BRIDGING_HEADER: '$(BITSKIM_ROOT)/clients/ios/App/Bridge.h'
         OTHER_LDFLAGS: ['$(inherited)', '-lssl', '-lcrypto']
+  BitSkimReviewUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: '$(BITSKIM_BUNDLE_ID).review-ui-tests'
+        GENERATE_INFOPLIST_FILE: 'YES'
+        TEST_TARGET_NAME: BitSkim
+    dependencies:
+      - target: BitSkim
+
 schemes:
   BitSkim:
     build:
@@ -93,3 +105,11 @@ schemes:
         BitSkimCoreTests: all
     test:
       targets: [BitSkimCoreTests]
+
+  BitSkimReviewUITests:
+    build:
+      targets:
+        BitSkim: all
+        BitSkimReviewUITests: all
+    test:
+      targets: [BitSkimReviewUITests]

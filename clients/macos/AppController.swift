@@ -160,6 +160,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, NS
 @main enum BitSkimMain {
     static func main() {
         let app = NSApplication.shared
+        if CommandLine.arguments.contains("--check-startup") { exit(MacStartupReview.run()) }
         let controller = AppController(); app.delegate = controller
         app.setActivationPolicy(.accessory)
         withExtendedLifetime(controller) { app.run() }

@@ -7,6 +7,15 @@ import UniformTypeIdentifiers
     @Environment(\.scenePhase) private var phase
     var body: some Scene {
         WindowGroup {
+#if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--review-accessibility-check") { ReviewAccessibilityHarness() }
+            else { clientHome }
+#else
+            clientHome
+#endif
+        }
+    }
+    private var clientHome: some View {
             MobileHome(client: client)
                 .environment(\.mobileTheme, MobileTheme.resolve(themeID))
                 .tint(MobileTheme.resolve(themeID)?.accent ?? .accentColor)
@@ -16,8 +25,8 @@ import UniformTypeIdentifiers
                     if state == .active { client.start(); client.refreshSharedFiles() }
                     else if state == .background { client.stop() }
                 }
-        }
     }
+
 }
 
 struct MobileHome: View {

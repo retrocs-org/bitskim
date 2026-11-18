@@ -42,7 +42,7 @@ To reinstall/start an existing build without recompiling:
 python3 scripts/run-android.py --device DEVICE_SERIAL
 ```
 
-Add `--test` to run debug-only native runtime checks before opening the app. These create private fixtures and verify TLS, Unicode file delivery, CRC32 readback, received-file rename, document-tree access through a debug provider, empty directories, a 96-file folder send and safe staging cleanup. They do not establish physical-device networking or provider compatibility.
+Add `--test` to run debug-only native runtime checks before opening the app. These create private fixtures and verify review layout with 200% text, light/dark themes and keyboard cancellation, plus TLS, Unicode file delivery, CRC32 readback, received-file rename, document-tree access through a debug provider, empty directories, a 96-file folder send and safe staging cleanup. They do not establish physical-device networking or provider compatibility.
 
 ```sh
 ./scripts/build-android.sh --run --avd BitSkim_API_37 --test
@@ -62,7 +62,7 @@ Discovery is enabled by default; `--discovery off` disables broadcast transport 
 ## Using the client
 
 - **Clients:** nearby clients grouped by installation, explicit address selection, manual IPv4, current-file progress, estimated time, outgoing batch totals, cancel and retry.
-- **Files:** Android's standard document picker for files, and **Choose Folder** for a read-only document-tree grant, including enabled providers that support folder access. Selected files are copied into private staging on a worker thread; provider originals stay unchanged. Choose a client and review all relative paths, file sizes, the total and destination before explicitly sending. Folder trees include nested files and empty directories. Android share-sheet imports use the same staging and review flow.
+- **Files:** Android's standard document picker for files, and **Choose Folder** for a read-only document-tree grant, including enabled providers that support folder access. Selected files are copied into private staging on a worker thread; provider originals stay unchanged. Choose a client and review all relative paths, file sizes, the total and destination before explicitly sending. Send/Cancel stay outside the scrolling list; path rows wrap and identify files/folders to accessibility services. Folder trees include nested files and empty directories. Android share-sheet imports use the same staging and review flow.
 - **Received:** browse folders, search the current folder, preview with an installed viewer, share, save a copy through Android Files, safely rename, or confirm permanent deletion. Existing incoming files use safe renamed destinations. Preview/share grants read access only to the selected received file.
 - **Settings:** Mocha by default, the shared palettes or system appearance, encryption mode, verification-code pairing, saved queues/history, QR invitations and diagnostics.
 

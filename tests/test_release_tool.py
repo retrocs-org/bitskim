@@ -123,7 +123,7 @@ class ReleaseTool(unittest.TestCase):
             self.assertEqual(release.remote_tag('https://gitlab.example.com/a/b', 'v0.2'), 'commit')
 
     def test_plan_has_no_build_or_upload_side_effects(self):
-        config = dict(release.DEFAULTS, env={'BITSKIM_SIGN_IDENTITY': 'Test Identity'})
+        config = dict(release.DEFAULTS, env={'BITSKIM_SIGN_IDENTITY': 'Test Identity', 'BITSKIM_LINUX_INSTANCE': 'test-linux'})
         with patch.object(release, 'run') as run:
             release.build(config, plan=True)
             run.assert_not_called()

@@ -39,7 +39,10 @@ def main():
   script.write_text(text)
   subprocess.run([a.makensis,'-V2','-DPRODUCT=BitSkimInstallerTest','-DAPP_MUTEX=Local\\BitSkimInstallerTest-'+version,'-DPREVIOUS_APP_MUTEX=Local\\BitSkimInstallerTest-0.1','-DOUTPUT='+str(out/('InstallerReview-'+version+'.exe')),str(script)],check=True)
  shutil.copy2(ROOT/'tests/test-windows-installer.ps1',out/'test-windows-installer.ps1')
+ shutil.copy2(ROOT/'tests/windows-wizard-review.ps1',out/'windows-wizard-review.ps1')
  launcher='@echo off\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0test-windows-installer.ps1" -OldSetup "%~dp0InstallerReview-0.1.exe" -Setup "%~dp0InstallerReview-0.2.exe" -Report "%~dp0installer-review.log"\r\necho Review complete. See installer-review.log beside this script.\r\npause\r\n'
  (out/'Run-installer-review.cmd').write_bytes(launcher.encode('ascii'))
+ interactive=launcher.replace('installer-review.log','wizard-review.log').replace('-Report ', '-Interactive -Report ')
+ (out/'Run-wizard-review.cmd').write_bytes(interactive.encode('ascii'))
  print('Prepared isolated native installer review:',out)
 if __name__=='__main__':main()

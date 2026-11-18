@@ -16,6 +16,32 @@ ROOT=Path(__file__).resolve().parents[1]
 
 class ReleaseGuidelines(unittest.TestCase):
  def fixture(self,directory):return fixtures.ReleaseTool().setup_release(directory)
+ def test_full_inventory_requires_each_linux_package_and_reports_omissions(self):
+  with tempfile.TemporaryDirectory() as directory:
+   root=Path(directory);out=root/'outputs';out.mkdir()
+   names=release.REPOSITORY_PACKAGES | release.LOCAL_ARCHIVES
+   for name in names:(out/name).write_bytes(name.encode())
+   def checksums():
+    (out/'SHA256SUMS').write_text(''.join(release.digest(p)+'  '+p.name+'\n' for p in sorted(out.iterdir()) if p.name!='SHA256SUMS'))
+   checksums();inventory=release.inventory(root)
+   assets,_=release.publication_assets(root,inventory)
+   self.assertEqual(len(release.REPOSITORY_PACKAGES),17);self.assertEqual(len(assets),34)
+   for name in sorted(release.linux_asset_names()):
+    path=out/name;data=path.read_bytes();path.unlink();checksums()
+    with self.assertRaisesRegex(ValueError,'missing: '+name.replace('.','\\.')):release.inventory(root)
+    path.write_bytes(data)
+   for name in release.linux_asset_names():(out/name).unlink()
+   checksums()
+   with self.assertRaisesRegex(ValueError,'Incomplete release'):release.inventory(root)
+   self.assertTrue({'linux-arm64','linux-arm64-cli','linux-x86_64','linux-x86_64-cli'}<=set(release.release_targets(root)))
+ def test_documented_repository_packages_match_enforced_inventory(self):
+  text=(ROOT/'docs/RELEASING.md').read_text().split('## Repository asset inventory',1)[1].split('```text',1)[1].split('```',1)[0]
+  self.assertEqual({line for line in text.splitlines() if line.startswith('BitSkim-')},release.REPOSITORY_PACKAGES)
+ def test_full_build_refuses_missing_or_partial_linux_configuration(self):
+  with patch.dict(os.environ,{},clear=True),patch.object(release,'run') as run:
+   for env in [{'BITSKIM_SIGN_IDENTITY':'Test'}, {'BITSKIM_SIGN_IDENTITY':'Test','BITSKIM_LINUX_INSTANCE':'test','BITSKIM_LINUX_ARCHES':'arm64'}]:
+    with self.subTest(env=env),self.assertRaisesRegex(ValueError,'Linux|LINUX'):release.build(dict(release.DEFAULTS,env=env),plan=True)
+   run.assert_not_called()
  def test_github_normal_latest_only_after_verified_assets(self):
   with tempfile.TemporaryDirectory() as d:
    root,manifest=self.fixture(d);api=FakeGitHub();release.publish_repository('github',manifest,api,root)

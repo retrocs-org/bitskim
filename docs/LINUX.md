@@ -130,7 +130,7 @@ python3 scripts/package-linux.py --arch arm64
 python3 scripts/package-linux.py --arch arm64 --cli-only
 ```
 
-Select `x86_64` on that build. Outputs are `BitSkim-0.2-Linux-ARCH.tar.gz` (desktop + CLI) and `BitSkim-0.2-Linux-CLI-ARCH.tar.gz` (CLI only), with SHA-256 sidecars. They include an `install.sh`, documentation, notices and build provenance, without source copies or private state. They run against the distribution's libraries. A full project source archive is distributed separately. `BITSKIM_RELEASE_OUTPUT=outputs/linux` selects an isolated directory beneath the checkout’s ignored `outputs/`. The combined packager includes present, current Linux builds, and release publication includes their checked archives with matching checksums.
+Select `x86_64` on that build. Outputs are `BitSkim-0.2-Linux-ARCH.tar.gz` (desktop + CLI) and `BitSkim-0.2-Linux-CLI-ARCH.tar.gz` (CLI only), with SHA-256 sidecars. They include an `install.sh`, documentation, notices and build provenance, without source copies or private state. They run against the distribution's libraries. A full project source archive is distributed separately. `BITSKIM_RELEASE_OUTPUT=outputs/linux` selects an isolated directory beneath the checkout’s ignored `outputs/`. The combined packager includes present, current Linux builds, and a full 0.2 release requires all four checked Linux archives with matching checksums.
 
 Run the actual process tests after compiling:
 

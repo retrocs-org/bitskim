@@ -177,15 +177,17 @@ python3 scripts/release.py release --output outputs/release-0.2-new \
 
 These commands are for a new tag, never a way to replace conflicting published assets. Use `--tag-message "BitSkim 0.2 release"` during preparation to choose the annotation; publication uses that prepared annotation. A supplied publication annotation must match. Commit messages, tag names and tag annotations are separate values.
 
-`plan` prints steps without building or uploading. `build` requires a clean committed checkout, runs buffered host tests, compiles the desktop/classic clients, signs/notarizes the Mac artifacts, packages and validates downloads, and optionally refreshes configured local distribution mirrors. It does not compile/publish the mobile development clients. Dependencies and Apple notarization use the network; no release API tokens are fetched.
+`plan` prints steps without building or uploading. `build` requires a clean committed checkout, runs buffered host tests, compiles the desktop/classic clients, signs/notarizes the Mac artifacts, packages and validates downloads, builds/tests both required Linux architectures, and optionally refreshes configured local distribution mirrors. It does not compile/publish the mobile development clients. Dependencies and Apple notarization use the network; no release API tokens are fetched.
 
 Builds print stages, elapsed times and package sizes. Detailed redacted output is saved in `<output>/release/build.log`; `--verbose` also streams it. Failed build stages retain `failed-build.log`. Build fingerprints and copies of provenance records remain local, outside the public release asset list.
 
 Without `--output`, the artifact directory is `outputs/`, with state in `outputs/release/`. Custom destinations must be inside `outputs/`, cannot traverse symbolic links and cannot use the reserved `outputs/release/` directory. A custom build directory must be fresh. A build refuses to overwrite a directory containing publication receipts. Compilation still uses shared `build/` intermediates: use separate checkouts for concurrent versions or independently retained native build trees.
 
+A full release requires `BITSKIM_LINUX_INSTANCE` to name an existing configured Lima build instance. Both `arm64` and `x86_64` are required; `BITSKIM_LINUX_ARCHES` defaults to `arm64,x86_64` and cannot select a partial release. Build individual Linux targets using the standalone commands in [LINUX.md](LINUX.md). The inventory checks all intended packages, even when no Linux archive exists, and names missing or unexpected files.
+
 ## Repository asset inventory
 
-For 0.2, upload these thirteen packages and one matching `<filename>.sha256` each—**26 uploaded assets** on each host:
+For 0.2, upload these seventeen packages and one matching `<filename>.sha256` each—**34 uploaded assets** on each host:
 
 ```text
 BitSkim-0.2-macOS-arm64.zip
@@ -201,6 +203,10 @@ BitSkim-0.2-Windows-Classic-x86.zip
 BitSkim-0.2-Atari-TOS-STinG-68000.zip
 BitSkim-0.2-Atari-MiNTNet-68000.zip
 BitSkim-0.2-Atari-MiNTNet-68060.zip
+BitSkim-0.2-Linux-arm64.tar.gz
+BitSkim-0.2-Linux-CLI-arm64.tar.gz
+BitSkim-0.2-Linux-x86_64.tar.gz
+BitSkim-0.2-Linux-CLI-x86_64.tar.gz
 ```
 
 Checksums contain the SHA-256 digest, two spaces, exact filename and newline. Upload identical package and checksum bytes to both hosts. Required dependency source/relink materials remain inside their respective binary packages.
@@ -281,8 +287,36 @@ Tests use temporary Git repositories, local artifacts and mocked APIs/FTP. They 
 
 API references: [GitHub releases](https://docs.github.com/en/rest/releases/releases), [GitHub release assets](https://docs.github.com/en/rest/releases/assets), [GitLab releases](https://docs.gitlab.com/api/releases/), [GitLab generic packages](https://docs.gitlab.com/user/packages/generic_packages/).
 
-## Optional Linux release assets
+## Required Linux release assets
 
-Set `BITSKIM_LINUX_INSTANCE` in the external build environment to an existing running Lima Linux instance with the dependencies in [LINUX.md](LINUX.md). The release build compiles/tests `arm64,x86_64` before packaging; `BITSKIM_LINUX_ARCHES` can select either architecture or both. Cross builds require target libraries/toolchains and a test runner already provisioned. `BITSKIM_LIMA_HOME` selects the shared tools location; `BITSKIM_LINUX_PKG_CONFIG_PATH` selects isolated target metadata if needed. With no instance configured, release automation does not require Linux build infrastructure.
+Set `BITSKIM_LINUX_INSTANCE` in the external build environment to an existing running Lima Linux instance with the dependencies in [LINUX.md](LINUX.md). The release build compiles/tests `arm64,x86_64` before packaging; `BITSKIM_LINUX_ARCHES` must contain both architectures once; its default is `arm64,x86_64`. Cross builds require target libraries/toolchains and a test runner already provisioned. `BITSKIM_LIMA_HOME` selects the shared tools location; `BITSKIM_LINUX_PKG_CONFIG_PATH` selects isolated target metadata if needed. A full release stops before building if no instance is configured.
 
-The standalone Linux builder/install/packager also works directly on Linux without release credentials. The combined packager includes present current Linux binaries as desktop+CLI and CLI-only tar.gz archives. Linux assets are optional additions to the existing desktop/retro inventory, with matching source provenance and per-file SHA-256 sidecars on both release hosts. Stale Linux binaries/packages fail checks rather than being silently published. The website exposes each Linux download only after a normal public GitHub release contains that asset; it never fabricates a 0.1 Linux fallback.
+The standalone Linux builder/install/packager also works directly on Linux without release credentials. The combined packager includes present current Linux binaries as desktop+CLI and CLI-only tar.gz archives. All four Linux archives are required alongside the desktop/retro inventory, with matching source provenance and per-file SHA-256 sidecars on both release hosts. Stale Linux binaries/packages fail checks rather than being silently published. The website exposes each Linux download only after a normal public GitHub release contains that asset; it never fabricates a 0.1 Linux fallback.
+
+
+## Native installer acceptance
+
+After building, prepare isolated Windows fixtures using the configured NSIS tool:
+
+```sh
+python3 scripts/prepare-windows-installer-review.py --makensis /path/to/makensis
+```
+
+In Windows, run `build/windows-installer-review/Run-wizard-review.cmd` and approve the administrator prompt. It stages its script/setup files locally before elevation. Only installers identified as `BitSkimInstallerTest` are accepted. It navigates Welcome, License, Components, Directory and Finish pages; checks cancellation, 0.1 upgrade, repeated/fresh 0.2 installation and uninstall; runs the installed native CoreCheck; and verifies preservation of unknown files, settings and received data. It never approves UAC automatically. A failed or unfamiliar page is left for inspection; the report is copied back as `wizard-review.log`. The silent-only runner remains available separately. Windows 10 needs its own native run.
+
+The packaged Mac executable supports an isolated native startup/view check:
+
+```sh
+/path/to/BitSkim.app/Contents/MacOS/BitSkim --check-startup --review-output /absolute/review/output
+```
+
+It uses a temporary preference domain and private profile, opens the actual native views, renders the main/preferences/tools screens in all eight themes, checks the listener/TLS identity and removes only its own profile. It performs no file transfer. Run it from the app copied out of the final DMG. The image builder uses native APFS creation and checks the mounted and copied bundle signatures, preventing HFS Finder metadata from invalidating an otherwise signed app. The release pipeline checks the notarized package automatically; run the complete check locally with:
+
+```sh
+python3 scripts/check-macos-dmg.py --require-notarization --native-views \
+  --review-output /absolute/review/output
+```
+
+This mounts only its own read-only image, copies the app into a temporary installation directory and checks version, strict signatures, tickets and Gatekeeper. This is separate from a human drag-to-Applications review.
+
+For Amiga, keep the existing bridged Workbench session and its network settings. Use the unpacked `Builds:BitSkim/Install-BitSkim` package, review the displayed application/Prefs/shared destinations and settings preservation, and check the installed 0.2 app/preferences and discovery. Do not substitute a non-networked profile or silently change the running profile to obtain a pass. Keep native reports/screenshots locally; compiler and installer-flow tests do not establish a native GUI/network result.

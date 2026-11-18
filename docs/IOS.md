@@ -6,20 +6,20 @@ This is a source-only iOS client in development, targeting iOS/iPadOS 16 or late
 
 ## What it does
 
-- Send up to 32 selected regular files per import, each up to 2 GiB minus one byte. Files are staged in private storage before queueing; imported folders are rejected explicitly.
+- Send files or provider folders, including nested files and empty directories, after reviewing the complete selection. Up to 32 roots and 32,760 entries can be reviewed; individual files are limited to 2 GiB minus one byte. Selected content is copied into private staging before queueing.
 - Receive files and complete folder manifests, including empty directories, into `Received` in the app's Documents directory. Existing files are preserved with collision-safe names.
 - Browse received folders, copy files or folders with **Save to Files**, and use system sharing for files. The Documents directory is also available through Files.
 - Prefer or require TLS, compare verification codes, remember device identities, show diagnostics/history and CRC32 readback results, retry queued sends and cancel transfers.
 - Show the Wi-Fi/LAN address for manual incoming connections.
 - Accept files/photos from other apps through the Share extension. The extension copies them to an App Group inbox. Open BitSkim, select a client or enter an address, then review the files and confirm Send. The extension does not silently open the containing app or send to a guessed recipient.
 
-Shared-inbox files stay on the device until queued. Failed or cancelled import copies are cleaned without deleting the originals. An interrupted batch can leave already completed received files; explicit cancellation removes the current partial download. Temporary staging requires enough local storage for a copy of each selected file.
+Pending shared-inbox selections stay on the device until sent or discarded. Once queued, a staged folder remains available until every queued child is finished or explicitly cleared. Failed or cancelled import copies are cleaned without deleting the originals. An interrupted batch can leave already completed received files; explicit cancellation removes the current partial download. Temporary staging requires enough local storage for a copy of each selected file.
 
-Keep BitSkim open to receive. On entering the background, it cancels active/queued transfers, closes its listeners and clears outgoing copies; completed received files remain. Opening it reconnects. Continuous background receiving and guaranteed completion while locked are not supported. There is no automatic acceptance of incoming files. The mobile UI uses verification-code device pairing; it does not yet expose shared-group PSK key entry.
+Keep BitSkim open to receive. On entering the background, it checkpoints the outgoing queue and recent history, stops network servicing and closes its listeners. Pending and queued private copies and completed received files remain. Opening it reconnects with restored outgoing work paused; choose Retry explicitly to continue. An interrupted transfer may need to restart its current file. Continuous background receiving and guaranteed completion while locked are not supported. There is no automatic acceptance of incoming files. The mobile UI uses verification-code device pairing; it does not yet expose shared-group PSK key entry.
 
 ## Review and send
 
-Select documents in **Files**, then choose a recipient in **Clients**. Selecting a client first also opens the standard file picker when no files are ready. Both routes open **Review transfer**, showing the recipient name/address, filenames, individual sizes, total size and encryption mode. Only the explicit **Send** button starts networking. Cancelling the review leaves the staged selections available for another recipient; it does not send or delete the originals. File sizes are rechecked at confirmation, and changed files require another review.
+Select documents in **Files**, then choose a recipient in **Clients**. Selecting a client first also opens the standard file picker when no files are ready. Both routes open **Review transfer**, showing the recipient name/address, filenames, individual sizes, total size and encryption mode. Send and Cancel stay in the navigation bar while the contents scroll, including with the largest accessibility text sizes. Full relative paths wrap, and VoiceOver announces file/folder type, path and size. Escape cancels; Command-S sends. Only the explicit **Send** button starts networking. Cancelling the review leaves the staged selections available for another recipient; it does not send or delete the originals. Staged file contents and folder structure are checked again at confirmation, and changed selections require another review.
 
 During a transfer, **Clients → Transfer** shows the current filename, item position, transferred bytes, recent speed and an estimated time remaining once data is moving. Reviewed outgoing batches also show an overall progress bar and total bytes. Incoming collections use the engine's overall summary; their time estimate is for the current item. Estimates can change with network speed and do not replace the final written-file verification result. Paused queues can be retried or cancelled explicitly.
 
@@ -151,3 +151,16 @@ The installed iOS 27.2 development runtime currently reproduces an app-container
 ## Saved work, QR connections and metadata
 
 Queues and eight recent results persist privately. Restarted outgoing work stays paused until Continue; staged files are retained. iOS can suspend or stop the app in the background, so keep it open for active transfers. Settings → Clear saved transfer history leaves files and queued work intact. Clients → Scan connection QR opens the camera scanner, with a paste field if no camera is available. Show my connection QR displays a five-minute invitation for a selected LAN address. File selection and review remain explicit; QR does not remember trust automatically or approve incoming files. Both devices need certificate encryption. Optional retro metadata in Settings retains .bskmeta companions for forwarding to Amiga/RISC OS. See [TRANSFERS.md](TRANSFERS.md) for limits. Camera/provider/signing behavior still requires physical-device review.
+
+
+## Review accessibility checks
+
+After project generation, run the isolated UI review against an installed iOS test device:
+
+```sh
+xcodebuild -project build/ios/BitSkim.xcodeproj -scheme BitSkimReviewUITests \
+  -sdk iphonesimulator -destination 'id=YOUR_DEVICE_ID' \
+  -derivedDataPath build/ios-accessibility CODE_SIGNING_ALLOWED=YES test
+```
+
+The debug-only harness renders the production review with synthetic long paths and a long collection. It starts no listener and reads/sends no files. Tests cover the largest Dynamic Type size, Mocha/Latte, pinned actions after scrolling, disabled Send while checking and cancellation. They retain screenshots in the test result. These checks do not replace physical-device VoiceOver and provider testing.

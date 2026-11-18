@@ -26,7 +26,8 @@ public final class MainActivity extends Activity implements ClientService.Listen
     private LinearLayout root,body,peerRows;
     private TextView status,details,diagnostics,pairing;
     private ProgressBar progress,overall;
-    private AlertDialog offerDialog,reviewDialog,fileDialog;
+    private AlertDialog offerDialog,fileDialog;
+    private Dialog reviewDialog;
     private long offeredSerial;
     private String peerKey="",addressDraft="",pendingKey="",deferredError="";
     private int tab,base,surface,text,muted,accent;
@@ -138,12 +139,11 @@ public final class MainActivity extends Activity implements ClientService.Listen
         importing=true;
         client.pauseForUi(()->client.review(files,snapshots->{
             importing=false;if(!started){client.releaseUi();return;}if(snapshots==null){render();return;}
-            long total=0;List<String> rows=new ArrayList<>();for(TransferFiles.Snapshot snapshot:snapshots){total+=snapshot.total;for(TransferFiles.Entry entry:snapshot.entries)rows.add(entry.path+(entry.directory?"":" · "+size(entry.bytes)));}
+            long total=0;List<String> rows=new ArrayList<>();for(TransferFiles.Snapshot snapshot:snapshots){total+=snapshot.total;for(TransferFiles.Entry entry:snapshot.entries)rows.add((entry.directory?"Folder: ":"File: ")+entry.path+(entry.directory?"":" · "+size(entry.bytes)));}
             int security=client.preferences.getInt("security",1);String protection=security==2?"Encryption required.":security==1?"Encryption preferred; older clients may use plaintext.":"Encryption disabled.";
-            LinearLayout contents=new LinearLayout(this);contents.setOrientation(LinearLayout.VERTICAL);contents.setPadding(dp(20),dp(12),dp(20),dp(12));contents.setBackgroundColor(base);
-            contents.addView(label((selected.id.isEmpty()?"Manual client":selected.name)+"\n"+selected.endpoint()+"\n"+rows.size()+" items · "+size(total)+"\n"+protection+"\nThe recipient must approve. Keep BitSkim open.",14,text));
-            ListView list=new ListView(this);list.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,rows){@Override public View getView(int position,View convert,ViewGroup parent){TextView row=(TextView)super.getView(position,convert,parent);row.setTextColor(text);row.setTextSize(14);return row;}});contents.addView(list,new LinearLayout.LayoutParams(-1,dp(240)));
-            reviewDialog=new AlertDialog.Builder(this).setTitle("Review transfer").setView(contents).setPositiveButton("Send",(dialog,which)->client.send(selected,files,snapshots,()->{forwarding.clear();tab=0;render();})).setNegativeButton("Cancel",(dialog,which)->client.releaseUi()).create();reviewDialog.setOnCancelListener(dialog->client.releaseUi());reviewDialog.show();
+            reviewDialog=new TransferReviewDialog(this,selected.id.isEmpty()?"Manual client":selected.name,selected.endpoint(),protection,rows,total,base,surface,text,accent,
+                ()->client.send(selected,files,snapshots,()->{forwarding.clear();tab=0;render();}),client::releaseUi);
+            reviewDialog.show();
         }),()->{importing=false;render();});
     }
     private void receivedPage(){
