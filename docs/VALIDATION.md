@@ -100,3 +100,8 @@ The Mac packaged application has an isolated native startup/view check that uses
 The 18 November Windows 11 wizard run passed actual Welcome/License/Components/Directory/Finish navigation, cancelled setup with no registration, 0.1 installation and 0.2 upgrade, refusal while a client mutex is held, repeated/fresh installation, installed native CoreCheck with zero failures, uninstall and shortcut cleanup. Unknown files, received data and all live settings hashes were preserved. The runner also safely recovered its interrupted private test installation. Windows 10 remains unverified.
 
 Mounted/copy testing found the HFS hybrid image added nonzero FinderInfo inside the signed Mac bundle. Native APFS image creation preserves both mounted and copied signatures; a real disk-image regression test verifies the valid copy and rejects forbidden metadata. The release pipeline now validates the mounted/copied app and requires stapled tickets and Gatekeeper assessment after notarization. Candidate-specific hashes/results stay in the local package-review report.
+
+
+## Amiga installer confirmation — 19 November 2026
+
+The project owner confirmed installation/update from the refreshed package in the usual bridged Workbench session. BitSkim and BitSkimPrefs opened as version 0.2, and nearby discovery worked. This completes the pending native Amiga installation/startup/discovery review. The existing session and network configuration were preserved. This is a user-reported result; it does not add new transfer, filesystem, physical-hardware or TCP/IP-stack coverage.

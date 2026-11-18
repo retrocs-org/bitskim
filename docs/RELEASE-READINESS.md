@@ -10,3 +10,10 @@ Version 0.2 adds saved-file verification, discovery/compatibility diagnostics, s
 A complete repository release contains 17 compiled packages plus 17 individual checksum files on each host. Linux desktop/CLI archives for arm64 and x86_64 are mandatory. Mobile development apps, local source archives and website archives remain outside that public binary inventory.
 
 Before publication, review the exact rebuilt Mac, Windows and Amiga packages. Windows setup-wizard navigation and Windows 10 runtime coverage remain separate from silent installer tests. Preserve the currently running Amiga session and its network configuration; a non-networked or unrelated profile does not establish the requested bridged-network check. Keep pending native checks visible in [VALIDATION.md](VALIDATION.md).
+
+
+## Completed native acceptance
+
+Windows 11 installer wizard/runtime checks and the corrected Mac DMG copy/signature/notarization/Gatekeeper checks passed. On 19 November 2026, the project owner also confirmed the refreshed Amiga installer, BitSkim/BitSkimPrefs 0.2 startup and discovery in the usual bridged Workbench session. The native Amiga check is now complete within that scope; see [VALIDATION.md](VALIDATION.md).
+
+These results close the requested installer review; they do not certify untested platforms or hardware. Windows 10, physical mobile/provider coverage and the other documented validation limits remain. Updating these validation notes changes fingerprinted release inputs, so perform the required fresh full release build from the final committed source before publication. Do not relabel existing build fingerprints.
