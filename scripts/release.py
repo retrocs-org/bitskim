@@ -201,6 +201,21 @@ def digest(path):
     return h.hexdigest()
 
 
+def linux_asset_names():
+    return {'BitSkim-0.2-Linux-'+kind+arch+'.tar.gz'
+            for arch in ('arm64','x86_64') for kind in ('','CLI-')}
+
+
+def release_targets(root=ROOT):
+    targets=list(TARGETS)
+    for arch in ('arm64','x86_64'):
+        desktop=(output_dir(root)/('BitSkim-0.2-Linux-'+arch+'.tar.gz')).is_file()
+        cli=(output_dir(root)/('BitSkim-0.2-Linux-CLI-'+arch+'.tar.gz')).is_file()
+        if desktop: targets.append('linux-'+arch)
+        if desktop or cli: targets.append('linux-'+arch+'-cli')
+    return tuple(targets)
+
+
 def inventory(root=ROOT):
     files = {}
     for line in (output_dir(root) / 'SHA256SUMS').read_text().splitlines():
@@ -219,6 +234,7 @@ def inventory(root=ROOT):
                 'BitSkim-0.2-website.zip', 'BitSkim-0.2-Windows-Classic-x86.zip',
                 'BitSkim-0.2-Atari-TOS-STinG-68000.zip', 'BitSkim-0.2-Atari-MiNTNet-68000.zip',
                 'BitSkim-0.2-Atari-MiNTNet-68060.zip'}
+    required.update(name for name in linux_asset_names() if (output_dir(root)/name).is_file())
     if required != files.keys():
         raise ValueError('Incomplete release; build/package every release target first')
     files['SHA256SUMS'] = digest(output_dir(root) / 'SHA256SUMS')
@@ -252,7 +268,13 @@ def clean_commit(root=ROOT):
 
 def check_builds(root=ROOT):
     scan(root)
-    records = {target: verify(target, root) for target in TARGETS}
+    records = {target: verify(target, root) for target in release_targets(root)}
+    from linux_release import verify_archive
+    for arch in ('arm64','x86_64'):
+        for cli_only in (False,True):
+            name='BitSkim-0.2-Linux-'+('CLI-' if cli_only else '')+arch+'.tar.gz'
+            archive=output_dir(root)/name
+            if archive.is_file():verify_archive(archive,arch,cli_only,root)
     for target in ('macos', 'dmg'):
         n = records[target].get('notarization', {})
         if n.get('status') != 'Accepted' or not n.get('ticket_stapled'):
@@ -263,7 +285,7 @@ def check_builds(root=ROOT):
 def check_source_archive(root=ROOT):
     with ZipFile(output_dir(root) / 'BitSkim-0.2-source.zip') as archive:
         records = json.loads(archive.read('BitSkim/BUILD-PROVENANCE.json'))
-        for target in TARGETS:
+        for target in release_targets(root):
             if records.get(target) != verify(target, root):
                 raise ValueError('Source archive build record differs: ' + target)
         for name in archive.namelist():
@@ -575,7 +597,7 @@ def publish(services, confirmed=False, root=ROOT, config=None, tag=None, tag_mes
 
 
 def build(config, root=ROOT, plan=False, verbose=False):
-    allowed = {'BITSKIM_SIGN_IDENTITY', 'BITSKIM_RELEASE_PYTHON', 'AMIGA_CC', 'LHA', 'WINDOWS_CC', 'RISCOS_CC', 'RISCOS_SDK_SOURCE', 'WATCOM', 'DOS_RUNNER', 'PHP', 'AMIGA_DEV_BIN', 'BITSKIM_BUILDS_DIR', 'ATARI_CC', 'STING_INCLUDE', 'LEGACY_WINDOWS_CC', 'LEGACY_WINDOWS_RC', 'MAKENSIS', 'NSISDIR'}
+    allowed = {'BITSKIM_SIGN_IDENTITY', 'BITSKIM_RELEASE_PYTHON', 'AMIGA_CC', 'LHA', 'LHA_READER', 'WINDOWS_CC', 'RISCOS_CC', 'RISCOS_SDK_SOURCE', 'WATCOM', 'DOS_RUNNER', 'PHP', 'AMIGA_DEV_BIN', 'BITSKIM_BUILDS_DIR', 'ATARI_CC', 'STING_INCLUDE', 'LEGACY_WINDOWS_CC', 'LEGACY_WINDOWS_RC', 'MAKENSIS', 'NSISDIR', 'BITSKIM_LINUX_INSTANCE', 'BITSKIM_LIMA_HOME', 'BITSKIM_LINUX_ARCHES', 'BITSKIM_LINUX_PKG_CONFIG_PATH'}
     if set(config['env']) - allowed:
         raise ValueError('Only documented build settings belong in config; tokens belong in the environment')
     env = dict(os.environ, **config['env'])
@@ -596,6 +618,14 @@ def build(config, root=ROOT, plan=False, verbose=False):
                 ['./scripts/build-windows-installer.sh'], [py, 'scripts/build-macos-dmg.py'],
                 [py, 'scripts/notarize-macos.py', 'dmg', '--profile', config['notary_profile']],
                 [py, 'scripts/package.py'], [py, 'scripts/check-release-site.py']]
+    if env.get('BITSKIM_LINUX_INSTANCE'):
+        arches=env.get('BITSKIM_LINUX_ARCHES','arm64,x86_64').split(',')
+        if not arches or len(set(arches))!=len(arches) or any(a not in ('arm64','x86_64') for a in arches):
+            raise ValueError('BITSKIM_LINUX_ARCHES must list arm64 and/or x86_64 once')
+        position=next(i for i,c in enumerate(commands) if 'scripts/package.py' in c)
+        commands[position:position]=[[py,'scripts/build-linux-lima.py','--instance',env['BITSKIM_LINUX_INSTANCE'],'--arch',arch,'--test'] for arch in arches]
+    elif env.get('BITSKIM_LINUX_ARCHES'):
+        raise ValueError('Set BITSKIM_LINUX_INSTANCE for the configured Linux builds')
     if env.get('AMIGA_DEV_BIN') or (root / 'work/amiga-dev-bin.txt').exists():
         commands.append([py, 'scripts/sync-amiga-bin.py'])
     if plan:
@@ -616,7 +646,7 @@ def build(config, root=ROOT, plan=False, verbose=False):
                 print('  completed in %.1fs'%(time.monotonic()-start),flush=True)
         check_builds(root);files=inventory(root);check_source_archive(root)
         snapshot=state/'provenance';snapshot.mkdir(exist_ok=True)
-        for target in TARGETS:shutil.copy2(root/'build/provenance'/(target+'.json'),snapshot/(target+'.json'))
+        for target in release_targets(root):shutil.copy2(root/'build/provenance'/(target+'.json'),snapshot/(target+'.json'))
         for name in files:
             if name!='SHA256SUMS':print(name+': '+str((out/name).stat().st_size)+' bytes')
         print('Build log: '+str(log_path))

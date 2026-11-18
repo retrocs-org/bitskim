@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=BitSkim
+Comment=Share files directly across your local network
+Exec=bitskim
+TryExec=bitskim
+Icon=org.bitskim.BitSkim
+Terminal=false
+Categories=Network;FileTransfer;
+StartupNotify=true

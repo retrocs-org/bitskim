@@ -30,6 +30,19 @@ Use an Apple silicon Mac with Xcode command-line tools/macOS SDK, Clang and Swif
 
 Output: `build/macos/BitSkim.app`. A local build defaults to ad-hoc signing. An installed Developer ID identity can be selected through `BITSKIM_SIGN_IDENTITY`; signing alone does not notarize an app. See [MACOS.md](MACOS.md).
 
+## Linux — GTK desktop and CLI
+
+Use Linux with a C11 compiler, Python 3.9+, pkg-config, GLib/GIO 2.66+ and OpenSSL 3+. The desktop requires GTK 4.12+. On Ubuntu 24.04:
+
+```sh
+sudo apt-get install build-essential python3 pkg-config libglib2.0-dev libssl-dev libgtk-4-dev
+./scripts/build-linux.sh
+```
+
+Outputs: `build/linux/arm64/bitskim` and `bitskim-cli`, or `build/linux/x86_64/` on x86-64. `./scripts/build-linux.sh --cli-only` builds without GTK; omit `libgtk-4-dev` in that case. Install with `python3 scripts/install-linux.py --prefix "$HOME/.local"`. No private release configuration is used.
+
+For a checked local archive, run `python3 scripts/package-linux.py --arch arm64` (or `x86_64`); add `--cli-only` for a separate CLI archive. System libraries are dynamically linked. See [LINUX.md](LINUX.md) for dependencies, cross-compilation, a macOS build helper using existing shared Linux tools, native tests and installation/removal.
+
 ## Android — experimental
 
 On Apple silicon macOS, use JDK 21, Python, Perl, make and Xcode command-line tools. SDK/NDK, Gradle, their caches and custom OpenSSL builds remain in `~/Development/tools/android`. No release credentials are used.
@@ -73,7 +86,7 @@ AMIGA_CC=/path/to/m68k-amigaos-gcc ./scripts/build-amiga.sh
 
 Outputs under `build/amiga/` include `BitSkim`, `BitSkimPrefs`, the Workbench installer and icons. Target: AmigaOS 3.x, Workbench and an AmiTCP-compatible stack. See [AMIGA.md](AMIGA.md).
 
-For LHA packaging, `./scripts/release-amiga.sh` reuses the installed compiler and writer. Standalone packaging and Aminet commands also discover the writer in `~/Development/tools/amiga/lha/bin/lha` or alongside the shared Amiga compiler. If needed, run `./scripts/bootstrap-lha.sh` to download and build the pinned writer under `~/Development/tools/amiga/lha/`, outside the checkout. Set `LHA_PREFIX` to change that installation directory, or `LHA` to select an existing executable. Lhasa is extraction-only.
+For LHA packaging, `./scripts/release-amiga.sh` reuses the installed compiler and writer. Standalone packaging and Aminet commands also discover the writer in `~/Development/tools/amiga/lha/bin/lha` or alongside the shared Amiga compiler. If needed, run `./scripts/bootstrap-lha.sh` to download and build the pinned writer under `~/Development/tools/amiga/lha/`, outside the checkout. Set `LHA_PREFIX` to change that installation directory, or `LHA` to select an existing executable. Lhasa is extraction-only. `LHA_READER=/path/to/lha` selects a compatible extraction tool for archive verification and Aminet preparation.
 
 ## Atari — TOS/STinG and MiNTNet (experimental)
 
@@ -184,7 +197,7 @@ RISCOS_SDK_SOURCE=/path/to/gccsdk295.tar.gz \
 python3 scripts/package.py
 ```
 
-It requires macOS, Windows and Amiga builds, verifies any present optional builds/installers, and writes portable packages, source ZIP/tar.gz, checksums and the PHP website ZIP under `outputs/`. DOS, Atari, RISC OS and Windows Classic packages include their required licenses and corresponding-source/relink material. Local packaging does not upload anything. To deliberately omit the optional RISC OS, Atari and Windows Classic packages, use `python3 scripts/package.py --primary-only`; a present DOS build is still included. Existing setup/DMG artifacts must be current too.
+It requires macOS, Windows and Amiga builds, verifies any present optional builds/installers including Linux, and writes portable packages, source ZIP/tar.gz, checksums and the PHP website ZIP under `outputs/`. DOS, Atari, RISC OS and Windows Classic packages include their required licenses and corresponding-source/relink material. Local packaging does not upload anything. To deliberately omit the optional RISC OS, Atari, Windows Classic and Linux packages, use `python3 scripts/package.py --primary-only`; a present DOS build is still included. Existing setup/DMG artifacts must be current too.
 
 Standalone Atari and Windows Classic packagers are `python3 scripts/package-atari.py` and `python3 scripts/package-windows-legacy.py`. RISC OS and DOS packagers are documented in their platform guides and require matching source archives. Do not distribute an executable without its required notices and source/relink material.
 

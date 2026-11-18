@@ -8,6 +8,8 @@ function bitskim_release_escape(string $text): string {
 
 function bitskim_select_releases(array $releases): array {
     $patterns = [
+        'linux-arm64' => 'Linux-arm64\.tar\.gz', 'linux-x86_64' => 'Linux-x86_64\.tar\.gz',
+        'linux-cli-arm64' => 'Linux-CLI-arm64\.tar\.gz', 'linux-cli-x86_64' => 'Linux-CLI-x86_64\.tar\.gz',
         'mac-dmg' => 'macOS-arm64\.dmg', 'mac-zip' => 'macOS-arm64\.zip',
         'windows-setup' => 'Windows10-x64-Setup\.exe', 'windows-zip' => 'Windows10-x64\.zip',
         'amiga-zip' => 'AmigaOS\.zip', 'dos-zip' => 'DOS-mTCP\.zip',
@@ -119,4 +121,13 @@ function bitskim_client_card(string $name, string $status, string $description, 
         echo '</span>';
     }
     echo '</div></article>';
+}
+
+function bitskim_linux_links(): array {
+    global $releaseCatalog;
+    $links = [];
+    foreach (['linux-x86_64' => 'x86-64 desktop + CLI', 'linux-arm64' => 'arm64 desktop + CLI', 'linux-cli-x86_64' => 'x86-64 CLI', 'linux-cli-arm64' => 'arm64 CLI'] as $id => $label) {
+        if (isset($releaseCatalog['clients'][$id])) $links[] = [$id, $label, ''];
+    }
+    return $links;
 }

@@ -51,3 +51,12 @@ class GitHubDownloads(unittest.TestCase):
   html=self.php('$releaseCatalog=bitskim_select_releases([]);bitskim_client_card("AmigaOS","Available","Description",[["amiga-lha","LHA","downloads/BitSkim-0.1.lha"]]);')
   self.assertIn('fallback',html);self.assertIn('https://github.com/retrocs-org/bitskim/releases/download/0.1/BitSkim-0.1.lha',html);self.assertNotIn('href="downloads/',html)
   self.assertEqual(self.php('$releaseCatalog=bitskim_select_releases([]);echo bitskim_source_url();'),'https://github.com/retrocs-org/bitskim/archive/refs/tags/0.1.zip')
+
+ def test_linux_downloads_only_appear_for_published_assets(self):
+  names=['BitSkim-0.2-Linux-'+suffix+'.tar.gz' for suffix in ('arm64','x86_64','CLI-arm64','CLI-x86_64')]
+  catalog=self.select([release('0.2','2026-11-18',names)])
+  self.assertEqual(set(catalog['clients']),{'linux-arm64','linux-x86_64','linux-cli-arm64','linux-cli-x86_64'})
+  code='$releaseCatalog=bitskim_select_releases(json_decode(stream_get_contents(STDIN),true));echo json_encode(bitskim_linux_links());'
+  self.assertEqual(json.loads(self.php(code,[])),[])
+  links=json.loads(self.php(code,[release('0.2','2026-11-18',names[:1])]))
+  self.assertEqual(len(links),1);self.assertEqual(links[0][0],'linux-arm64')

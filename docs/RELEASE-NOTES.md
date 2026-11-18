@@ -7,14 +7,16 @@ Direct local-network file sharing between modern desktops and classic computers,
 - Nearby discovery through UDP broadcasts, or manual IPv4 connections.
 - Files and folder collections on capable clients, approval prompts, progress, cancellation, session queues/history and conflict choices.
 - Written-file CRC32 verification and compatibility/discovery diagnostics.
-- Mac and modern Windows prefer TLS, support verification-code pairing and remembered device identities. Retro connections use plaintext.
+- Mac, modern Windows and Linux prefer TLS, support verification-code pairing and remembered device identities. Retro connections use plaintext.
 - Shared color palettes and native platform integration. Experimental iOS and Android clients are included as source only.
 
 ## Installation
 
 Choose the package for your platform from the tagged release. macOS uses the signed/notarized Apple silicon DMG or ZIP; modern Windows uses its x64 setup or portable ZIP. Windows packages are unsigned. Unpack the Amiga archive and open Install-BitSkim; the Amiga requires AmigaOS 3.x and a compatible TCP/IP stack. DOS, Atari, RISC OS and Windows Classic packages have limited validation; consult their platform guides before installation.
 
-Open BitSkim on both devices on a trusted local network, allow incoming connections and approve transfers on the receiving device. Individual files are limited to 2 GiB minus one byte. Filesystem metadata is not preserved. Mobile clients require development builds and are not public binary downloads. See docs/INSTALLATION.md, docs/BUILDING.md and docs/VALIDATION.md in the source for requirements and validation limits.
+Linux desktop+CLI tar.gz archives target arm64/x86-64 with distribution-provided GTK 4.12+, GLib/GIO and OpenSSL 3; see docs/LINUX.md for installation and limits.
+
+Open BitSkim on both devices on a trusted local network, allow incoming connections and approve transfers on the receiving device. Individual files are limited to 2 GiB minus one byte. Opt-in retro metadata is preserved by supported clients. Mobile clients require development builds and are not public binary downloads. See docs/INSTALLATION.md, docs/BUILDING.md and docs/VALIDATION.md in the source for requirements and validation limits.
 
 ## Source and Licence
 
@@ -31,6 +33,7 @@ BitSkim-owned code is MIT licensed. Third-party components retain their own term
 
 #### Features
 
+- Linux GTK desktop and separate headless CLI for arm64/x86-64, with discovery, file/folder approval, TLS pairing, disk verification, saved queues/history, shared themes, diagnostics and QR invitations.
 - Saved outgoing queues and eight recent results; restored work stays paused until explicit Continue, with mobile staging retained across restart.
 - Android approved active transfers continue while minimized through a visible foreground notification with Cancel. Idle receiving still needs the app open.
 - Five-minute QR connection invitations on modern desktop/mobile clients, mobile scanning, TLS fingerprint/device checks and receiver-validated tokens before file offers.
@@ -50,6 +53,7 @@ BitSkim-owned code is MIT licensed. Third-party components retain their own term
 
 #### Enhancements
 
+- Standalone Linux build/install commands, checked desktop/CLI tar.gz packages and optional coordinated Linux builds; public download links appear automatically when Linux assets are released.
 - Local builds refresh an unpacked BitSkim installer drawer in the shared builds directory, with matching classic drawer/installer icons and archives kept in its packages subdirectory.
 - Release automation enforces complete version notes, identical annotated tags and checked platform assets; publishes normal/latest repository releases; supports separate output directories, redacted logs and stable-name Aminet submissions from retained published archives.
 - Android build/run/bootstrap commands keep downloaded tools, SDK/NDK, Gradle and custom OpenSSL builds in the external shared tools directory. Physical-device and cloud-provider validation remain pending.
@@ -61,6 +65,7 @@ BitSkim-owned code is MIT licensed. Third-party components retain their own term
 
 #### Bugs
 
+- Aminet preparation honors the configured LHA extraction reader for archive verification.
 - Avoid repeated empty-offer notifications while idle, keeping iOS settings responsive.
 - iOS receiving addresses keep port numbers ungrouped in all locales; local launch supports Device Hub and older Simulator app names.
 - Windows loads saved device identities at startup so remembered pairing survives restarting.

@@ -11,6 +11,7 @@ Send files and folders directly between modern desktops and classic computers. B
 | Client | Version 0.2 |
 | --- | --- |
 | macOS | Apple silicon, macOS 13+; public downloads signed and notarized |
+| Linux | [GTK desktop and CLI](docs/LINUX.md), arm64/x86-64; Ubuntu 24.04 library baseline |
 | Windows | Windows 10/11 x64 target; unsigned; Windows 10 GUI validation pending |
 | AmigaOS | AmigaOS 3.x, 68000-compatible, Workbench and TCP/IP stack |
 | DOS / mTCP | Experimental; packet driver required |
@@ -28,9 +29,9 @@ See [validation coverage](docs/VALIDATION.md) for the checks completed on each p
 2. Choose a nearby computer, or connect using its IPv4 address.
 3. Select files or folders to send, then accept the offer and choose a destination on the receiving computer.
 
-Transfers include progress, cancellation, queues, conflict choices and speed limits. Individual files can be up to 2 GiB minus one byte; filesystem metadata is not preserved. Available features depend on the client.
+Transfers include progress, cancellation, queues, conflict choices and speed limits. Individual files can be up to 2 GiB minus one byte; retro metadata preservation is optional on supported clients. Available features depend on the client.
 
-Modern Mac and Windows clients prefer TLS encryption. Retro transfers use plaintext. Compare verification codes before remembering a modern device's identity. Keep BitSkim's listening port off the public Internet. BitSkim uses its own protocol and does not interoperate with AirDrop.
+Modern Mac, Windows and Linux clients prefer TLS encryption. Retro transfers use plaintext. Compare verification codes before remembering a modern device's identity. Keep BitSkim's listening port off the public Internet. BitSkim uses its own protocol and does not interoperate with AirDrop.
 
 ## Documentation
 

@@ -6,7 +6,7 @@ from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 import hashlib, shutil, struct, os, time, json, argparse
 from build_provenance import verify,StaleBuild
 parser=argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--primary-only',action='store_true',help='Package macOS, Amiga and modern Windows only; omit optional RISC OS builds explicitly')
+parser.add_argument('--primary-only',action='store_true',help='Package macOS, Amiga and modern Windows only; omit optional retro and Linux builds explicitly')
 args=parser.parse_args()
 ROOT=Path(__file__).resolve().parents[1]
 assert (ROOT/'VERSION').read_text().strip()=='0.2', 'Version is locked at 0.2'
@@ -19,6 +19,12 @@ if not args.primary_only:
 if (ROOT/'build/dos/BITSKIM.EXE').exists():checks.append('dos')
 for cpu in (() if args.primary_only else ('arm2','strongarm')):
     if (ROOT/'build/riscos'/cpu/'!BitSkim/!RunImage').exists(): checks.append('riscos-'+cpu)
+linux_arches=[]
+if not args.primary_only:
+    for arch in ('arm64','x86_64'):
+        if (ROOT/'build/linux'/arch/'bitskim-cli').is_file():
+            linux_arches.append(arch);checks.append('linux-'+arch+'-cli')
+            if (ROOT/'build/linux'/arch/'bitskim').is_file():checks.append('linux-'+arch)
 for target,name in [('dmg','BitSkim-0.2-macOS-arm64.dmg'),('setup','BitSkim-0.2-Windows10-x64-Setup.exe')]:
     if (output_dir(ROOT)/name).exists(): checks.append(target)
 try:
@@ -58,6 +64,11 @@ with ZipFile(winzip,'w',ZIP_DEFLATED) as z:
     z.write(ROOT/'build/windows/BitSkim-CoreCheck.exe','BitSkim/Tools/BitSkim-CoreCheck.exe')
     for source, target in [('docs/TRANSFER-TOOLS.md','TRANSFER-TOOLS.md'),('docs/TRANSFERS.md','TRANSFERS.md'),('assets/licenses/OpenSSL-LICENSE','OpenSSL-LICENSE'),('assets/licenses/QRCODEGEN-LICENSE','QRCODEGEN-LICENSE'),('docs/WINDOWS.md','README.MD'),('LICENSE','LICENSE'),('THIRD-PARTY-NOTICES.MD','THIRD-PARTY-NOTICES.MD'),('assets/themes/CATPPUCCIN-LICENSE','CATPPUCCIN-LICENSE')]:
         z.write(ROOT/source,'BitSkim/'+target)
+from linux_release import package as package_linux
+linux_packages=[]
+for arch in linux_arches:
+    linux_packages.append(package_linux(OUT,arch,cli_only=True))
+    if 'linux-'+arch in checks:linux_packages.append(package_linux(OUT,arch))
 from source_release import write_source
 sourcezip,sourcetar=write_source(OUT,checks,ROOT)
 from riscos_release import write_riscos
@@ -70,13 +81,13 @@ experimental=[]
 if 'atari-sting' in checks: experimental.extend(write_atari(OUT,sourcezip,ROOT))
 if 'windows-legacy' in checks: experimental.append(write_windows_legacy(OUT/'BitSkim-0.2-Windows-Classic-x86.zip',ROOT))
 installer_files=[p for p in (OUT/'BitSkim-0.2-macOS-arm64.dmg',OUT/'BitSkim-0.2-Windows10-x64-Setup.exe') if p.is_file()]
-for file in (maczip,amigazip,*amigaextras,winzip,sourcezip,sourcetar,*riscoszips,*doszips,*experimental,*installer_files): shutil.copy2(file,DOWNLOADS/file.name)
+for file in (maczip,amigazip,*amigaextras,winzip,sourcezip,sourcetar,*riscoszips,*doszips,*experimental,*linux_packages,*installer_files): shutil.copy2(file,DOWNLOADS/file.name)
 # Website archives carry a checksum list for their actual downloadable packages.
-client_files=(maczip,amigazip,*amigaextras,winzip,sourcezip,sourcetar,*riscoszips,*doszips,*experimental,*installer_files)
+client_files=(maczip,amigazip,*amigaextras,winzip,sourcezip,sourcetar,*riscoszips,*doszips,*experimental,*linux_packages,*installer_files)
 (DOWNLOADS/'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n' for p in client_files))
 webzip=OUT/'BitSkim-0.2-website.zip'
 with ZipFile(webzip,'w',ZIP_DEFLATED) as z: add_tree(z,ROOT/'public-web','public-web')
-files=(maczip,amigazip,*amigaextras,winzip,sourcezip,sourcetar,*riscoszips,*doszips,*experimental,*installer_files,webzip)
+files=(maczip,amigazip,*amigaextras,winzip,sourcezip,sourcetar,*riscoszips,*doszips,*experimental,*linux_packages,*installer_files,webzip)
 (OUT/'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n' for p in files))
 shutil.copy2(OUT/'SHA256SUMS',DOWNLOADS/'SHA256SUMS')
 for p in files: print(f'{p.name}: {p.stat().st_size:,} bytes')

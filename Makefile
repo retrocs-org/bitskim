@@ -38,3 +38,11 @@ release-prepare:
 .PHONY: ios
 ios:
 	./scripts/build-ios.sh iphoneos
+
+.PHONY: linux linux-cli linux-install
+linux:
+	./scripts/build-linux.sh
+linux-cli:
+	./scripts/build-linux.sh --cli-only
+linux-install:
+	python3 scripts/install-linux.py

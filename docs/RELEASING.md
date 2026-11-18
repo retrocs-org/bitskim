@@ -53,11 +53,12 @@ Allowed `env` keys are:
 | Purpose | Settings |
 | --- | --- |
 | Python, PHP and Mac signing | `BITSKIM_RELEASE_PYTHON`, `PHP`, `BITSKIM_SIGN_IDENTITY` |
-| Amiga and LHA writer | `AMIGA_CC`, `LHA`, `AMIGA_DEV_BIN` |
+| Amiga and LHA writer | `AMIGA_CC`, `LHA`, `LHA_READER`, `AMIGA_DEV_BIN` |
 | Modern/classic Windows and installer | `WINDOWS_CC`, `LEGACY_WINDOWS_CC`, `LEGACY_WINDOWS_RC`, `MAKENSIS`, `NSISDIR` |
 | DOS | `WATCOM`, `DOS_RUNNER` |
 | Atari | `ATARI_CC`, `STING_INCLUDE` |
 | RISC OS | `RISCOS_CC`, `RISCOS_SDK_SOURCE` |
+| Optional Linux builds | `BITSKIM_LINUX_INSTANCE`, `BITSKIM_LIMA_HOME`, `BITSKIM_LINUX_ARCHES`, `BITSKIM_LINUX_PKG_CONFIG_PATH` |
 | Optional local distribution mirror | `BITSKIM_BUILDS_DIR` |
 
 Keep installed toolchains under the shared tools directory, not a disposable checkout. See the platform build guides for provisioning. LHA creation needs a compression-capable LHa-for-UNIX writer; Lhasa only extracts. Mac app and DMG publication require Developer ID signing, accepted notarization and stapled tickets. The JSON contains certificate/profile names, not private keys or passwords.
@@ -279,3 +280,9 @@ python3 -m unittest discover -s tests -b
 Tests use temporary Git repositories, local artifacts and mocked APIs/FTP. They never publish. Exercise hosted adapters against dedicated test repositories before a production tag. The release tool's checks establish matching source/artifact bytes, not reproducible toolchains or universal native compatibility. Multi-service publication is not atomic; changes between preflight and upload can stop a later destination.
 
 API references: [GitHub releases](https://docs.github.com/en/rest/releases/releases), [GitHub release assets](https://docs.github.com/en/rest/releases/assets), [GitLab releases](https://docs.gitlab.com/api/releases/), [GitLab generic packages](https://docs.gitlab.com/user/packages/generic_packages/).
+
+## Optional Linux release assets
+
+Set `BITSKIM_LINUX_INSTANCE` in the external build environment to an existing running Lima Linux instance with the dependencies in [LINUX.md](LINUX.md). The release build compiles/tests `arm64,x86_64` before packaging; `BITSKIM_LINUX_ARCHES` can select either architecture or both. Cross builds require target libraries/toolchains and a test runner already provisioned. `BITSKIM_LIMA_HOME` selects the shared tools location; `BITSKIM_LINUX_PKG_CONFIG_PATH` selects isolated target metadata if needed. With no instance configured, release automation does not require Linux build infrastructure.
+
+The standalone Linux builder/install/packager also works directly on Linux without release credentials. The combined packager includes present current Linux binaries as desktop+CLI and CLI-only tar.gz archives. Linux assets are optional additions to the existing desktop/retro inventory, with matching source provenance and per-file SHA-256 sidecars on both release hosts. Stale Linux binaries/packages fail checks rather than being silently published. The website exposes each Linux download only after a normal public GitHub release contains that asset; it never fabricates a 0.1 Linux fallback.

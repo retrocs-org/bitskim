@@ -4,6 +4,7 @@
 
 ### Features
 
+- Linux GTK desktop and separate headless CLI for arm64/x86-64, with discovery, file/folder approval, TLS pairing, disk verification, saved queues/history, shared themes, diagnostics and QR invitations.
 - Saved outgoing queues and eight recent results; restored work stays paused until explicit Continue, with mobile staging retained across restart.
 - Android approved active transfers continue while minimized through a visible foreground notification with Cancel. Idle receiving still needs the app open.
 - Five-minute QR connection invitations on modern desktop/mobile clients, mobile scanning, TLS fingerprint/device checks and receiver-validated tokens before file offers.
@@ -24,6 +25,7 @@
 
 ### Enhancements
 
+- Standalone Linux build/install commands, checked desktop/CLI tar.gz packages and optional coordinated Linux builds; public download links appear automatically when Linux assets are released.
 - Local builds refresh an unpacked BitSkim installer drawer in the shared builds directory, with matching classic drawer/installer icons and archives kept in its packages subdirectory.
 - Release automation enforces complete version notes, identical annotated tags and checked platform assets; publishes normal/latest repository releases; supports separate output directories, redacted logs and stable-name Aminet submissions from retained published archives.
 - Android build/run/bootstrap commands keep downloaded tools, SDK/NDK, Gradle and custom OpenSSL builds in the external shared tools directory. Physical-device and cloud-provider validation remain pending.
@@ -35,6 +37,7 @@
 
 ### Bugs
 
+- Aminet preparation honors the configured LHA extraction reader for archive verification.
 - Avoid repeated empty-offer notifications while idle, keeping iOS settings responsive.
 - iOS receiving addresses keep port numbers ungrouped in all locales; local launch supports Device Hub and older Simulator app names.
 - Windows loads saved device identities at startup so remembered pairing survives restarting.

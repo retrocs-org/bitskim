@@ -88,3 +88,9 @@ shared-key connection alone is not a verified-device pin.
 On macOS, select multiple files or folders in the send picker to append them to
 the queue. Adding items preserves existing entries and leaves a paused queue paused.
 An expired or cancelled receive dialog cannot approve a later offer.
+
+## Linux desktop and terminal
+
+The GTK client groups nearby devices with explicit address selection. Select files/folders or drop files into the window, select a client or enter an IPv4 address, then click Send selected items. Approve incoming offers and review their destination/transport. Settings controls themes, receiving, encryption and speed limits; Transfer tools contains diagnostics, pairing and saved results. Saved queues restore paused.
+
+The separate CLI supports discovery, send/receive, queue continuation and JSON diagnostics/history. It prompts for incoming approval; unattended receive requires explicit `--accept --directory /absolute/folder`. Desktop and CLI share private XDG storage, so simultaneous processes need separate `--profile` and `--port` values. See [LINUX.md](LINUX.md) for examples.

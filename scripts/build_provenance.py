@@ -19,6 +19,8 @@ for cpu in ('arm2','strongarm'):
  ARTIFACTS['riscos-'+cpu]=['build/riscos/'+cpu+'/'+p for p in ('!BitSkim','main.o','bitskim.o','platform.o','riscos-file.o')]
 for variant in ('sting','mintnet','mintnet060'):
  ARTIFACTS['atari-'+variant]=['build/atari/'+variant+'/'+p for p in ('BITSKIM.PRG','bitskim.o','platform.o','main.o')+ (('sting.o',) if variant=='sting' else ())]
+for arch in ('arm64','x86_64'):
+ for suffix,binary in (('', 'bitskim'),('-cli','bitskim-cli')):ARTIFACTS['linux-'+arch+suffix]=['build/linux/'+arch+'/'+binary,'build/linux/'+arch+'/DEPENDENCIES.json']
 DEPENDENCIES={'setup-legacy':['windows-legacy'],'dmg':['macos'],'setup':['windows']}
 class StaleBuild(RuntimeError):pass
 

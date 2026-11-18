@@ -41,7 +41,7 @@ def sync(destination,root=ROOT):
             print('Verified unpacked installer: '+str(target)+' (open Install-BitSkim)')
     packages=[]
     for file in sorted(out.glob('BitSkim-*')):
-        if file.is_file() and (file.name=='BitSkim-0.2.lha' or (file.suffix in ('.zip','.dmg','.exe') and any(part in file.name for part in ('AmigaOS','Atari-','DOS-mTCP','RISCOS3','Windows','macOS')))):packages.append(file)
+        if file.is_file() and (file.name=='BitSkim-0.2.lha' or (file.name.startswith('BitSkim-0.2-Linux-') and file.name.endswith('.tar.gz')) or (file.suffix in ('.zip','.dmg','.exe') and any(part in file.name for part in ('AmigaOS','Atari-','DOS-mTCP','RISCOS3','Windows','macOS')))):packages.append(file)
     lines=[]
     for file in packages:
         data=file.read_bytes();copy(data,target/'packages'/file.name);digest=hashlib.sha256(data).hexdigest();lines.append(digest+'  '+file.name)

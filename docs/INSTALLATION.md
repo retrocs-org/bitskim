@@ -45,6 +45,12 @@ Open **BitSkim-0.2-macOS-arm64.dmg** and drag **BitSkim.app** onto the **Applica
 
 macOS 13 or later is required. The public Mac release app and DMG are Developer ID signed and notarized, with stapled tickets. Local developer builds may instead be ad-hoc signed. Fresh-machine and older-macOS compatibility remain separate checks. The DMG does not register a login item or change permissions/firewall settings. To remove the app, quit it and move it from Applications to the Trash. Preferences and received files remain. The ZIP is still supplied as an alternative.
 
+## Linux desktop and CLI
+
+Extract the matching `BitSkim-0.2-Linux-arm64.tar.gz` or `BitSkim-0.2-Linux-x86_64.tar.gz` archive. Run `bin/bitskim` or `bin/bitskim-cli --help` from the extracted directory, or install with `./install.sh "$HOME/.local"` (`sudo ./install.sh /usr/local` for all users). Separate `Linux-CLI-ARCH.tar.gz` archives omit the desktop. Downloads become available when their assets are published; local builds use the same layout.
+
+These are dynamically linked Linux binaries built against Ubuntu 24.04 libraries: the desktop needs GTK 4.12+, GLib/GIO and OpenSSL 3; the CLI needs GLib/GIO and OpenSSL 3 without a display. See [LINUX.md](LINUX.md) for exact dependencies, settings/state locations, simultaneous profiles, removal and distribution limits. Received files and private user state are preserved when replacing installed binaries.
+
 ## Building the installers
 
 See [BUILDING.md](BUILDING.md) for the target matrix and [AMIGA.md](AMIGA.md), [MACOS.md](MACOS.md) and [WINDOWS.md](WINDOWS.md#building) for exact prerequisites, overrides and outputs.

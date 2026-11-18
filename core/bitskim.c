@@ -146,7 +146,7 @@ struct BSClient {
     FILE *run_file,*incoming_results;unsigned long run_count,receive_serial;unsigned char run_token[16];int run_token_set;BSRun outgoing_run,incoming_run;BSRetry *retry;
     FILE *queue_file;unsigned long queue_head;BSBatch *queue_batch;int queue_batch_index;int queue_count,queue_active,queue_paused;unsigned long queue_processed;
 };
-static void copystr(char *d,const char *s,size_t n) { if(n) { strncpy(d,s?s:"",n-1); d[n-1]=0; } }
+static void copystr(char *d,const char *s,size_t n) { size_t i=0;if(!n)return;if(!s)s="";while(i+1<n && s[i])i++;memmove(d,s,i);memset(d+i,0,n-i); }
 static void batch_free(BSBatch *b) {if(b && --b->refs==0){if(b->items)fclose(b->items);if(b->wire_tree)free(b->wire_tree);free(b);}}
 static BSBatch *batch_new(void) {BSBatch *b=(BSBatch *)calloc(1,sizeof *b);if(b){b->refs=1;b->items=bsp_temp_file();if(!b->items){free(b);b=NULL;}}return b;}
 static void wide_add(unsigned long *hi,unsigned long *lo,unsigned long h,unsigned long l){unsigned long old=*lo;*lo=(*lo+l)&0xffffffffUL;*hi=(*hi+h+(*lo<old))&0xffffffffUL;}
@@ -435,7 +435,7 @@ static BSSocket open_socket(BSClient *c,int type) {
 #ifdef SO_NOSIGPIPE
     setsockopt(s,SOL_SOCKET,SO_NOSIGPIPE,&yes,sizeof(yes));
 #endif
-    memset(&a,0,sizeof(a)); a.sin_family=AF_INET; a.sin_port=htons(type==SOCK_DGRAM ? c->config.discovery_port : c->config.port);
+    memset(&a,0,sizeof(a)); a.sin_family=AF_INET; a.sin_port=htons(type==SOCK_DGRAM ? (c->discovery_paused ? 0 : c->config.discovery_port) : c->config.port);
     a.sin_addr.s_addr=c->config.bind_address[0] ? inet_addr(c->config.bind_address) : INADDR_ANY;
     if(bind(s,(struct sockaddr *)&a,sizeof(a))<0) {
         /* Shared-host test systems can probe from an ephemeral UDP port. */
@@ -446,7 +446,7 @@ static BSSocket open_socket(BSClient *c,int type) {
     if(bsp_nonblock(s)<0) { bsp_close(s); return BS_INVALID_SOCKET; }
     return s;
 }
-BSClient *bs_create(const BSConfig *config,BSCallback cb,void *context) {
+static BSClient *create_client(const BSConfig *config,BSCallback cb,void *context,int manual) {
     BSClient *c; int i;
     if(!config || strlen(config->id)!=32) return NULL;
     for(i=0;i<32;i++) if(hexval(config->id[i])<0) return NULL;
@@ -458,14 +458,16 @@ BSClient *bs_create(const BSConfig *config,BSCallback cb,void *context) {
     if(!c->config.name[0]) copystr(c->config.name,"BitSkim",64);
     if(!c->config.port) c->config.port=BS_PORT;
     if(!c->config.discovery_port) c->config.discovery_port=c->config.port;
-    c->callback=cb; c->context=context; c->listener=c->udp=c->sock=BS_INVALID_SOCKET;
+    c->callback=cb; c->context=context; c->discovery_paused=manual; c->listener=c->udp=c->sock=BS_INVALID_SOCKET;
     for(i=0;i<LINGER_MAX;i++) c->linger[i]=BS_INVALID_SOCKET;
     c->listener=open_socket(c,SOCK_STREAM);
     if(c->listener==BS_INVALID_SOCKET || listen(c->listener,4)<0) { bs_destroy(c); return NULL; }
     c->udp=open_socket(c,SOCK_DGRAM);
     if(c->udp==BS_INVALID_SOCKET) { bs_destroy(c); return NULL; }
-    copystr(c->status.message,"Ready on your local network",256); bs_refresh(c); return c;
+    copystr(c->status.message,"Ready on your local network",256); if(!manual)bs_refresh(c); return c;
 }
+BSClient *bs_create(const BSConfig *config,BSCallback cb,void *context) { return create_client(config,cb,context,0); }
+BSClient *bs_create_manual(const BSConfig *config,BSCallback cb,void *context) { return create_client(config,cb,context,1); }
 void bs_destroy(BSClient *c) { int i; if(!c) return;state_close(c);if(c->check_pending)bsp_close(c->check_socket);retry_free(c);if(c->run_file)fclose(c->run_file);if(c->incoming_results)fclose(c->incoming_results);tree_scan_free(c); if(c->queue_file)fclose(c->queue_file);batch_free(c->queue_batch);batch_free(c->in_batch);batch_revoke(c); cleanup_transfer(c); for(i=0;i<LINGER_MAX;i++) if(c->linger[i]!=BS_INVALID_SOCKET) bsp_close(c->linger[i]); if(c->listener!=BS_INVALID_SOCKET) bsp_close(c->listener); if(c->udp!=BS_INVALID_SOCKET) bsp_close(c->udp);
 #ifdef BS_OPENSSL
     OPENSSL_cleanse(c->pairing_key,32);

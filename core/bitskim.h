@@ -72,6 +72,8 @@ typedef enum { BS_EVENT_PEERS=1, BS_EVENT_OFFER, BS_EVENT_STATUS,
    progress is coalesced to at most one per bs_tick. */
 typedef void (*BSCallback)(void *context, BSEvent event);
 BSClient *bs_create(const BSConfig *, BSCallback, void *context);
+/* Manual-only startup: no discovery probe or well-known UDP listener. */
+BSClient *bs_create_manual(const BSConfig *,BSCallback,void *);
 BSClient *bs_create_app(const char *name, const char *platform, const char *id, int visible, int receiving);
 void bs_destroy(BSClient *);
 void bs_tick(BSClient *);

@@ -2,7 +2,7 @@
 """Prepare a reviewed Aminet submission; uploading is always explicit."""
 from pathlib import Path
 from release_paths import output_dir
-import argparse,email.utils,ftplib,hashlib,json,re,textwrap
+import argparse,email.utils,ftplib,hashlib,json,re,textwrap,os
 from build_provenance import verify
 ROOT=Path(__file__).resolve().parents[1]
 HOST='main.aminet.net'
@@ -56,7 +56,7 @@ def prepare(uploader,author='BitSkim contributors',root=ROOT):
     from amiga_release import payload,writer
     import shutil,subprocess,tempfile
     with tempfile.TemporaryDirectory() as temp:
-        reader=shutil.which('lha') or writer()
+        reader=shutil.which(os.environ.get('LHA_READER','lha')) or writer()
         subprocess.run([reader,'x',str(archive.resolve())],cwd=temp,check=True,stdout=subprocess.DEVNULL)
         extracted=Path(temp)
         actual={str(p.relative_to(extracted)):digest(p) for p in extracted.rglob('*') if p.is_file()}
