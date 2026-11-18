@@ -122,7 +122,7 @@ final class TransferTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: source), "original")
     }
     @MainActor func testIdleReceiverDoesNotRepublishEmptyOffers() async throws {
-        let model = IOSClient(listeningPort: freePort())
+        let model = IOSClient(listeningPort: freePort(), storage: root.appendingPathComponent("Profile-" + UUID().uuidString), inbox: root.appendingPathComponent("ImportInbox"), identity: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Trust"))
         model.start(); defer { model.stop() }
         XCTAssertNil(model.error)
         var emptyOffers = 0
@@ -130,22 +130,30 @@ final class TransferTests: XCTestCase {
         try await Task.sleep(nanoseconds: 250_000_000)
         withExtendedLifetime(subscription) { XCTAssertEqual(emptyOffers, 0) }
     }
+    @MainActor private func waitForReview(_ model: IOSClient) async -> SendReview? {
+        for _ in 0..<500 { if let review = model.review { return review }; if model.error != nil { return nil }; try? await Task.sleep(nanoseconds: 10_000_000) }
+        return nil
+    }
+    @MainActor func testFolderPickerUsesReadAccessAndPreservesCancellation() async throws {
+        let picker = FileProviderImport.controller(folders: true)
+        XCTAssertEqual(picker.documentPickerMode, .open); XCTAssertFalse(picker.allowsMultipleSelection); XCTAssertNil(picker.directoryURL)
+    }
     @MainActor func testReviewDoesNotSendUntilExplicitConfirmation() async throws {
         let source = root.appendingPathComponent("review.txt"), destination = root.appendingPathComponent("received.txt")
         let bytes = Data("only after confirmation".utf8); try bytes.write(to: source)
-        let model = IOSClient(listeningPort: freePort())
+        let model = IOSClient(listeningPort: freePort(), storage: root.appendingPathComponent("Profile-" + UUID().uuidString), inbox: root.appendingPathComponent("ImportInbox"), identity: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Trust"))
         model.start(); defer { model.stop() }
         XCTAssertNil(model.error)
         model.sharedFiles = [source]
         model.prepare(address: "127.0.0.1:\(receiverPort)")
-        guard let review = model.review else { return XCTFail("Missing review") }
+        guard let review = await waitForReview(model) else { return XCTFail(model.error ?? "Missing review") }
         XCTAssertEqual(review.total, UInt64(bytes.count)); XCTAssertEqual(review.files.count, 1)
         for _ in 0..<15 { bs_service(receiver, 4); try await Task.sleep(nanoseconds: 10_000_000) }
         XCTAssertEqual(bs_status(receiver)!.pointee.active, 0)
         model.closeReview(); XCTAssertNil(model.review)
         XCTAssertEqual(try Data(contentsOf: source), bytes)
         model.sharedFiles = [source]; model.prepare(address: "127.0.0.1:\(receiverPort)")
-        guard let confirmed = model.review else { return XCTFail("Missing second review") }
+        guard let confirmed = await waitForReview(model) else { return XCTFail("Missing second review") }
         model.confirmSend(confirmed)
         var accepted = false
         for _ in 0..<400 {
@@ -162,11 +170,12 @@ final class TransferTests: XCTestCase {
     @MainActor func testReviewRejectsChangedFilesWithoutSending() async throws {
         let source = root.appendingPathComponent("changed.txt")
         try Data("first".utf8).write(to: source)
-        let model = IOSClient(listeningPort: freePort()); model.start(); defer { model.stop() }
+        let model = IOSClient(listeningPort: freePort(), storage: root.appendingPathComponent("Profile-" + UUID().uuidString), inbox: root.appendingPathComponent("ImportInbox"), identity: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Trust")); model.start(); defer { model.stop() }
         model.sharedFiles = [source]; model.prepare(address: "127.0.0.1:\(receiverPort)")
-        guard let review = model.review else { return XCTFail("Missing review") }
+        guard let review = await waitForReview(model) else { return XCTFail(model.error ?? "Missing review") }
         try Data("a different length".utf8).write(to: source)
         model.confirmSend(review)
+        for _ in 0..<500 { if !model.importing { break }; try await Task.sleep(nanoseconds: 10_000_000) }
         XCTAssertNil(model.review); XCTAssertTrue(model.error?.contains("changed") == true)
         bs_service(receiver, 4); XCTAssertEqual(bs_status(receiver)!.pointee.active, 0)
     }
@@ -177,9 +186,9 @@ final class TransferTests: XCTestCase {
         let destination = root.appendingPathComponent("batch", isDirectory: true)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
         XCTAssertNotEqual(bs_limits_configure(receiver, 0, 64 * 1024), 0)
-        let model = IOSClient(listeningPort: freePort()); model.start(); defer { model.stop() }
+        let model = IOSClient(listeningPort: freePort(), storage: root.appendingPathComponent("Profile-" + UUID().uuidString), inbox: root.appendingPathComponent("ImportInbox"), identity: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Trust")); model.start(); defer { model.stop() }
         model.sharedFiles = [first, second]; model.prepare(address: "127.0.0.1:\(receiverPort)")
-        guard let review = model.review else { return XCTFail("Missing review") }
+        guard let review = await waitForReview(model) else { return XCTFail(model.error ?? "Missing review") }
         let expected = UInt64(firstBytes.count + secondBytes.count)
         XCTAssertEqual(review.total, expected); model.confirmSend(review)
         var accepted = Set<UInt>(), observedOverall = false, previous: UInt64 = 0
@@ -239,6 +248,30 @@ final class TransferTests: XCTestCase {
         guard pump({ bs_queue_count(sender) == 0 && bs_status(sender)!.pointee.active == 0 && bs_status(receiver)!.pointee.active == 0 }) else { return }
         XCTAssertEqual(try Data(contentsOf: destination.appendingPathComponent("Tree/sub/å-λ.txt")), Data("folder payload".utf8))
         XCTAssertTrue(FileManager.default.fileExists(atPath: destination.appendingPathComponent("Tree/sub/empty").path))
+    }
+    @MainActor func testReviewedFolderSendKeepsAllStagedChildrenUntilCompletion() async throws {
+        let folder = root.appendingPathComponent("MobileTree", isDirectory: true), inbox = root.appendingPathComponent("ImportInbox", isDirectory: true)
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("Sub/Empty"), withIntermediateDirectories: true)
+        let payload = Data(repeating: 61, count: 192 * 1024); try payload.write(to: folder.appendingPathComponent("Sub/Möte.bin"))
+        let staged = try ShareInbox.stage(folder, inbox: inbox, allowDirectories: true)
+        defer { if let batch = ShareInbox.ownedBatch(staged, inbox: inbox) { ShareInbox.removeBatch(batch, inbox: inbox) } }
+        let destination = root.appendingPathComponent("folder-received", isDirectory: true); try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        let model = IOSClient(listeningPort: freePort(), storage: root.appendingPathComponent("Profile-" + UUID().uuidString), inbox: root.appendingPathComponent("ImportInbox"), identity: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Trust")); model.start(); defer { model.stop() }
+        model.sharedFiles = [staged]; model.prepare(address: "127.0.0.1:\(receiverPort)")
+        guard let review = await waitForReview(model) else { return XCTFail(model.error ?? "Missing folder review") }
+        XCTAssertEqual(review.total, UInt64(payload.count)); XCTAssertTrue(review.entries.contains { $0.path.hasSuffix("Empty/") })
+        bs_service(receiver, 4); XCTAssertEqual(bs_status(receiver)!.pointee.active, 0)
+        model.confirmSend(review); var approved = false
+        for _ in 0..<1200 {
+            bs_service(receiver, 4)
+            if !approved, bs_status(receiver)!.pointee.awaiting_decision != 0 { XCTAssertNotEqual(bs_accept_batch(receiver, destination.path), 0); approved = true }
+            if !model.importing, approved, !model.active, model.progress.queued == 0, FileManager.default.fileExists(atPath: destination.appendingPathComponent("MobileTree/Sub/Möte.bin").path) { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(approved); XCTAssertEqual(try Data(contentsOf: destination.appendingPathComponent("MobileTree/Sub/Möte.bin")), payload)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destination.appendingPathComponent("MobileTree/Sub/Empty").path))
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("Sub/Möte.bin")), payload)
     }
     func testInboxRejectsOversizedFilesAndFoldersWithoutPartialCommit() throws {
         let inbox = root.appendingPathComponent("Inbox"); try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: false)

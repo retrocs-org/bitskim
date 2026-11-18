@@ -57,12 +57,52 @@ final class FileManagementTests: XCTestCase {
         _ = try store.rename(alias.appendingPathComponent("original.txt"), to: "renamed.txt")
         XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("renamed.txt").path))
     }
-    func testReviewTotalsEmptyFilesAndRejectsDirectories() throws {
+    func testReviewTotalsEmptyFilesAndFolderContents() throws {
         let first = try file("zero.txt", contents: ""), second = try file("data.txt", contents: "12345")
         let review = try SendReview.make(recipient: "Test", urls: [first, second])
         XCTAssertEqual(review.total, 5); XCTAssertEqual(review.files.map(\.bytes), [0, 5])
-        XCTAssertThrowsError(try SendReview.make(recipient: "Test", urls: [root]))
+        let folder = try SendReview.make(recipient: "Test", urls: [root])
+        XCTAssertEqual(folder.total, 5); XCTAssertEqual(folder.entries.filter { !$0.isDirectory }.count, 2)
         XCTAssertThrowsError(try SendReview.make(recipient: "Test", urls: []))
+    }
+    func testFolderStagingPreservesTreeAndRejectsNestedLinksAtomically() throws {
+        let folder = root.appendingPathComponent("Tree", isDirectory: true), inbox = root.appendingPathComponent("Inbox", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("Sub/Empty"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        let file = folder.appendingPathComponent("Sub/Möte.txt"); try Data("folder bytes".utf8).write(to: file)
+        let staged = try ShareInbox.stage(folder, inbox: inbox, allowDirectories: true)
+        XCTAssertEqual(try Data(contentsOf: staged.appendingPathComponent("Sub/Möte.txt")), Data("folder bytes".utf8))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staged.appendingPathComponent("Sub/Empty").path))
+        XCTAssertEqual(try SelectionSnapshot.inspect(staged).signature, try SelectionSnapshot.inspect(folder).signature)
+        let before = try FileManager.default.contentsOfDirectory(at: inbox, includingPropertiesForKeys: nil)
+        try FileManager.default.createSymbolicLink(at: folder.appendingPathComponent("Sub/link"), withDestinationURL: file)
+        XCTAssertThrowsError(try ShareInbox.stage(folder, inbox: inbox, allowDirectories: true))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(at: inbox, includingPropertiesForKeys: nil), before)
+        XCTAssertEqual(try Data(contentsOf: file), Data("folder bytes".utf8))
+    }
+    func testFolderReviewDetectsSameSizeChangesAndAddedEntries() throws {
+        let folder = root.appendingPathComponent("Tree", isDirectory: true); try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let file = folder.appendingPathComponent("file"); try Data("abc".utf8).write(to: file)
+        let before = try SelectionSnapshot.inspect(folder)
+        try Data("xyz".utf8).write(to: file)
+        XCTAssertNotEqual(before.signature, try SelectionSnapshot.inspect(folder).signature)
+        let changed = try SelectionSnapshot.inspect(folder)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("Empty"), withIntermediateDirectories: false)
+        XCTAssertNotEqual(changed.signature, try SelectionSnapshot.inspect(folder).signature)
+        XCTAssertThrowsError(try SendReview.make(recipient: "Test", urls: [file, file]))
+    }
+    func testQueuedFolderOwnershipSurvivesPartialProgress() throws {
+        let folder = root.appendingPathComponent("Tree", isDirectory: true), inbox = root.appendingPathComponent("Inbox", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false); try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: false)
+        try Data("keep".utf8).write(to: folder.appendingPathComponent("child"))
+        let staged = try ShareInbox.stage(folder, inbox: inbox, allowDirectories: true)
+        try ShareInbox.markQueued(staged, inbox: inbox)
+        XCTAssertTrue(try ShareInbox.pending(inbox: inbox).isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staged.appendingPathComponent("child").path))
+        let batch = try XCTUnwrap(ShareInbox.ownedBatch(staged.appendingPathComponent("child"), inbox: inbox))
+        XCTAssertEqual(ShareInbox.queuedBatches(inbox: inbox), [batch])
+        ShareInbox.removeBatch(batch, inbox: inbox)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staged.path)); XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("child")), Data("keep".utf8))
     }
     func testETAHandlesZeroRateAndRoundsUp() {
         XCTAssertNil(MobileProgress.eta(remaining: 100, rate: 0))

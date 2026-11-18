@@ -100,9 +100,9 @@ public final class MainActivity extends Activity implements ClientService.Listen
         body.addView(button("Cancel transfer",()->client.command(2,0,"")));body.addView(button("Retry queued transfer",()->client.command(8,0,"")));
     }
     private void filesPage(){
-        section("Files to send");body.addView(button(importing?"Preparing files…":"Browse Android Files",()->pickFiles(null)));
+        section("Files to send");body.addView(button(importing?"Preparing files…":"Browse Android Files",()->pickFiles(null)));body.addView(button("Choose Folder",()->pickFolder(null)));
         body.addView(label("Choose local files or an enabled document provider. Files are copied locally; originals remain unchanged.",14,muted));
-        List<File> files=client.selectedFiles();pendingKey=files.toString();section("Ready to send · "+files.size());for(File file:files)body.addView(label(file.getName()+" · "+size(file.length()),16,text));
+        List<File> files=client.selectedFiles();pendingKey=files.toString();section("Ready to send · "+files.size());for(File file:files)body.addView(label(file.getName()+(file.isDirectory()?" · folder":" · "+size(file.length())),16,text));
         if(files.isEmpty())body.addView(label("No files selected.",14,muted));else{body.addView(button("Choose a client",()->{tab=0;render();}));body.addView(button("Clear selection",()->{if(!importing)client.discardSelection(this::render);}));}
     }
     private void choose(InputPolicy.Target selected){
@@ -112,6 +112,12 @@ public final class MainActivity extends Activity implements ClientService.Listen
     private void pickFiles(InputPolicy.Target selected){
         if(importing)return;target=selected;client.pauseForUi(()->{pickerOpen=true;Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("*/*");intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);try{startActivityForResult(intent,11);}catch(ActivityNotFoundException e){pickerOpen=false;client.releaseUi();error("No Android document picker is installed.");}});
     }
+    private void pickFolder(InputPolicy.Target selected){
+        if(importing)return;target=selected;client.pauseForUi(()->{pickerOpen=true;Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);try{startActivityForResult(intent,14);}catch(ActivityNotFoundException failure){pickerOpen=false;client.releaseUi();error("No Android folder picker is installed.");}});
+    }
+    private void importFinished(boolean success){
+        importing=false;if(!started){client.releaseUi();return;}if(success&&target!=null)review(target);else{tab=1;render();}
+    }
     private void handleSharedIntent(Intent intent){
         if(intent==null)return;if(Intent.ACTION_VIEW.equals(intent.getAction())&&intent.getData()!=null){openInvitation(intent.getData().toString());setIntent(new Intent(this,MainActivity.class));return;}String action=intent.getAction();List<Uri> uris=new ArrayList<>();
         if(Intent.ACTION_SEND.equals(action)){Uri uri=intent.getParcelableExtra(Intent.EXTRA_STREAM);if(uri!=null)uris.add(uri);}
@@ -119,21 +125,26 @@ public final class MainActivity extends Activity implements ClientService.Listen
         target=null;if(!uris.isEmpty())importUris(uris);setIntent(new Intent(this,MainActivity.class));
     }
     private void importUris(List<Uri> uris){
-        importing=true;client.importFiles(uris,()->{importing=false;if(!started)return;if(target!=null)review(target);else{tab=1;render();}});
+        importing=true;render();client.importFiles(uris,this::importFinished);
     }
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);pickerOpen=false;
+        if(request==14){if(result==RESULT_OK&&data!=null&&data.getData()!=null){importing=true;render();client.importFolder(data.getData(),this::importFinished);}else client.releaseUi();return;}
         if(request==13){client.releaseUi();String value=new ScanContract().parseResult(result,data).getContents();if(value!=null)openInvitation(value);return;}
         if(request==11){if(result==RESULT_OK&&data!=null){List<Uri> uris=new ArrayList<>();if(data.getClipData()!=null)for(int i=0;i<data.getClipData().getItemCount();i++)uris.add(data.getClipData().getItemAt(i).getUri());else if(data.getData()!=null)uris.add(data.getData());importUris(uris);}else client.releaseUi();}
         else if(request==12){File source=exportSource;exportSource=null;client.releaseUi();if(result==RESULT_OK&&data!=null&&data.getData()!=null&&source!=null){Uri uri=data.getData();new Thread(()->{try(InputStream input=new FileInputStream(source);OutputStream out=getContentResolver().openOutputStream(uri)){if(out==null)throw new IOException("Provider could not open destination.");copyStream(input,out);ui.post(()->Toast.makeText(this,"Copy handed to the document provider",Toast.LENGTH_LONG).show());}catch(Exception e){ui.post(()->error(e.getMessage()));}},"BitSkim export").start();}}
     }
     private void review(InputPolicy.Target selected){
-        List<File> files=new ArrayList<>(forwarding.isEmpty()?client.selectedFiles():forwarding);if(files.isEmpty()){error("Choose files first.");return;}
-        client.pauseForUi(()->{try{
-            long[] sizes=new long[files.size()];long total=0;StringBuilder message=new StringBuilder((selected.id.isEmpty()?"Manual client":selected.name)+"\n"+selected.endpoint()+"\n\n");for(int i=0;i<files.size();i++){File file=files.get(i);if(!file.isFile()||file.length()>InputPolicy.MAX_FILE)throw new IOException("A selected file is unavailable or too large.");sizes[i]=file.length();total+=sizes[i];message.append(file.getName()).append(" · ").append(size(sizes[i])).append('\n');}
-            message.append("\nTotal: ").append(size(total)).append("\nThe recipient must approve. Keep BitSkim open.");
-            int security=client.preferences.getInt("security",1);message.append(security==2?"\nEncryption required.":security==1?"\nEncryption preferred; older clients may use plaintext.":"\nEncryption disabled.");
-            reviewDialog=new AlertDialog.Builder(this).setTitle("Review transfer").setMessage(message).setPositiveButton("Send",(dialog,which)->client.send(selected,files,sizes,()->{forwarding.clear();tab=0;render();})).setNegativeButton("Cancel",(dialog,which)->client.releaseUi()).create();reviewDialog.setOnCancelListener(dialog->client.releaseUi());reviewDialog.show();
-        }catch(Exception e){client.releaseUi();error(e.getMessage());}});
+        List<File> files=new ArrayList<>(forwarding.isEmpty()?client.selectedFiles():forwarding);if(files.isEmpty()){error("Choose files or a folder first.");return;}
+        importing=true;
+        client.pauseForUi(()->client.review(files,snapshots->{
+            importing=false;if(!started){client.releaseUi();return;}if(snapshots==null){render();return;}
+            long total=0;List<String> rows=new ArrayList<>();for(TransferFiles.Snapshot snapshot:snapshots){total+=snapshot.total;for(TransferFiles.Entry entry:snapshot.entries)rows.add(entry.path+(entry.directory?"":" · "+size(entry.bytes)));}
+            int security=client.preferences.getInt("security",1);String protection=security==2?"Encryption required.":security==1?"Encryption preferred; older clients may use plaintext.":"Encryption disabled.";
+            LinearLayout contents=new LinearLayout(this);contents.setOrientation(LinearLayout.VERTICAL);contents.setPadding(dp(20),dp(12),dp(20),dp(12));contents.setBackgroundColor(base);
+            contents.addView(label((selected.id.isEmpty()?"Manual client":selected.name)+"\n"+selected.endpoint()+"\n"+rows.size()+" items · "+size(total)+"\n"+protection+"\nThe recipient must approve. Keep BitSkim open.",14,text));
+            ListView list=new ListView(this);list.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,rows){@Override public View getView(int position,View convert,ViewGroup parent){TextView row=(TextView)super.getView(position,convert,parent);row.setTextColor(text);row.setTextSize(14);return row;}});contents.addView(list,new LinearLayout.LayoutParams(-1,dp(240)));
+            reviewDialog=new AlertDialog.Builder(this).setTitle("Review transfer").setView(contents).setPositiveButton("Send",(dialog,which)->client.send(selected,files,snapshots,()->{forwarding.clear();tab=0;render();})).setNegativeButton("Cancel",(dialog,which)->client.releaseUi()).create();reviewDialog.setOnCancelListener(dialog->client.releaseUi());reviewDialog.show();
+        }),()->{importing=false;render();});
     }
     private void receivedPage(){
         section("Received");if(!receivedFolder.equals(client.received))body.addView(button("Parent folder",()->{receivedFolder=receivedFolder.getParentFile();render();}));

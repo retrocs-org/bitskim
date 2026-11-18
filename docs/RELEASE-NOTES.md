@@ -33,6 +33,8 @@ BitSkim-owned code is MIT licensed. Third-party components retain their own term
 
 #### Features
 
+- iOS and Android native folder selection with read-only provider staging, nested/empty directory preservation, full content review and explicit send confirmation.
+- Linux desktop completion/failure notifications with grouped results, verified-receipt counts, Open folder and a saved per-profile notification preference.
 - Linux GTK desktop and separate headless CLI for arm64/x86-64, with discovery, file/folder approval, TLS pairing, disk verification, saved queues/history, shared themes, diagnostics and QR invitations.
 - Saved outgoing queues and eight recent results; restored work stays paused until explicit Continue, with mobile staging retained across restart.
 - Android approved active transfers continue while minimized through a visible foreground notification with Cancel. Idle receiving still needs the app open.
@@ -53,6 +55,7 @@ BitSkim-owned code is MIT licensed. Third-party components retain their own term
 
 #### Enhancements
 
+- Mobile folder reviews use bounded manifests and background hashing; changed content requires a new review, and provider copy failures leave originals untouched.
 - Standalone Linux build/install commands, checked desktop/CLI tar.gz packages and optional coordinated Linux builds; public download links appear automatically when Linux assets are released.
 - Local builds refresh an unpacked BitSkim installer drawer in the shared builds directory, with matching classic drawer/installer icons and archives kept in its packages subdirectory.
 - Release automation enforces complete version notes, identical annotated tags and checked platform assets; publishes normal/latest repository releases; supports separate output directories, redacted logs and stable-name Aminet submissions from retained published archives.
@@ -65,6 +68,8 @@ BitSkim-owned code is MIT licensed. Third-party components retain their own term
 
 #### Bugs
 
+- Mobile staging cleanup waits for the whole queue instead of deleting folder children after the first completed item; restored queues retain their owned roots.
+- Android status reports bound queued path previews so large folder queues cannot overflow the display report.
 - Aminet preparation honors the configured LHA extraction reader for archive verification.
 - Avoid repeated empty-offer notifications while idle, keeping iOS settings responsive.
 - iOS receiving addresses keep port numbers ungrouped in all locales; local launch supports Device Hub and older Simulator app names.

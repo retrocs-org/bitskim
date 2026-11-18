@@ -107,7 +107,9 @@ struct MobileHome: View {
             NavigationStack {
                 MobileList {
                     Section("Browse files to send") {
-                        Button("Browse Files", systemImage: "folder") { client.browseFiles() }
+                        Button("Browse Files", systemImage: "doc") { client.browseFiles() }
+                            .disabled(client.active || client.importing)
+                        Button("Choose Folder", systemImage: "folder") { client.browseFiles(folders: true) }
                             .disabled(client.active || client.importing)
                         if client.importing { ProgressView("Preparing files…") }
                     }
@@ -164,7 +166,7 @@ struct MobileHome: View {
         .sheet(isPresented:$scanQR,onDismiss:{if !scannedInvitation.isEmpty{let value=scannedInvitation;scannedInvitation="";client.prepare(invitation:value)}}){MobileQRScanner{value in scanQR=false;DispatchQueue.main.asyncAfter(deadline:.now()+0.5){client.prepare(invitation:value)}}}
         .confirmationDialog("Clear saved transfer history?",isPresented:$clearHistory,titleVisibility:.visible){Button("Clear history",role:.destructive){client.clearHistory()}}message:{Text("Files and queued transfers are kept.")}
         .sheet(isPresented: $client.filePicker) {
-            FileProviderImport() { result in
+            FileProviderImport(folders: client.folderPicker) { result in
                 client.filePicker = false; client.imported(result)
             }
         }

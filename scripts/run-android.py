@@ -54,10 +54,11 @@ def main():
  if not apk.is_file():raise SystemExit('Build the Android app first: ./scripts/build-android.sh')
  print(run('-s',serial,'install','-r',apk).stdout,end='')
  if args.test:
-  run('-s',serial,'shell','am','force-stop','org.bitskim.android')
-  result=run('-s',serial,'shell','am','instrument','-w','-r','org.bitskim.android/.RuntimeChecks',check=False)
-  print(result.stdout,end='');print(result.stderr,end='')
-  if result.returncode or 'PASS Android runtime checks' not in result.stdout or 'INSTRUMENTATION_CODE: -1' not in result.stdout:raise SystemExit('Android runtime checks failed.')
+  for suite,expected in [('RuntimeChecks','PASS Android runtime checks'),('FolderChecks','PASS native folder provider')]:
+   run('-s',serial,'shell','am','force-stop','org.bitskim.android')
+   result=run('-s',serial,'shell','am','instrument','-w','-r','org.bitskim.android/.'+suite,check=False)
+   print(result.stdout,end='');print(result.stderr,end='')
+   if result.returncode or expected not in result.stdout or 'INSTRUMENTATION_CODE: -1' not in result.stdout:raise SystemExit('Android '+suite+' failed.')
  if serial.startswith('emulator-'):
   forwards=run('forward','--list').stdout.splitlines()
   existing=[line for line in forwards if len(line.split())>=3 and line.split()[1]=='tcp:46442']

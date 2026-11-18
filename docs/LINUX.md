@@ -53,6 +53,12 @@ Use `--cli-only` to omit the desktop; `--arch` selects a built architecture. Pac
 
 To uninstall, remove `bin/bitskim`, `bin/bitskim-cli`, `share/applications/org.bitskim.BitSkim.desktop`, `share/icons/hicolor/512x512/apps/org.bitskim.BitSkim.png` and `share/doc/bitskim` from that installation prefix. User data is kept separately.
 
+## Transfer notifications
+
+The desktop sends one grouped result notification after a collection finishes or its queue pauses on failure, cancellation or decline. Counts report the actual completed and unsuccessful items. Written-file verification is claimed only when confirmed by the engine. **Open folder** opens the receiving directory or outgoing source folder in the system file manager; clicking the notification opens Transfer tools. These actions work while that BitSkim process is running.
+
+**Settings → Notify when transfers finish or fail** turns alerts on or off and persists per profile; new profiles enable them. The desktop notification service and its Do Not Disturb settings control display. The CLI does not send desktop notifications. Closing BitSkim withdraws its current result notification. Full local paths are kept out of notification text, although a single-file result can show its filename.
+
 ## Command line
 
 Examples assume `bitskim-cli` is in PATH. Use the other device's reachable LAN address; 127.0.0.1 is only for processes on the same machine.

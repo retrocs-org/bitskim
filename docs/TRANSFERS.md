@@ -32,6 +32,12 @@ verified in HELLO. A missing or ambiguous ID pauses the queue rather than
 selecting another recipient. Address-based connections explicitly target that
 address and port. Names and IDs are not authenticated identities.
 
+## Mobile folder sending
+
+iOS **Files → Choose Folder** and Android **Files → Choose Folder** use the platform's native folder picker. Enabled providers must grant readable directory access. BitSkim copies the tree to private staging without modifying provider originals, reviews nested paths/empty directories and sizes, then requires explicit confirmation of the recipient. The staged contents are checked again before queueing. A changed or unreadable selection is rejected. Cancelling selection or review sends nothing.
+
+Selections allow at most 32 roots and 32,760 file/directory entries, 2 GiB minus one byte per file, portable relative paths of 255 UTF-8 bytes and at most 16 path components (directories below level 16). Links, special files, loops and unsupported names fail preparation. Cloud folders may need a local download or individual file selection. Staged roots stay owned by the entire queue, so completing one directory or file cannot delete later children. Restored work remains paused until explicitly continued. The Share extensions continue to import regular files.
+
 ## Encryption on capable clients
 
 macOS arm64 and Windows 10 x64 use statically linked OpenSSL 3.5.9 for

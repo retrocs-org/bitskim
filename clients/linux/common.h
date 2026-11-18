@@ -5,6 +5,8 @@
 typedef struct {
     char *profile,*name,*bind,*security,*destination;
     int port;
+    BSCallback callback;
+    void *context;
     gboolean metadata,no_discovery;
 } LinuxOptions;
 typedef struct {
@@ -13,7 +15,7 @@ typedef struct {
     GKeyFile *preferences;
     char *config_dir,*state_dir,*data_dir,*settings,*destination,*theme;
     int lock_fd,security;
-    gboolean metadata,visible,receiving;
+    gboolean metadata,visible,receiving,notifications;
 } LinuxClient;
 gboolean linux_open(LinuxClient *,const LinuxOptions *,int receiving,GError **);
 void linux_close(LinuxClient *);

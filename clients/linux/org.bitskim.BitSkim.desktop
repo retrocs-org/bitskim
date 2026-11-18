@@ -8,3 +8,4 @@ Icon=org.bitskim.BitSkim
 Terminal=false
 Categories=Network;FileTransfer;
 StartupNotify=true
+X-GNOME-UsesNotifications=true

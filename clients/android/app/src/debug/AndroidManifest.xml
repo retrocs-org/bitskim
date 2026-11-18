@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <instrumentation android:name=".RuntimeChecks" android:targetPackage="org.bitskim.android" android:label="BitSkim development checks" />
     <instrumentation android:name=".BackgroundChecks" android:targetPackage="org.bitskim.android" android:label="BitSkim background transfer checks" />
+    <instrumentation android:name=".FolderChecks" android:targetPackage="org.bitskim.android" android:label="BitSkim folder provider checks" />
+    <application><provider android:name=".FolderProviderChecks" android:authorities="${applicationId}.folderchecks" android:exported="true" android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS"><intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter></provider></application>
 </manifest>

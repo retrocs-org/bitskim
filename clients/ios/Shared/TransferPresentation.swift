@@ -4,25 +4,28 @@ struct SendFile: Identifiable {
     var id: URL { url }
     let url: URL
     let bytes: UInt64
+    let snapshot: SelectionSnapshot
+    var isDirectory: Bool { snapshot.entries.first?.isDirectory == true }
 }
 struct SendReview: Identifiable {
     let id = UUID()
     let recipient: String
     let endpoint: String
     let files: [SendFile]
+    let entries: [SendEntry]
     var total: UInt64 { files.reduce(0) { $0 + $1.bytes } }
     static func make(recipient: String, urls: [URL], endpoint: String = "") throws -> SendReview {
-        guard !urls.isEmpty else { throw CocoaError(.fileNoSuchFile) }
-        let files = try urls.map { url -> SendFile in
-            var freshURL = url; freshURL.removeAllCachedResourceValues()
-            let values = try freshURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
-            guard values.isRegularFile == true, values.isSymbolicLink != true,
-                  let size = values.fileSize, size >= 0, size <= 2_147_483_647 else {
-                throw CocoaError(.fileReadUnsupportedScheme, userInfo: [NSLocalizedDescriptionKey: "Choose regular files no larger than 2 GiB minus one byte."])
+        guard !urls.isEmpty, urls.count <= 32, Set(urls.map(\.standardizedFileURL)).count == urls.count else { throw CocoaError(.fileNoSuchFile) }
+        var files: [SendFile] = [], entries: [SendEntry] = []
+        for url in urls {
+            let snapshot = try SelectionSnapshot.inspect(url)
+            guard entries.count + snapshot.entries.count <= SelectionSnapshot.maximumEntries else {
+                throw NSError(domain: "BitSkim", code: 4, userInfo: [NSLocalizedDescriptionKey: "Choose no more than 32,760 files and folder entries."])
             }
-            return SendFile(url: url, bytes: UInt64(size))
+            files.append(SendFile(url: url, bytes: snapshot.total, snapshot: snapshot))
+            entries.append(contentsOf: snapshot.entries)
         }
-        return SendReview(recipient: recipient, endpoint: endpoint, files: files)
+        return SendReview(recipient: recipient, endpoint: endpoint, files: files, entries: entries)
     }
 }
 struct MobileProgress: Equatable {

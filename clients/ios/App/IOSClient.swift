@@ -32,12 +32,18 @@ struct MobileHistory: Identifiable, Equatable {
     @Published var error: String?
     @Published var importing = false
     @Published var filePicker = false
+    @Published var folderPicker = false
+    private var cleanupRunning = false
+    private var lastCleanup = Date.distantPast
+    private var preparationToken: UUID?
+    private var manifestWork: Task<SendReview, Error>?
     @Published var sharedFiles: [URL] = []
     @Published var review: SendReview?
     @Published var progress = MobileProgress()
     private var reviewLease = false
     private var reviewCopies: [URL] = []
-    private var sendPlan: [SendFile] = []
+    private var planPrefix: [UInt64] = [0]
+    private var sendPlan: [SendEntry] = [] { didSet { planPrefix = [0]; for entry in sendPlan { planPrefix.append(planPrefix.last! + entry.bytes) } } }
     @Published var retroMetadata = UserDefaults.standard.bool(forKey:"retroMetadata")
     private var invitationText: String?
     @Published var security = UserDefaults.standard.object(forKey: "security") as? Int ?? 1
@@ -58,22 +64,30 @@ struct MobileHistory: Identifiable, Equatable {
     let discovery = (Bundle.main.object(forInfoDictionaryKey: "BitSkimBroadcastDiscovery") as? String) == "YES"
     private let support: URL
     private let imports: URL
+    private let inboxOverride: URL?
+    private let identityStore: URL
     private let defaults = UserDefaults.standard
 
-    init(listeningPort: UInt16? = nil) {
+    init(listeningPort: UInt16? = nil, storage: URL? = nil, inbox: URL? = nil, identity: URL? = nil) {
+        inboxOverride = inbox
         self.listeningPort = listeningPort ?? {
             guard let value = Bundle.main.object(forInfoDictionaryKey: "BitSkimListeningPort") as? String, let port = UInt16(value), port > 0 else { return UInt16(BS_PORT) }
             return port
         }()
         let fm = FileManager.default
-        received = fm.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Received", isDirectory: true)
-        support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        received = (storage ?? fm.urls(for: .documentDirectory, in: .userDomainMask)[0]).appendingPathComponent("Received", isDirectory: true)
+        support = storage ?? fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        identityStore = identity ?? support.appendingPathComponent("Trust", isDirectory: true)
         imports = support.appendingPathComponent("Outgoing", isDirectory: true)
+    }
+    private func sharedInbox() throws -> URL {
+        if let inboxOverride { try FileManager.default.createDirectory(at: inboxOverride, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]); return inboxOverride }
+        return try ShareInbox.root()
     }
     func start() {
         guard engine == nil else { return }
         do {
-            let fm = FileManager.default, trust = support.appendingPathComponent("Trust", isDirectory: true)
+            let fm = FileManager.default, trust = identityStore
             for folder in [received, support, imports, trust] {
                 try fm.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700, .protectionKey: FileProtectionType.completeUntilFirstUserAuthentication])
             }
@@ -99,11 +113,15 @@ struct MobileHistory: Identifiable, Equatable {
             guard bs_trust_configure(client, trust.path) != 0, bs_security_configure(client, Int32(security), "") != 0 else {
                 throw messageError("Cannot initialize saved device identities and encryption.")
             }
-            let saved = trust.deletingLastPathComponent().appendingPathComponent("transfers.dat")
+            let saved = support.appendingPathComponent("transfers.dat")
             if bs_state_configure(client,saved.path)==0 { self.error=String(cString:bs_state_error(client)) }
             sending=(0..<Int(bs_queue_count(client))).compactMap { index in
                 var item=BSQueueItem();guard bs_queue_item(client,Int32(index),&item) != 0 else{return nil};return URL(fileURLWithPath:wireText(item.path))
             }
+            var restoredBatches = Set<URL>()
+            for file in sending { for root in [imports, try? sharedInbox()].compactMap({ $0 }) {
+                if let batch = ShareInbox.ownedBatch(file, inbox: root), restoredBatches.insert(batch).inserted { try ShareInbox.markQueued(file, inbox: root) }
+            } }
             bs_metadata_enable(client,retroMetadata ? 1:0)
             bs_conflict_policy(client, BS_CONFLICT_RENAME)
             bs_batch_enable(client, 1)
@@ -119,7 +137,7 @@ struct MobileHistory: Identifiable, Equatable {
         }
     }
     func stop() {
-        closeReview()
+        closeReview(); preparationToken = nil; importing = false; importBrowserOpen = false; fileBrowserRequests = 0
         generation &+= 1
         timer?.invalidate(); timer = nil
         if let client = engine { _ = bs_state_flush(client); updateHistory(client); bs_destroy(client) }
@@ -164,7 +182,7 @@ struct MobileHistory: Identifiable, Equatable {
         let nextTrust = bs_trust_status(client) == 1; if trusted != nextTrust { trusted = nextTrust }
         updateProgress(client, state: state)
         updateHistory(client)
-        if !active && bs_queue_count(client) == 0 { cleanupSending() }
+        if !active && bs_queue_count(client) == 0 && bs_queue_scanning(client) == 0 { cleanupSending() }
     }
     private func updateProgress(_ client: OpaquePointer, state: BSStatus) {
         var next = MobileProgress()
@@ -179,8 +197,8 @@ struct MobileHistory: Identifiable, Equatable {
         if state.incoming == 0, !sendPlan.isEmpty, Int(count) == sendPlan.count, position > 0 {
             let completed = min(Int(position - 1), sendPlan.count)
             next.position = "File \(position) of \(count)"
-            next.overallTotal = sendPlan.reduce(0) { $0 + $1.bytes }
-            next.overallDone = min(next.overallTotal, sendPlan.prefix(completed).reduce(0) { $0 + $1.bytes } + UInt64(state.transferred))
+            next.overallTotal = planPrefix.last ?? 0
+            next.overallDone = min(next.overallTotal, planPrefix[completed] + UInt64(state.transferred))
             next.remainingSeconds = state.active != 0 ? MobileProgress.eta(remaining: next.overallTotal - next.overallDone, rate: next.rate) : nil
         } else {
             let count = bs_batch_count(client)
@@ -196,11 +214,6 @@ struct MobileHistory: Identifiable, Equatable {
             return MobileHistory(id: item.serial, name: wireText(item.filename), message: wireText(item.message), integrity: integrity)
         }
         if history != next { history = next }
-        var queued=Set<String>()
-        for index in 0..<Int(bs_queue_count(client)){var item=BSQueueItem();if bs_queue_item(client,Int32(index),&item) != 0{queued.insert(wireText(item.path))}}
-        var completed=[URL]()
-        for index in 0..<Int(bs_history_count(client)){var item=BSHistoryItem();if bs_history_item(client,Int32(index),&item) != 0,item.incoming==0,item.result==BS_RESULT_COMPLETE.rawValue{let path=wireText(item.path);if !queued.contains(path){completed.append(URL(fileURLWithPath:path))}}}
-        removeOwned(completed);sending.removeAll{completed.contains($0)}
     }
     private func matches(_ serial: UInt) -> Bool {
         guard let client = engine else { return false }
@@ -262,12 +275,12 @@ struct MobileHistory: Identifiable, Equatable {
         guard engine != nil, !active, !importing else { return }
         if sharedFiles.isEmpty {
             guard beginFileBrowser() else { return }
-            importBrowserOpen = true; filePicker = true
+            folderPicker = false; importBrowserOpen = true; filePicker = true
         } else { presentReview(sharedFiles) }
     }
-    func browseFiles() {
+    func browseFiles(folders: Bool = false) {
         guard !importing, beginFileBrowser() else { return }
-        browseBeforeRecipient = true; destination = nil
+        browseBeforeRecipient = true; destination = nil; folderPicker = folders
         importBrowserOpen = true; filePicker = true
     }
     func beginFileBrowser() -> Bool {
@@ -283,21 +296,23 @@ struct MobileHistory: Identifiable, Equatable {
         if let client = engine { bs_configure(client, UIDevice.current.model, discovery ? 1 : 0, fileBrowserRequests == 0 ? 1 : 0) }
     }
     func endImportBrowser() {
-        guard importBrowserOpen else { return }; importBrowserOpen = false; endFileBrowser()
+        guard importBrowserOpen, !importing else { return }; importBrowserOpen = false; endFileBrowser()
     }
     func imported(_ result: Result<[URL], Error>) {
-        endImportBrowser()
+        let allowDirectories = folderPicker
         switch result {
         case .failure(let failure):
+            endImportBrowser()
             if (failure as NSError).code != NSUserCancelledError { error = failure.localizedDescription }
         case .success(let urls):
-            guard !urls.isEmpty, urls.count <= 32 else { error = "Choose between 1 and 32 files at a time."; return }
+            guard !urls.isEmpty, urls.count <= 32 else { endImportBrowser(); error = "Choose between 1 and 32 files or folders at a time."; return }
             importing = true
             let holdForClient = browseBeforeRecipient
             let root: URL
-            do { root = try ShareInbox.root() }
-            catch { importing = false; self.error = error.localizedDescription; return }
-            let currentGeneration = generation
+            do { root = try sharedInbox() }
+            catch { importing = false; endImportBrowser(); self.error = error.localizedDescription; return }
+            let currentGeneration = generation, token = UUID()
+            preparationToken = token
             Task {
                 do {
                     let staged = try await Task.detached(priority: .userInitiated) {
@@ -306,13 +321,13 @@ struct MobileHistory: Identifiable, Equatable {
                             for url in urls {
                                 let access = url.startAccessingSecurityScopedResource()
                                 defer { if access { url.stopAccessingSecurityScopedResource() } }
-                                copies.append(try ShareInbox.stage(url, inbox: root))
+                                copies.append(try ShareInbox.stage(url, inbox: root, allowDirectories: allowDirectories))
                             }
                             return copies
                         } catch { for copy in copies { try? FileManager.default.removeItem(at: copy.deletingLastPathComponent()) }; throw error }
                     }.value
-                    importing = false
-                    guard generation == currentGeneration else { removeOwned(staged); return }
+                    guard generation == currentGeneration, preparationToken == token else { refreshSharedFiles(); return }
+                    importing = false; preparationToken = nil; endImportBrowser()
                     refreshSharedFiles()
                     if !holdForClient {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -320,60 +335,101 @@ struct MobileHistory: Identifiable, Equatable {
                             self.presentReview(staged)
                         }
                     }
-                } catch { importing = false; self.error = error.localizedDescription }
+                } catch { guard generation == currentGeneration, preparationToken == token else { return }; importing = false; preparationToken = nil; endImportBrowser(); self.error = error.localizedDescription }
             }
         }
     }
     private func presentReview(_ files: [URL]) {
-        guard let destination, review == nil, let client = engine else { return }
-        guard bs_queue_count(client) == 0 else {
-            error = "Retry or cancel the queued transfer before starting another send."; return
+        guard let destination, review == nil, !importing, let client = engine else { return }
+        guard bs_queue_count(client) == 0 else { error = "Retry or cancel the queued transfer before starting another send."; return }
+        guard beginFileBrowser() else { return }
+        reviewLease = true; reviewCopies = files; importing = true
+        let token = UUID(), currentGeneration = generation
+        preparationToken = token
+        let recipient = destination.name, endpoint = ConnectionTarget.endpoint(destination.address, port: destination.port)
+        Task {
+            do {
+                let work = Task.detached(priority: .userInitiated) { try SendReview.make(recipient: recipient, urls: files, endpoint: endpoint) }; manifestWork = work
+                let manifest = try await work.value
+                guard preparationToken == token, generation == currentGeneration else { return }
+                importing = false; preparationToken = nil; review = manifest
+            } catch {
+                guard preparationToken == token, generation == currentGeneration else { return }
+                self.error = error.localizedDescription; closeReview()
+            }
         }
-        do {
-            let manifest = try SendReview.make(recipient: destination.name, urls: files, endpoint: ConnectionTarget.endpoint(destination.address, port: destination.port))
-            guard beginFileBrowser() else { return }
-            reviewLease = true; reviewCopies = files; review = manifest
-        } catch { self.error = error.localizedDescription }
     }
     func closeReview() {
         guard reviewLease else { return }
+        preparationToken = nil; manifestWork?.cancel(); manifestWork = nil; importing = false
         review = nil; reviewLease = false
         let temporary = reviewCopies.filter { $0.standardizedFileURL.path.hasPrefix(imports.standardizedFileURL.path + "/") }
         removeOwned(temporary); reviewCopies = []
         endFileBrowser()
     }
     func confirmSend(_ manifest: SendReview) {
-        guard review?.id == manifest.id, let client = engine, bs_status(client)!.pointee.active == 0 else { return }
-        do {
-            let fresh = try SendReview.make(recipient: manifest.recipient, urls: manifest.files.map(\.url), endpoint: manifest.endpoint)
-            guard fresh.files.map(\.bytes) == manifest.files.map(\.bytes) else { throw messageError("The selected files changed. Review them again before sending.") }
-            sendPlan = fresh.files
-            reviewCopies = []; closeReview()
-            enqueue(fresh.files.map(\.url))
-        } catch { self.error = error.localizedDescription; closeReview() }
+        guard review?.id == manifest.id, !importing, let client = engine, bs_status(client)!.pointee.active == 0 else { return }
+        importing = true
+        let token = UUID(), currentGeneration = generation
+        preparationToken = token
+        Task {
+            do {
+                let work = Task.detached(priority: .userInitiated) {
+                    try SendReview.make(recipient: manifest.recipient, urls: manifest.files.map(\.url), endpoint: manifest.endpoint)
+                }; manifestWork = work
+                let fresh = try await work.value
+                guard preparationToken == token, generation == currentGeneration, review?.id == manifest.id else { return }
+                guard fresh.files.map({$0.snapshot.signature}) == manifest.files.map({$0.snapshot.signature}) else { throw messageError("The selected files changed. Review them again before sending.") }
+                sendPlan = fresh.entries; reviewCopies = []; closeReview(); enqueue(fresh.files.map(\.url))
+            } catch {
+                guard preparationToken == token, generation == currentGeneration else { return }
+                self.error = error.localizedDescription; closeReview()
+            }
+        }
     }
     private func enqueue(_ files: [URL]) {
         guard let client = engine, let destination else { removeOwned(files); return }
-        for (index, file) in files.enumerated() {
-            let ok = invitationText.map{bs_queue_invitation(client,$0,file.path)} ?? destination.peer.map { bs_queue_peer_address(client, $0, destination.address, destination.port, file.path) } ?? bs_queue_address(client, destination.address, destination.port, file.path)
-            if ok == 0 {
-                error = String(cString: bs_last_error(client))
-                let unsentImports = files[index...].filter { $0.standardizedFileURL.path.hasPrefix(imports.standardizedFileURL.path + "/") }
-                removeOwned(Array(unsentImports)); break
+        let roots = [imports, try? sharedInbox()].compactMap { $0 }
+        bs_queue_pause(client)
+        do {
+            for file in files {
+                let ok = invitationText.map{bs_queue_invitation(client,$0,file.path)} ?? destination.peer.map { bs_queue_peer_address(client, $0, destination.address, destination.port, file.path) } ?? bs_queue_address(client, destination.address, destination.port, file.path)
+                guard ok != 0 else { throw messageError(String(cString: bs_last_error(client))) }
             }
-            sending.append(file)
+            guard bs_state_flush(client) != 0 else { throw messageError(String(cString: bs_state_error(client))) }
+            for file in files { for root in roots { try ShareInbox.markQueued(file, inbox: root) } }
+            sending = files; bs_queue_continue(client)
+        } catch {
+            bs_queue_clear(client); _ = bs_state_flush(client)
+            for file in files { for root in roots {
+                if let batch = ShareInbox.ownedBatch(file, inbox: root) { try? FileManager.default.removeItem(at: root.appendingPathComponent(".queued-" + batch.lastPathComponent)) }
+            } }
+            self.error = error.localizedDescription
         }
-        sharedFiles = ((try? ShareInbox.pending()) ?? []).filter { !sending.contains($0) }
+        sharedFiles = ((try? ShareInbox.pending(inbox: try? sharedInbox())) ?? []).filter { !sending.contains($0) }
         tick()
     }
-    func refreshSharedFiles() { sharedFiles = ((try? ShareInbox.pending()) ?? []).filter { !sending.contains($0) } }
-    private func cleanupSending() { removeOwned(sending); sending = [] }
-    private func removeOwned(_ files: [URL]) {
-        let roots = [imports, try? ShareInbox.root()].compactMap { $0 }.map { $0.standardizedFileURL.path + "/" }
-        for file in files where roots.contains(where: { file.standardizedFileURL.path.hasPrefix($0) }) {
-            try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+    func refreshSharedFiles() { sharedFiles = ((try? ShareInbox.pending(inbox: try? sharedInbox())) ?? []).filter { !sending.contains($0) } }
+    private func cleanupSending() {
+        guard !cleanupRunning, Date().timeIntervalSince(lastCleanup) >= 2 else { return }
+        let roots = [imports, try? sharedInbox()].compactMap { $0 }
+        let batches = roots.flatMap { root in ShareInbox.queuedBatches(inbox: root).map { (root, $0) } }
+        sending = []
+        guard !batches.isEmpty else { return }
+        cleanupRunning = true; lastCleanup = Date()
+        Task {
+            await Task.detached(priority: .utility) {
+                for (root, batch) in batches { ShareInbox.removeBatch(batch, inbox: root) }
+            }.value
+            cleanupRunning = false; refreshSharedFiles()
         }
     }
+    private func removeOwned(_ files: [URL]) {
+        let roots = [imports, try? sharedInbox()].compactMap { $0 }
+        let batches = Set(files.compactMap { file in roots.compactMap { ShareInbox.ownedBatch(file, inbox: $0) }.first })
+        for batch in batches { ShareInbox.removeBatch(batch, inbox: batch.deletingLastPathComponent()) }
+    }
+
     private static func lanAddresses() -> [String] {
         var first: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&first) == 0, let first else { return [] }

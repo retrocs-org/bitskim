@@ -31,7 +31,7 @@ public final class BackgroundChecks extends Instrumentation {
             File staging=new File(client.pending,UUID.randomUUID().toString());staging.mkdir();File source=new File(staging,"Background-check.bin");
             try(OutputStream out=new FileOutputStream(source)){byte[] buffer=new byte[65536];for(int i=0;i<128;i++)out.write(buffer);}
             String invitation=engine.submit(()->Native.invitation(receiver,"127.0.0.1")).get();ownsQueue=true;
-            client.send(new InputPolicy.Target("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","Test receiver","127.0.0.1",46445,invitation),Collections.singletonList(source),new long[]{source.length()},()->{});
+            client.send(new InputPolicy.Target("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","Test receiver","127.0.0.1",46445,invitation),Collections.singletonList(source),Collections.singletonList(TransferFiles.inspect(source)),()->{});
             deadline=System.currentTimeMillis()+10000;boolean accepted=false;
             while(System.currentTimeMillis()<deadline){JSONObject state=new JSONObject(engine.submit(()->Native.tick(receiver)).get());if(state.optBoolean("awaiting")){long serial=state.optLong("serial");if(!engine.submit(()->Native.action(receiver,3,serial,"")).get())throw new IOException("Cannot approve fixture");accepted=true;break;}Thread.sleep(20);}
             if(!accepted)throw new IOException("No outgoing offer: "+client.state.optString("status")+" / "+client.state.optString("error"));

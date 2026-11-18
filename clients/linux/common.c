@@ -30,6 +30,7 @@ gboolean linux_save(LinuxClient *app,GError **error){gsize size;char *data;
     g_key_file_set_integer(app->preferences,"BitSkim","Metadata",app->metadata);
     g_key_file_set_integer(app->preferences,"BitSkim","Visible",app->visible);
     g_key_file_set_integer(app->preferences,"BitSkim","Receiving",app->receiving);
+    g_key_file_set_integer(app->preferences,"BitSkim","Notifications",app->notifications);
     data=g_key_file_to_data(app->preferences,&size,error);if(!data)return FALSE;
     gboolean okay=g_file_set_contents_full(app->settings,data,(gssize)size,G_FILE_SET_CONTENTS_CONSISTENT|G_FILE_SET_CONTENTS_DURABLE,0600,error);g_free(data);return okay;
 }
@@ -55,12 +56,13 @@ gboolean linux_open(LinuxClient *app,const LinuxOptions *options,int receiving,G
     app->config.visible=options->no_discovery?0:app->visible;app->config.receiving=receiving<0?app->receiving:receiving;
     app->security=pref_int(app->preferences,"Security",1);if(options->security){if(!strcmp(options->security,"off"))app->security=0;else if(!strcmp(options->security,"prefer"))app->security=1;else if(!strcmp(options->security,"require"))app->security=2;else{failure(error,"Security must be off, prefer or require");goto bad;}}
     if(app->security<0||app->security>2){failure(error,"Invalid saved security mode");goto bad;}
+    app->notifications=pref_int(app->preferences,"Notifications",1)!=0;
     app->metadata=options->metadata||pref_int(app->preferences,"Metadata",0);app->theme=pref_string(app->preferences,"Theme","mocha");
     const char *downloads=g_get_user_special_dir(G_USER_DIRECTORY_DOWNLOAD);char *fallback=downloads?g_strdup(downloads):g_build_filename(g_get_home_dir(),"Downloads",NULL);
     app->destination=options->destination?g_strdup(options->destination):pref_string(app->preferences,"Destination",fallback);g_free(fallback);
     if(!g_path_is_absolute(app->destination)||strlen(app->destination)>BS_PATH_MAX){failure(error,"Receive folder must be an absolute path within the engine path limit");goto bad;}
     if(new_settings&&!linux_save(app,error))goto bad;
-    if(!bs_platform_init()||!(app->engine=(options->no_discovery?bs_create_manual:bs_create)(&app->config,NULL,NULL))){failure(error,"Cannot listen on the selected TCP/UDP port. Close another BitSkim copy, or use --port");goto bad;}
+    if(!bs_platform_init()||!(app->engine=(options->no_discovery?bs_create_manual:bs_create)(&app->config,options->callback,options->context))){failure(error,"Cannot listen on the selected TCP/UDP port. Close another BitSkim copy, or use --port");goto bad;}
     path=g_build_filename(app->data_dir,"trust",NULL);if(!private_directory(path,error))goto bad;
     if(!bs_trust_configure(app->engine,path)||!bs_security_configure(app->engine,app->security,"")){failure(error,"Cannot initialize the saved TLS device identity");goto bad;}g_clear_pointer(&path,g_free);
     path=g_build_filename(app->state_dir,"transfers.dat",NULL);bs_state_configure(app->engine,path);g_clear_pointer(&path,g_free);
