@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2 — In development
+## 0.2 — 2026-11-19
 
 ### Features
 

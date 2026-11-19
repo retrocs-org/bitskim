@@ -1,8 +1,8 @@
-# BitSkim 0.2 development status
+# BitSkim 0.2 release validation
 
 [Website](https://bitskim.retrocs.org) · [Source](https://github.com/retrocs-org/bitskim)
 
-Version 0.2 is in development and remains fixed until explicitly changed by the project owner. Published 0.1 downloads and screenshots remain historical 0.1 artifacts. Do not relabel those binaries as 0.2.
+Version 0.2 remains fixed until explicitly changed by the project owner. This document records the validation and package requirements for its normal release. Published 0.1 downloads and screenshots remain historical 0.1 artifacts. Do not relabel those binaries as 0.2.
 
 Version 0.2 adds saved-file verification, discovery/compatibility diagnostics, saved queues/history, optional retro metadata, Linux desktop/CLI clients, and source-only mobile clients with folder review. Rebuild and validate every client and package against the current source before releasing. Experimental clients retain their runtime-validation limitations; see [VALIDATION.md](VALIDATION.md).
 
