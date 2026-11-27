@@ -73,13 +73,14 @@ class ReleaseGuidelines(unittest.TestCase):
   notes=(ROOT/'docs/RELEASE-NOTES.md').read_text().strip();self.assertEqual(validate_notes(notes,ROOT),notes)
   for value in [notes.replace('## Features','## Overview',1),notes.replace('## Installation','## Installation\n\nTODO',1),notes.rsplit('\n- ',1)[0]]:
    with self.assertRaises(ValueError):validate_notes(value,ROOT)
- def test_aminet_has_all_version_changes_and_no_older_history(self):
+ def test_aminet_has_complete_current_and_older_history(self):
   text=aminet_release.readme('uploader@example.invalid');flat=' '.join(text.split())
   self.assertTrue(all(len(line)<=76 for line in text.splitlines()))
   self.assertIn('Distribution: Aminet',flat);self.assertIn('VERSION CHANGELOG',flat)
-  for values in version_changes(ROOT).values():
-   for item in values:self.assertIn(' '.join(plain(item).split()),flat)
-  self.assertNotIn('0.1 - Initial release',text)
+  for version in ('0.2','0.1'):
+   for values in version_changes(ROOT,version).values():
+    for item in values:self.assertIn(' '.join(plain(item).split()),flat)
+  self.assertIn('0.1 - Initial release',text)
  def test_aminet_existing_incoming_files_block_before_receipt_or_stor(self):
   from test_aminet_release import AminetRelease
   for listing in [['/new/bitskim.lha'],['bitskim.readme'],None]:

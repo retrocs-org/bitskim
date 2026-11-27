@@ -52,8 +52,24 @@ final class TransferTests: XCTestCase {
             if ready() { return true }
             usleep(1000)
         }
-        XCTFail("Transfer timed out: \(String(cString: bs_last_error(sender))) / \(String(cString: bs_last_error(receiver)))")
+        XCTFail("Transfer timed out: \(String(cString: bs_user_error(sender))) / \(String(cString: bs_user_error(receiver)))")
         return false
+    }
+    func testRetainedCleanupKeepsCompletedFileAndReportsSourceBuild() throws {
+        XCTAssertNotNil(String(cString:bs_build_id()).range(of:"^[a-f0-9]{12}$",options:.regularExpression))
+        let part=root.appendingPathComponent("owned.bsk-part"),meta=root.appendingPathComponent("owned.bsk-resume"),completed=root.appendingPathComponent("owned")
+        let source=root.appendingPathComponent("source");try Data(repeating:42,count:262144).write(to:source);try Data("kept".utf8).write(to:completed)
+        XCTAssertEqual(bs_resume_enable(sender,1),1);XCTAssertEqual(bs_resume_enable(receiver,1),1);XCTAssertEqual(bs_limits_configure(sender,16384,0),1)
+        XCTAssertEqual(bs_send(sender,"127.0.0.1",receiverPort,source.path),1);guard pump({bs_status(receiver)!.pointee.awaiting_decision != 0})else{return}
+        XCTAssertEqual(bs_accept_resumable(receiver,completed.path,0),1);guard pump({bs_status(receiver)!.pointee.transferred>0 && bs_status(receiver)!.pointee.transferred<bs_status(receiver)!.pointee.total})else{return}
+        bs_destroy(sender);sender=nil
+        for _ in 0..<1000 {bs_tick(receiver);if bs_status(receiver)!.pointee.active==0 {break};usleep(1000)}
+        let serial=bs_retained_scan(receiver,root.path);XCTAssertNotEqual(serial,0)
+        for _ in 0..<100 {if bs_retained_step(receiver) != 1 {break}}
+        XCTAssertEqual(bs_retained_phase(receiver),2);XCTAssertEqual(bs_retained_count(receiver),1)
+        XCTAssertEqual(bs_retained_remove(receiver,serial),1)
+        for _ in 0..<100 {if bs_retained_step(receiver) != 3 {break}}
+        XCTAssertEqual(bs_retained_phase(receiver),4);XCTAssertFalse(FileManager.default.fileExists(atPath:part.path));XCTAssertFalse(FileManager.default.fileExists(atPath:meta.path));XCTAssertEqual(try Data(contentsOf:completed),Data("kept".utf8))
     }
     func testEncryptedUnicodeBinaryAndVerifiedReceipt() throws {
         let source = root.appendingPathComponent("å-λ.bin"), destination = root.appendingPathComponent("received.bin")

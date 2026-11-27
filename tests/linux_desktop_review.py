@@ -79,7 +79,15 @@ def review(directory, screenshot=None):
                     assert records[-1]['title']==title, records[-1]
                     return records[-1]
                 time.sleep(.05)
-            raise RuntimeError('Missing notification: '+title)
+            visible=[];pending=[Atspi.get_desktop(0)];inspected=0
+            while pending and inspected<3000:
+                node=pending.pop();inspected+=1
+                try:
+                    if node.get_state_set().contains(Atspi.StateType.SHOWING) and node.get_name():visible.append(node.get_name()[:600])
+                    pending.extend(node.get_child_at_index(i) for i in range(node.get_child_count()))
+                except Exception:pass
+            exitcode=desktop.poll();detail=desktop.stderr.read()[-3000:] if exitcode is not None else 'still running'
+            raise RuntimeError('Missing notification: '+title+'; desktop exit='+repr(exitcode)+'; stderr='+detail+'; records='+repr(records)+'; visible='+repr(visible[-70:]))
 
         def command(binary, profile, listen, *arguments):
             return runner + [str(directory / binary), '--profile', str(root / profile),

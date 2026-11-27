@@ -140,3 +140,11 @@ python3 -m unittest discover -s tests -p test_linux_clients.py -v
 ```
 
 The tests use separate temporary profiles, loopback ports and actual binaries, including TLS, byte comparisons, empty files/folders, collisions, saved retries, metadata companions, invitation checks, permissions and GTK approval controls. Test tools are optional for normal use. See [VALIDATION.md](VALIDATION.md) for completed checks and remaining desktop/distribution coverage.
+
+## Build identity and retained partial files
+
+About/Settings and Diagnostics display the source build fingerprint alongside version 0.2. It identifies the source contents, including uncommitted edits, independently of checkout path or Git history. Direct compiler invocations that omit the generated identity header are explicitly labeled as unidentified. Regenerate builds with the supplied scripts after source changes. Different target configurations may share a source ID; it is not a binary checksum.
+
+Open **Retained partial files** from Settings/Preferences or Linux Transfer tools. Desktop clients let you choose a receive folder; mobile clients review Received. The bounded scan lists recognized checkpoint pairs and their disk usage. Review every listed entry, then confirm **Remove reviewed partials** to discard that resume progress. Completed files, unrecognized files, links and changed/locked checkpoints are kept. Older unmarked checkpoints and volumes that cannot store the local marker are excluded from cleanup; they remain usable for resume. Transfers or queued work prevent cleanup; any intervening transfer requires another scan. Closing the review stops further cleanup. A limit notice means only the listed files were reviewed; other files are kept.
+
+During folder recovery, progress distinguishes checking existing content from transferring remaining data, with counts for verified, resumed, received and remaining files. Hashing bytes are shown as checked bytes, not network payload.

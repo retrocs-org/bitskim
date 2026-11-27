@@ -341,8 +341,11 @@ script+=r'''
  (exit (quiet)))
 ))
 '''
-(out/'Install-BitSkim').write_text(script)
+(out/'Install').write_text(script)
 from amiga_package_icons import build
 build(ROOT)
-(out/'Install-BitSkim.info').write_bytes((ROOT/'assets/icons/Install-BitSkim.info').read_bytes())
+(out/'Install.info').write_bytes((ROOT/'assets/icons/Install.info').read_bytes())
+# Retire superseded generated filenames after their replacements are ready.
+for name in ('Install-BitSkim','Install-BitSkim.info'):
+    (out/name).unlink(missing_ok=True)
 print('Built package-only Amiga Installer with three destination selections')

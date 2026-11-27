@@ -16,11 +16,11 @@ for target in sting mintnet mintnet060; do
  for unit in bitskim platform main; do
   src="clients/atari/$unit.c"
   if [ "$unit" = bitskim ]; then src=core/bitskim.c; fi
-  "$ATARI_CC" $flags -std=gnu89 -Os -Wall -Wextra -Werror -DBS_ATARI $extra -Icore -I"$STING_INCLUDE" -c "$src" -o "$out/$unit.o"
+  "$ATARI_CC" $flags -std=gnu89 -Os -Wall -Wextra -Werror -DBS_ATARI $extra -include build/generated/build-id.h -Icore -I"$STING_INCLUDE" -c "$src" -o "$out/$unit.o"
  done
  objects="$out/bitskim.o $out/platform.o $out/main.o"
  if [ "$target" = sting ]; then
-  "$ATARI_CC" $flags -std=gnu89 -Os -Wall -Wextra -Werror -DBS_ATARI $extra -Icore -I"$STING_INCLUDE" -c clients/atari/sting.c -o "$out/sting.o"
+  "$ATARI_CC" $flags -std=gnu89 -Os -Wall -Wextra -Werror -DBS_ATARI $extra -include build/generated/build-id.h -Icore -I"$STING_INCLUDE" -c clients/atari/sting.c -o "$out/sting.o"
   objects="$objects $out/sting.o"
  fi
  "$ATARI_CC" $flags $objects -lgem -Wl,-Map,"$out/link.map" -o "$out/BITSKIM.PRG"

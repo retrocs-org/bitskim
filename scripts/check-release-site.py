@@ -55,5 +55,7 @@ def validate(root):
  if errors:raise RuntimeError('\n'.join(sorted(set(errors))))
  return len(pages)
 if __name__=='__main__':
- try:print('PASS: '+str(validate(ROOT/'public-web'))+' pages, local links/assets, public URLs and downloadable package checksums')
+ try:
+  subprocess.run([sys.executable,str(ROOT/'scripts/sync-compatibility.py'),'--check'],check=True)
+  print('PASS: '+str(validate(ROOT/'public-web'))+' pages, local links/assets, public URLs and downloadable package checksums')
  except (OSError,RuntimeError,subprocess.CalledProcessError) as error:sys.exit(str(error))

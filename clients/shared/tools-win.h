@@ -84,6 +84,11 @@ static LRESULT bs_tools_paint(HWND w,UINT msg,WPARAM wp,LPARAM lp,int *handled){
 }
 static void bs_tools_refresh(void){char report[4096],history[2048],code[20],normalized[4096];TCHAR native[4096];size_t used,i,j=0;int peer_index;char compatibility[512];const BSPeer *peer;
     bs_tools_apply_theme();bs_diagnostics(bs_tools_client,report,sizeof report);used=strlen(report);bs_tools_index=bs_tools_find();
+    {BSHistoryItem item;int idle=!bs_status(bs_tools_client)->active,has=bs_tools_index>=0 && bs_history_item(bs_tools_client,bs_tools_index,&item);
+     EnableWindow(GetDlgItem(bs_tools_window,8),idle && has && !item.incoming && item.path[0]);
+     EnableWindow(GetDlgItem(bs_tools_window,9),has && item.path[0]);
+     EnableWindow(GetDlgItem(bs_tools_window,11),idle);}
+
     if(bs_tools_index>=0 && bs_history_text(bs_tools_client,bs_tools_index,history,sizeof history)){strncat(report,"\n\nRECENT TRANSFER\n",sizeof report-strlen(report)-1);strncat(report,history,sizeof report-strlen(report)-1);}else if(!used)strcpy(report,"No transfer history.");
     if(bs_peer_count(bs_tools_client))strncat(report,"\n\nNEARBY COMPATIBILITY (DISCOVERY HINTS)\n",sizeof report-strlen(report)-1);
     for(peer_index=0;peer_index<bs_peer_count(bs_tools_client);peer_index++){
@@ -137,12 +142,12 @@ static LRESULT CALLBACK bs_tools_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp){
     if(msg==WM_TIMER){if(!bs_tools_serial)bs_tools_pick(0);bs_tools_refresh();return 0;}
     if(msg==WM_COMMAND){int id=LOWORD(wp);char error[256];TCHAR native[512];
         if(id==1 && HIWORD(wp)==CBN_SELCHANGE)bs_conflict_policy(bs_tools_client,(int)SendMessage(bs_tools_policy,CB_GETCURSEL,0,0));
-        else if(id==3){char code[20];TCHAR entered[20];int i;GetWindowText(bs_tools_entry,entered,20);for(i=0;entered[i] && i<19;i++)code[i]=(char)toupper((unsigned char)entered[i]);code[i]=0;if(!bs_trust_current(bs_tools_client,code)){bs_tools_convert(bs_last_error(bs_tools_client),native,512);MessageBox(w,native,TEXT("Device pairing"),MB_OK|MB_ICONEXCLAMATION);}else SetWindowText(bs_tools_entry,TEXT(""));}
+        else if(id==3){char code[20];TCHAR entered[20];int i;GetWindowText(bs_tools_entry,entered,20);for(i=0;entered[i] && i<19;i++)code[i]=(char)toupper((unsigned char)entered[i]);code[i]=0;if(!bs_trust_current(bs_tools_client,code)){bs_tools_convert(bs_user_error(bs_tools_client),native,512);MessageBox(w,native,TEXT("Device pairing"),MB_OK|MB_ICONEXCLAMATION);}else SetWindowText(bs_tools_entry,TEXT(""));}
         else if(id==4){if(MessageBox(w,TEXT("Forget this device identity? Verify codes again before trusting it."),TEXT("BitSkim"),MB_YESNO)==IDYES)bs_forget_current(bs_tools_client);}
         else if(id==6 || id==7){int index=bs_tools_find();if(index>=0)bs_tools_pick(index+(id==6?1:-1));}
-        else if(id==8){int index=bs_tools_find();if(index>=0 && !bs_retry_history(bs_tools_client,index)){strncpy(error,bs_last_error(bs_tools_client),255);error[255]=0;bs_tools_convert(error,native,512);MessageBox(w,native,TEXT("Retry"),MB_OK);}}
+        else if(id==8){int index=bs_tools_find();if(index>=0 && !bs_retry_history(bs_tools_client,index)){strncpy(error,bs_user_error(bs_tools_client),255);error[255]=0;bs_tools_convert(error,native,512);MessageBox(w,native,TEXT("Retry"),MB_OK);}}
         else if(id==9){BSHistoryItem h;int index=bs_tools_find();if(index>=0 && bs_history_item(bs_tools_client,index,&h)){TCHAR path[BS_PATH_MAX+1],*slash,*other;bs_tools_convert(h.path,path,BS_PATH_MAX+1);slash=_tcsrchr(path,TEXT('/'));other=_tcsrchr(path,TEXT('\\'));if(other && (!slash || other>slash))slash=other;if(slash){slash[1]=0;ShellExecute(w,TEXT("explore"),path,NULL,NULL,SW_SHOWNORMAL);}}}
-        else if(id==11){TCHAR entered[64];char address[64];int i;GetWindowText(bs_tools_address,entered,64);for(i=0;i<63 && entered[i];i++)address[i]=(char)entered[i];address[i]=0;if(!bs_network_test(bs_tools_client,address,0)){bs_tools_convert(bs_last_error(bs_tools_client),native,512);MessageBox(w,native,TEXT("Connection check"),MB_OK);}bs_tools_serial=0;}
+        else if(id==11){TCHAR entered[64];char address[64];int i;GetWindowText(bs_tools_address,entered,64);for(i=0;i<63 && entered[i];i++)address[i]=(char)entered[i];address[i]=0;if(!bs_network_test(bs_tools_client,address,0)){bs_tools_convert(bs_user_error(bs_tools_client),native,512);MessageBox(w,native,TEXT("Connection check"),MB_OK);}bs_tools_serial=0;}
         else if(id==10)DestroyWindow(w);
         if(bs_tools_window)bs_tools_refresh();
         return 0;
@@ -180,7 +185,7 @@ static int bs_tools_pair_offer(HWND owner,BSClient *client){char code[20],label[
     sprintf(label,"Compare this entire code with the sending computer:\n\n%s\n\nOnly choose Yes if both codes match.\nYes: remember this device identity\nNo: accept this transfer without remembering\nCancel: decline the transfer",code);bs_tools_convert(label,native,600);
     answer=MessageBox(owner,native,TEXT("Verify sending device"),MB_YESNOCANCEL|MB_ICONQUESTION);
     if(answer==IDCANCEL)return 0;
-    if(answer==IDYES && !bs_trust_current(client,code)){bs_tools_convert(bs_last_error(client),native,600);MessageBox(owner,native,TEXT("Pairing failed"),MB_OK);return 0;}
+    if(answer==IDYES && !bs_trust_current(client,code)){bs_tools_convert(bs_user_error(client),native,600);MessageBox(owner,native,TEXT("Pairing failed"),MB_OK);return 0;}
     return 1;
 }
 

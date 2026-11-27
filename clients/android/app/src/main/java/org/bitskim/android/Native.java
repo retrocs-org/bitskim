@@ -1,6 +1,8 @@
 package org.bitskim.android;
 final class Native {
     static { System.loadLibrary("bitskim"); }
+    static native String buildId();
+    static native String retainedItem(long handle,long reviewed,int index);
     static native long create(String name, String id, String trust, String received, int port, boolean discovery, int security);
     static native void destroy(long handle);
     static native String tick(long handle);

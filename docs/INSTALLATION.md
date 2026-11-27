@@ -5,7 +5,7 @@ Website: https://bitskim.retrocs.org
 
 ## AmigaOS 3.x
 
-Unpack the entire Amiga ZIP, open its BitSkim drawer and double-click **Install-BitSkim**. Its project icon starts the supplied **StartInstaller** launcher, which prefers SYS:System/Installer and falls back to C:Installer. The system Installer V42 or later is required and is not redistributed. Shell alternative: `Installer Install-BitSkim APPNAME BitSkim`, from the unpacked drawer.
+Unpack the entire Amiga ZIP, open its BitSkim drawer and double-click **Install**. Its project icon starts the supplied **StartInstaller** launcher, which prefers SYS:System/Installer and falls back to C:Installer. The system Installer V42 or later is required and is not redistributed. Shell alternative: `Installer Install APPNAME BitSkim`, from the unpacked drawer.
 
 Close BitSkim and BitSkimPrefs first. The launcher now allows and defaults to the system Installer's **Novice** level. Novice installation uses the standard locations below without destination questions, automatically enables Workbench boot startup and launches the installed app immediately afterwards. There are no separate boot-start or launch-now choices. Select Average (Intermediate) to choose only the main app and Preferences directories, or Expert to also choose the shared-data parent.
 
@@ -55,7 +55,7 @@ These are dynamically linked Linux binaries built against Ubuntu 24.04 libraries
 
 See [BUILDING.md](BUILDING.md) for the target matrix and [AMIGA.md](AMIGA.md), [MACOS.md](MACOS.md) and [WINDOWS.md](WINDOWS.md#building) for exact prerequisites, overrides and outputs.
 
-Build the applications first. `scripts/build-amiga.sh` also compiles StartInstaller and generates Install-BitSkim plus its Workbench project icon. `scripts/build-amiga-installer.py` is the authoritative Installer-script generator; it uses an explicit file manifest for copy/removal, with no recursive deletion.
+Build the applications first. `scripts/build-amiga.sh` also compiles StartInstaller and generates Install plus its Workbench project icon. `scripts/build-amiga-installer.py` is the authoritative Installer-script generator; it uses an explicit file manifest for copy/removal, with no recursive deletion.
 
 Windows setup requires NSIS (makensis): run `scripts/build-windows-installer.sh`. Override MAKENSIS/NSISDIR for an isolated toolchain. The script uses the NSIS Modern UI and current-user registry/shortcuts. See the [official NSIS scripting reference](https://nsis.sourceforge.io/Docs/Chapter4.html).
 
@@ -67,15 +67,17 @@ Finally run `python3 scripts/package.py` to refresh portable ZIPs, source, websi
 
 The build scripts now create build/provenance fingerprints. Run them successfully for every packaged target after finishing source/doc edits; scripts/package.py rejects old binaries, changed payloads and stale installer dependencies before modifying ZIPs or downloads. Existing setup and DMG artifacts also require current fingerprints. See the main README for commands. Build stamps are not signatures or a replacement for platform signing.
 
-The package drawer and Installer use the owner-supplied generic software-package/install artwork. Keep BitSkim.info beside the BitSkim drawer and Install-BitSkim.info beside the Install-BitSkim script. The latter is a project icon using StartInstaller; do not point it at the BitSkim application. That outer icon belongs to the distribution only; installed shared data deliberately has no drawer icon.
+The package drawer and Installer use the same Amiga artwork as AmiRocket. Keep BitSkim.info beside the BitSkim drawer and Install.info beside the Install script. The latter is a project icon using StartInstaller; do not point it at the BitSkim application. That outer icon belongs to the distribution only; installed shared data deliberately has no drawer icon.
 
 The Amiga package includes `BitSkim.guide`, a linked AmigaGuide manual. Double-click its book icon or choose Help in BitSkim or BitSkimPrefs. The guide is installed in the fixed HELP: drawer and both programs find it through the installation-location metadata. It opens in `SYS:Utilities/MultiView` (or `C:MultiView`). The installer installs and removes the guide and its `.info` file.
 
 ## One-command Amiga release
 
-`./scripts/release-amiga.sh` compiles and packages the Amiga distribution into `outputs/BitSkim-0.2.lha`, the matching `BitSkim-0.2-AmigaOS.zip`, `BitSkim-0.2.lha.sha256` and updated SHA256SUMS. Use `AMIGA_CC=/path/to/m68k-amigaos-gcc` to select a compiler. `LHA` selects a LHa-for-UNIX writer; absent one, a pinned/checksummed upstream build is created locally under work/ (see AMIGA.md for prerequisites). An installed Lhasa reader alone cannot create archives.
+`./scripts/release-amiga.sh` compiles and packages the Amiga distribution into `outputs/BitSkim-0.2.lha`, the matching `BitSkim-0.2-AmigaOS.zip`, `BitSkim-0.2.lha.sha256` and updated SHA256SUMS. Use `AMIGA_CC=/path/to/m68k-amigaos-gcc` to select a compiler. `LHA` selects a LHa-for-UNIX writer; absent one, a pinned/checksummed upstream build is installed under `~/Development/tools/amiga/lha` (see AMIGA.md for prerequisites). An installed Lhasa reader alone cannot create archives.
 
-On Amiga, extract the complete LHA with a compatible LhA tool (for example `lha x BitSkim-0.2.lha RAM:`), keeping `BitSkim.info` beside the extracted `BitSkim` drawer. Open the drawer and run Install-BitSkim. The release script changes no system configuration, performs no guest installation and does not publish a release. It retains version 0.2.
+Amiga packages use generic level-0 headers and LH5 compression (or stored entries where appropriate). Packaging normalizes filename separators to `/` and recalculates each changed header checksum before extraction checks. This avoids the level-0 `0xFF` path-handling mismatch seen with OLHa 0.4.4, without changing compressed contents, file CRCs or dates. The exact native Amiga OLHa binary test remains pending; see VALIDATION.md for the host test scope.
+
+On Amiga, extract the complete LHA with a compatible LhA tool (for example `lha x BitSkim-0.2.lha RAM:`), keeping `BitSkim.info` beside the extracted `BitSkim` drawer. Open the drawer and run Install. The release script changes no system configuration, performs no guest installation and does not publish a release. It retains version 0.2.
 
 The distribution drawer icon stores an explicit icons-only/icon-view preference. Keep the outer BitSkim.info beside the extracted BitSkim drawer to apply it. Workbench shows entries with associated .info files by default; helpers, licenses and installation assets remain in the archive and can be viewed with Show All Files. An already-open drawer or a previously retained/snapshotted icon may keep the user's existing view until the new drawer icon is used.
 

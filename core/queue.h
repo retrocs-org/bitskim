@@ -9,16 +9,16 @@ static int bs_queue_add(BSClient *c,const char *id,const char *address,unsigned 
     unsigned long size=0;BSQueued q;char normal[BS_PATH_MAX+1];size_t length;int kind;
     if(!c || c->retry || !path || !*path || strlen(path)>BS_PATH_MAX)return 0;
     copystr(normal,path,sizeof normal);length=strlen(normal);while(length>1 && (normal[length-1]=='/' || normal[length-1]=='\\'))normal[--length]=0;path=normal;
-    kind=bsp_path_kind(path);if((kind!=1 && kind!=2) || (kind==1 && !bsp_size(path,&size))){copystr(c->error,"Choose a regular file or readable folder; links and special files are not sent",256);return 0;}
-    if(c->queue_count>=BS_QUEUE_MAX){copystr(c->error,"Queue count exceeds the portable count range",256);return 0;}
-    if((id && strlen(id)!=32) || (!id && (!address || strlen(address)>=48 || !inet_addr(address) || inet_addr(address)==INADDR_NONE))){copystr(c->error,"Invalid queue recipient",256);return 0;}
+    kind=bsp_path_kind(path);if((kind!=1 && kind!=2) || (kind==1 && !bsp_size(path,&size))){set_error(c,BS_ERR_SOURCE,"Choose a regular file or readable folder; links and special files are not sent");return 0;}
+    if(c->queue_count>=BS_QUEUE_MAX){set_error(c,BS_ERR_LIMIT,"Queue count exceeds the portable count range");return 0;}
+    if((id && strlen(id)!=32) || (!id && (!address || strlen(address)>=48 || !inet_addr(address) || inet_addr(address)==INADDR_NONE))){set_error(c,BS_ERR_PROTOCOL,"Invalid queue recipient");return 0;}
     memset(&q,0,sizeof q);if(id)copystr(q.id,id,33);if(address)copystr(q.address,address,48);
     q.kind=kind==2?2:0;if(kind==2){if(++c->tree_counter==0)++c->tree_counter;q.group=c->tree_counter;}
     q.total=size;q.port=port?port:BS_PORT;copystr(q.path,path,sizeof q.path);
     if(!c->queue_file)c->queue_file=bsp_temp_file();
     if(!c->queue_file || c->queue_head+(unsigned long)c->queue_count>=2147483647UL/sizeof q ||
        fseek(c->queue_file,(long)(c->queue_head+(unsigned long)c->queue_count)*(long)sizeof q,SEEK_SET) ||
-       fwrite(&q,sizeof q,1,c->queue_file)!=1 || fflush(c->queue_file)) {copystr(c->error,"Cannot store queue: check temporary disk space",256);return 0;}
+       fwrite(&q,sizeof q,1,c->queue_file)!=1 || fflush(c->queue_file)) {set_error(c,BS_ERR_STORAGE,"Cannot store queue: check temporary disk space");return 0;}
     if(!c->queue_count){c->queue_processed=0;if(c->run_file)fclose(c->run_file);c->run_file=NULL;c->run_count=0;memset(&c->outgoing_run,0,sizeof c->outgoing_run);}
     c->queue_count++;state_mark(c);remember_folder(c,0,path,kind==2);return 1;
 }
@@ -27,7 +27,7 @@ static int queue_with_icon(BSClient *c,const char *id,const char *address,unsign
 int bs_queue_peer(BSClient *c,const char *id,const char *path){return queue_with_icon(c,id,NULL,0,path);}
 int bs_queue_peer_address(BSClient *c,const char *id,const char *address,unsigned short port,const char *path){
     if(!c || !id || !address)return 0;
-    if(strlen(address)>=48 || !inet_addr(address) || inet_addr(address)==INADDR_NONE){copystr(c->error,"Invalid queue recipient",256);return 0;}
+    if(strlen(address)>=48 || !inet_addr(address) || inet_addr(address)==INADDR_NONE){set_error(c,BS_ERR_PROTOCOL,"Invalid queue recipient");return 0;}
     return queue_with_icon(c,id,address,port,path);
 }
 int bs_queue_address(BSClient *c,const char *ip,unsigned short port,const char *path){return queue_with_icon(c,NULL,ip,port,path);}
@@ -66,12 +66,24 @@ static void queue_tick(BSClient *c){BSQueued q;const BSBatchItem *item;char name
     if(c->queue_paused || !c->queue_count)return;
     if(!queue_read(c,0,&q))goto failed;
     if(q.kind==2){if(tree_scan_tick(c,&q)<0)run_record(c,BS_RESULT_FAILED);return;}
-    ok=queue_batch_prepare(c);if(!ok)return;if(ok<0){copystr(c->error,"Cannot prepare file list: check source files and temporary disk space",256);goto failed;}
-    if(!queue_read(c,0,&q)){copystr(c->error,"Cannot read transfer queue",256);goto failed;}
+    ok=queue_batch_prepare(c);if(!ok)return;if(ok<0){set_error(c,BS_ERR_SOURCE,"Cannot prepare file list: check source files and temporary disk space");goto failed;}
+    if(!queue_read(c,0,&q)){set_error(c,BS_ERR_INTERNAL,"Cannot read transfer queue");goto failed;}
     item=batch_item(c->queue_batch,c->queue_batch_index);
-    if(!item || (q.kind==1?bsp_path_kind(q.path)!=2:(!bsp_size(q.path,&size) || bsp_path_kind(q.path)!=1)) || (q.relative[0]?(copystr(name,q.relative,256),0):!wire_filename(q.path,name)) || (q.kind!=1 && size!=item->total) || strcmp(name,item->filename)){copystr(c->error,"A queued file changed; clear and queue it again",256);goto failed;}
+    if(!item || (q.kind==1?bsp_path_kind(q.path)!=2:(!bsp_size(q.path,&size) || bsp_path_kind(q.path)!=1)) || (q.relative[0]?(copystr(name,q.relative,256),0):!wire_filename(q.path,name)) || (q.kind!=1 && size!=item->total) || strcmp(name,item->filename)){set_error(c,BS_ERR_SOURCE,"A queued file changed; clear and queue it again");goto failed;}
     c->queue_dir_request=q.kind==1;
-    ok=q.invitation_expires?invitation_send(c,&q):q.id[0]?(q.address[0]?bs_send_peer_address(c,q.id,q.address,q.port,q.path):bs_send_peer(c,q.id,q.path)):bs_send(c,q.address,q.port,q.path);c->queue_dir_request=0;
+    if(c->state==SESSION_IDLE && session_matches(c,&q))ok=session_send(c,&q);
+    else {if(c->state==SESSION_IDLE)cleanup_transfer(c);
+    ok=q.invitation_expires?invitation_send(c,&q):q.id[0]?(q.address[0]?bs_send_peer_address(c,q.id,q.address,q.port,q.path):bs_send_peer(c,q.id,q.path)):bs_send(c,q.address,q.port,q.path);}
+    c->queue_dir_request=0;
     if(ok){c->queue_active=1;c->out_batch=c->queue_batch;c->out_batch_index=c->queue_batch_index;if(q.relative[0])copystr(c->status.filename,q.relative,256);return;}
-failed:run_record(c,BS_RESULT_FAILED);c->queue_paused=1;copystr(c->status.message,c->error,256);notify(c,BS_EVENT_ERROR);
+failed:
+    run_record(c,BS_RESULT_FAILED);
+    {char reason[256];BSErrorCode code=c->error_code;int known=queue_read(c,0,&q);copystr(reason,c->error,sizeof reason);
+     /* A preflight/socket-open failure is a new failed attempt, not the last receipt. */
+     reset_status(c,0,known?q.address:"");c->status.active=0;c->transfer_result=BS_RESULT_FAILED;c->queue_paused=1;
+     if(known){c->status.total=q.total;copystr(c->source,q.path,sizeof c->source);copystr(c->remote_id,q.id,sizeof c->remote_id);c->remote_port=q.port;
+       if(q.relative[0])copystr(c->status.filename,q.relative,sizeof c->status.filename);
+       else if(wire_filename(q.path,name))copystr(c->status.filename,name,sizeof c->status.filename);}
+     set_error(c,code,reason);c->error_transfer_serial=c->transfer_serial;copystr(c->status.message,reason,sizeof c->status.message);notify(c,BS_EVENT_ERROR);}
+
 }

@@ -84,15 +84,17 @@ gboolean linux_enqueue(LinuxClient *app,const char *peer,const char *address,uns
     if(before||bs_status(app->engine)->active)return failure(error,"Finish, continue or clear the existing queue before starting another send");
     bs_queue_pause(app->engine);
     for(guint i=0;i<paths->len;i++){const char *path=g_ptr_array_index(paths,i);int okay=invitation?bs_queue_invitation(app->engine,invitation,path):peer&&*peer?(address&&*address?bs_queue_peer_address(app->engine,peer,address,port,path):bs_queue_peer(app->engine,peer,path)):bs_queue_address(app->engine,address,port,path);
-        if(!okay){bs_queue_clear(app->engine);return failure(error,bs_last_error(app->engine));}}
+        if(!okay){bs_queue_clear(app->engine);return failure(error,bs_user_error(app->engine));}}
     bs_queue_continue(app->engine);return TRUE;
 }
 gboolean linux_accept(LinuxClient *app,const char *folder,gboolean allow_unknown,GError **error){const BSStatus *status=bs_status(app->engine);char path[BS_PATH_MAX+1];BSStorage storage;
     if(!status->awaiting_decision)return failure(error,"This offer has expired");
     if(!g_file_test(folder,G_FILE_TEST_IS_DIR))return failure(error,"Choose an existing destination folder");
-    if(bs_batch_count(app->engine)>0){if(!bs_storage_info(app->engine,folder,1,&storage))return failure(error,"Cannot check destination storage");if((storage.known&&!storage.enough)||(!storage.known&&!allow_unknown))return failure(error,storage.known?"Insufficient destination storage":"Destination storage is unknown; review before accepting");return bs_accept_batch(app->engine,folder)?TRUE:failure(error,bs_last_error(app->engine));}
+    if(bs_batch_count(app->engine)>0){if(!bs_storage_info(app->engine,folder,1,&storage))return failure(error,"Cannot check destination storage");if((storage.known&&!storage.enough)||(!storage.known&&!allow_unknown))return failure(error,storage.known?"Insufficient destination storage":"Destination storage is unknown; review before accepting");return bs_accept_batch(app->engine,folder)?TRUE:failure(error,bs_user_error(app->engine));}
     if(!bs_suggest_destination(folder,status->filename,0,path,sizeof path))return failure(error,"Cannot choose a safe destination filename");
     if(!bs_destination_space_info(app->engine,path,0,&storage))return failure(error,"Cannot check destination storage");if((storage.known&&!storage.enough)||(!storage.known&&!allow_unknown))return failure(error,storage.known?"Insufficient destination storage":"Destination storage is unknown; review before accepting");
-    return bs_accept_resumable(app->engine,path,0)?TRUE:failure(error,bs_last_error(app->engine));
+    return bs_accept_resumable(app->engine,path,0)?TRUE:failure(error,bs_user_error(app->engine));
 }
 void linux_json_string(const char *value){char *valid=g_utf8_make_valid(value?value:"",-1);putchar('"');for(const unsigned char *p=(const unsigned char *)valid;*p;p++){if(*p=='"'||*p=='\\'){putchar('\\');putchar(*p);}else if(*p<32||*p==127)printf("\\u%04x",*p);else putchar(*p);}putchar('"');g_free(valid);}
+
+gboolean linux_resume_folder(LinuxClient *app,const char *folder,GError **error){return bs_accept_batch_resume(app->engine,folder)?TRUE:failure(error,bs_user_error(app->engine));}

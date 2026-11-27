@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "version": "0.2",
+  "clients": [
+    {
+      "id": "macos",
+      "name": "macOS",
+      "target": "Apple silicon; macOS 13+",
+      "guide": "MACOS.md",
+      "verified": "Native startup/UI, all themes, Mac/Windows encrypted transfers and mounted/copied notarized app checks.",
+      "pending": "Human installation review and broader physical-network coverage."
+    },
+    {
+      "id": "windows",
+      "name": "Windows",
+      "target": "Windows 10/11 x64; unsigned",
+      "guide": "WINDOWS.md",
+      "verified": "Windows 11 native engine, high-DPI UI, install/update/uninstall and setup-wizard checks.",
+      "pending": "Windows 10 GUI/runtime review."
+    },
+    {
+      "id": "amiga",
+      "name": "AmigaOS",
+      "target": "AmigaOS 3.x; 68000+; TCP/IP stack",
+      "guide": "AMIGA.md",
+      "verified": "Owner-confirmed native installation, app/Preferences startup and bridged discovery; host LHa/OLHa extraction.",
+      "pending": "Exact native OLHa/LHa archive check pending; broader hardware and TCP/IP stacks."
+    },
+    {
+      "id": "linux",
+      "name": "Linux",
+      "target": "GTK desktop and CLI; arm64/x86-64; Ubuntu 24.04 baseline",
+      "guide": "LINUX.md",
+      "verified": "arm64 native process/GTK tests; x86-64 process tests through emulation; TLS, folders and result notifications.",
+      "pending": "Physical x86-64, real Wayland sessions and other distributions."
+    },
+    {
+      "id": "dos",
+      "name": "DOS / mTCP",
+      "target": "Experimental; 8086; packet driver",
+      "guide": "DOS.md",
+      "verified": "DOS runtime transfers in both directions, discovery, queues, folders and receive decisions.",
+      "pending": "Physical network cards and older DOS versions."
+    },
+    {
+      "id": "atari",
+      "name": "Atari TOS / MiNTNet",
+      "target": "Experimental STinG and MiNTNet builds",
+      "guide": "ATARI.md",
+      "verified": "Target builds; STinG app startup and Transfer tools navigation.",
+      "pending": "Native transfers and physical hardware."
+    },
+    {
+      "id": "riscos",
+      "name": "RISC OS",
+      "target": "Experimental ARM2 and StrongARM builds",
+      "guide": "RISCOS.md",
+      "verified": "Compile/link and package checks for both CPU variants.",
+      "pending": "Native startup, transfers and physical hardware."
+    },
+    {
+      "id": "windows-classic",
+      "name": "Windows Classic",
+      "target": "Experimental x86; Windows 95/98/Me/XP targets",
+      "guide": "WINDOWS-LEGACY.md",
+      "verified": "PE32/subsystem/import compatibility checks.",
+      "pending": "Native runtime and hardware."
+    },
+    {
+      "id": "ios",
+      "name": "iPhone / iPad",
+      "target": "Experimental source-only; iOS 16+",
+      "guide": "IOS.md",
+      "verified": "Local runtime TLS transfers, file/folder review, file management, themes and accessibility layout checks.",
+      "pending": "Physical devices, authenticated cloud providers and VoiceOver; local Files runtime issue remains documented."
+    },
+    {
+      "id": "android",
+      "name": "Android",
+      "target": "Experimental source-only; 64-bit Android 8+ target",
+      "guide": "ANDROID.md",
+      "verified": "Android 17 local runtime/JNI TLS transfers, folder staging, minimized-transfer cancellation and accessibility layout checks.",
+      "pending": "Physical devices, Wi-Fi discovery, older Android versions, authenticated providers and TalkBack."
+    },
+    {
+      "id": "windows16",
+      "name": "Windows 3.x",
+      "target": "Development-only; Win16; installed Winsock 1.1",
+      "guide": "WINDOWS16.md",
+      "verified": "8086 large-model build; NE format and Win16 import checks.",
+      "pending": "Native startup, Winsock stacks, transfers, cancellation and keyboard review."
+    },
+    {
+      "id": "mac-classic",
+      "name": "Classic Mac OS 8/9",
+      "target": "Port preparation; PowerPC/Open Transport initially",
+      "guide": "MAC-CLASSIC.md",
+      "verified": "Shared pinned Retro68 PowerPC compiler build.",
+      "pending": "Networking SDK, safe HFS/Open Transport adapters and all native app/transfer checks; no client binary."
+    }
+  ],
+  "scope": "These are observed 0.2 checks, with limitations retained explicitly. The new file-date extension has host socket coverage; native date preservation still needs review on each target. Release candidates require their own artifact acceptance checks."
+}

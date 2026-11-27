@@ -29,19 +29,24 @@ def readme(uploader,author='BitSkim contributors',root=ROOT,version='0.2',tag=No
     paragraph('FEATURES')
     paragraph('Automatic discovery, manual IPv4, receive approval, save paths, themed Workbench windows, iconified reception, ARexx and progress/speed. Amiga transfers are plaintext and names are unverified; use a trusted network. Features and validation differ between clients.')
     paragraph('INSTALLATION')
-    paragraph('Unpack bitskim.lha and open Install-BitSkim. Main app, Preferences and shared resources have selectable destinations; help and ENV:/ENVARC: settings use standard locations. MultiView opens the guide. The system Installer V42 or later is required and is not redistributed. Keep the unpacked package for updates and uninstall.')
+    paragraph('Unpack bitskim.lha and open Install. Main app, Preferences and shared resources have selectable destinations; help and ENV:/ENVARC: settings use standard locations. MultiView opens the guide. The system Installer V42 or later is required and is not redistributed. Keep the unpacked package for updates and uninstall.')
     paragraph('SOURCE AND LICENCE')
     paragraph('BitSkim-owned code is MIT licensed; bundled dependencies retain their own licences. See LICENSE and THIRD-PARTY-NOTICES.MD in the archive.')
     paragraph('Source: https://github.com/retrocs-org/bitskim')
     paragraph('Release: https://github.com/retrocs-org/bitskim/releases/tag/'+(tag or version))
     paragraph('VERSION CHANGELOG')
-    paragraph(version)
-    for group,items in version_changes(root,version).items():
-        if not items:continue
-        paragraph(group.upper())
-        for item in items:
-            lines.append('')
-            lines.extend(textwrap.wrap(plain(item),76,initial_indent='  - ',subsequent_indent='    ',break_long_words=False,break_on_hyphens=False))
+    current_changes=version_changes(root,version)
+    headings=re.findall(r'^## (.+)$',(Path(root)/'CHANGELOG.MD').read_text(),re.M)
+    for heading in headings:
+        release_version=heading.split()[0]
+        paragraph(heading)
+        changes=current_changes if release_version==version else version_changes(root,release_version)
+        for group,items in changes.items():
+            if not items:continue
+            paragraph(group.upper())
+            for item in items:
+                lines.append('')
+                lines.extend(textwrap.wrap(plain(item),76,initial_indent='  - ',subsequent_indent='    ',break_long_words=False,break_on_hyphens=False))
     if any(len(line)>76 for line in lines):raise ValueError('Aminet readme exceeds 76 columns; shorten metadata or changelog URLs')
     return '\n'.join(lines)+'\n'
 

@@ -8,20 +8,24 @@ Send files and folders directly between modern desktops and classic computers. B
 
 ## Clients
 
-| Client | Version 0.2 |
+<!-- compatibility:start -->
+| Client | Target |
 | --- | --- |
-| macOS | Apple silicon, macOS 13+; public downloads signed and notarized |
-| Linux | [GTK desktop and CLI](docs/LINUX.md), arm64/x86-64; Ubuntu 24.04 library baseline |
-| Windows | Windows 10/11 x64 target; unsigned; Windows 10 GUI validation pending |
-| AmigaOS | AmigaOS 3.x, 68000-compatible, Workbench and TCP/IP stack |
-| DOS / mTCP | Experimental; packet driver required |
-| Atari TOS / MiNTNet | Experimental STinG and MiNTNet builds; transfers unverified |
-| RISC OS | Experimental ARM2 and StrongARM builds; runtime validation pending |
-| Windows Classic | Experimental x86 build for Windows 95/98/Me/XP targets; runtime validation pending |
-| Android | [Experimental source-only client](docs/ANDROID.md); 64-bit Android 8+ target; physical-device validation pending |
-| iPhone / iPad | [Experimental source-only client](docs/IOS.md); iOS 16+ target; device validation pending |
+| [macOS](docs/MACOS.md) | Apple silicon; macOS 13+ |
+| [Windows](docs/WINDOWS.md) | Windows 10/11 x64; unsigned |
+| [AmigaOS](docs/AMIGA.md) | AmigaOS 3.x; 68000+; TCP/IP stack |
+| [Linux](docs/LINUX.md) | GTK desktop and CLI; arm64/x86-64; Ubuntu 24.04 baseline |
+| [DOS / mTCP](docs/DOS.md) | Experimental; 8086; packet driver |
+| [Atari TOS / MiNTNet](docs/ATARI.md) | Experimental STinG and MiNTNet builds |
+| [RISC OS](docs/RISCOS.md) | Experimental ARM2 and StrongARM builds |
+| [Windows Classic](docs/WINDOWS-LEGACY.md) | Experimental x86; Windows 95/98/Me/XP targets |
+| [iPhone / iPad](docs/IOS.md) | Experimental source-only; iOS 16+ |
+| [Android](docs/ANDROID.md) | Experimental source-only; 64-bit Android 8+ target |
+| [Windows 3.x](docs/WINDOWS16.md) | Development-only; Win16; installed Winsock 1.1 |
+| [Classic Mac OS 8/9](docs/MAC-CLASSIC.md) | Port preparation; PowerPC/Open Transport initially |
+<!-- compatibility:end -->
 
-See [validation coverage](docs/VALIDATION.md) for the checks completed on each platform.
+Compatibility summaries are generated from [one maintained record](docs/compatibility.json). See [validation coverage](docs/VALIDATION.md) for completed checks and remaining limits.
 
 ## Start sharing
 
@@ -29,7 +33,7 @@ See [validation coverage](docs/VALIDATION.md) for the checks completed on each p
 2. Choose a nearby computer, or connect using its IPv4 address.
 3. Select files or folders to send, then accept the offer and choose a destination on the receiving computer.
 
-Transfers include progress, cancellation, queues, conflict choices and speed limits. Individual files can be up to 2 GiB minus one byte; retro metadata preservation is optional on supported clients. The iOS and Android development clients can select provider folders and review their contents before sending; Linux desktop results include optional notifications with Open folder. Available features depend on the client.
+Transfers include progress, cancellation, queues, conflict choices and speed limits. Individual files can be up to 2 GiB minus one byte; file modification-date and retro metadata preservation are optional. The iOS and Android development clients can select provider folders and review their contents before sending; Linux desktop results include optional notifications with Open folder. Available features depend on the client.
 
 Modern Mac, Windows and Linux clients prefer TLS encryption. Retro transfers use plaintext. Compare verification codes before remembering a modern device's identity. Keep BitSkim's listening port off the public Internet. BitSkim uses its own protocol and does not interoperate with AirDrop.
 

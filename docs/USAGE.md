@@ -32,7 +32,7 @@ The executable targets Windows 10 x64. Automated native engine checks passed in 
 
 ## Get started on an Amiga
 
-Unpack the Amiga LHA or ZIP and double-click `Install-BitSkim` in its drawer. Novice installation uses default paths, enables WBStartup and starts the app after installation; custom mode chooses the main app, Preferences and shared-data parent locations; Help and configuration use fixed system locations. You can also copy the complete drawer manually into `Bin:`. Launch `Bin:BitSkim/BitSkim` or `Bin:BitSkim/BitSkimPrefs`; each has a distinct native Workbench icon. Keep the drawer’s `BitSkim.info` alongside the drawer itself.
+Unpack the Amiga LHA or ZIP and double-click `Install` in its drawer. Novice installation uses default paths, enables WBStartup and starts the app after installation; custom mode chooses the main app, Preferences and shared-data parent locations; Help and configuration use fixed system locations. You can also copy the complete drawer manually into `Bin:`. Launch `Bin:BitSkim/BitSkim` or `Bin:BitSkim/BitSkimPrefs`; each has a distinct native Workbench icon. Keep the drawer’s `BitSkim.info` alongside the drawer itself.
 
 Requires AmigaOS 3.x, a Workbench screen at least 640×256, and an AmiTCP-compatible `bsdsocket.library` version 4 or later (Roadshow is the initial real-network-stack target). The executable targets the 68000 instruction set; real 68000 hardware performance and minimum RAM are not yet certified.
 
@@ -94,3 +94,7 @@ An expired or cancelled receive dialog cannot approve a later offer.
 The GTK client groups nearby devices with explicit address selection. Select files/folders or drop files into the window, select a client or enter an IPv4 address, then click Send selected items. Approve incoming offers and review their destination/transport. Settings controls themes, receiving, encryption and speed limits; Transfer tools contains diagnostics, pairing and saved results. Saved queues restore paused.
 
 The separate CLI supports discovery, send/receive, queue continuation and JSON diagnostics/history. It prompts for incoming approval; unattended receive requires explicit `--accept --directory /absolute/folder`. Desktop and CLI share private XDG storage, so simultaneous processes need separate `--profile` and `--port` values. See [LINUX.md](LINUX.md) for examples.
+
+## File dates and recovery
+
+Optional **Preserve file dates and retro metadata** must be enabled on both ends before sending. The receiver verifies contents before restoring the regular file's modification date and reports restoration failures without losing delivered contents. See [transfer behavior](TRANSFERS.md#preserve-file-modification-dates) for precision and legacy-client limits. User-facing errors include a next step; Transfer tools retains raw diagnostics and provides retry, connection checks and folder access.

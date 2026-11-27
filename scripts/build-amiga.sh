@@ -6,8 +6,8 @@ AMIGA_CC=${AMIGA_CC:-m68k-amigaos-gcc}
 python3 scripts/build-amiga-guide.py
 python3 scripts/build_provenance.py begin amiga
 mkdir -p build/amiga
-"$AMIGA_CC" -std=gnu89 -Os -m68000 -mcrt=nix20 -D__amigaos__ -Wall -Wextra -Wno-pointer-sign -Wno-discarded-qualifiers -Icore core/bitskim.c core/platform.c clients/amiga/main.c -o build/amiga/BitSkim -lamiga
-"$AMIGA_CC" -std=gnu89 -Os -m68000 -mcrt=nix20 -D__amigaos__ -DBITSKIM_PREFS -Wall -Wextra -Wno-pointer-sign -Wno-discarded-qualifiers -Icore core/bitskim.c core/platform.c clients/amiga/main.c -o build/amiga/BitSkimPrefs -lamiga
+"$AMIGA_CC" -std=gnu89 -Os -m68000 -mcrt=nix20 -D__amigaos__ -Wall -Wextra -Wno-pointer-sign -Wno-discarded-qualifiers -include build/generated/build-id.h -Icore core/bitskim.c core/platform.c clients/amiga/main.c -o build/amiga/BitSkim -lamiga
+"$AMIGA_CC" -std=gnu89 -Os -m68000 -mcrt=nix20 -D__amigaos__ -DBITSKIM_PREFS -Wall -Wextra -Wno-pointer-sign -Wno-discarded-qualifiers -include build/generated/build-id.h -Icore core/bitskim.c core/platform.c clients/amiga/main.c -o build/amiga/BitSkimPrefs -lamiga
 if [ -f assets/icons/BitSkim.info ]; then
     cp assets/icons/BitSkim.info build/amiga/BitSkim.info
     cp assets/icons/BitSkimPrefs.info build/amiga/BitSkimPrefs.info

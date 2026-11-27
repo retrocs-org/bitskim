@@ -2,7 +2,8 @@
 """Package verified local builds without changing the release version."""
 from pathlib import Path
 from release_paths import output_dir
-from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
+from zipfile import ZIP_DEFLATED
+from archive_dates import PackageZipFile as ZipFile
 import hashlib, shutil, struct, os, time, json, argparse
 from build_provenance import verify,StaleBuild
 parser=argparse.ArgumentParser(description=__doc__)

@@ -158,7 +158,7 @@ static void ui_draw(void) {
     bs_progress_summary(client,line,sizeof line);ui_put(3,23,74,line,0x08);
     sprintf(line,"%d waiting | F9 controls%s",bs_queue_waiting(client),bs_queue_paused(client)?" / paused":"");ui_put(3,22,36,line,0x08);
     sprintf(line,"Visible %s / Receive %s / Plaintext",config.visible?"on":"off",config.receiving?"on":"off");ui_put(39,22,38,line,0x08);
-    ui_put(3,23,74,ui_notice[0]?ui_notice:s->message,0x07);
+    ui_put(3,23,74,ui_notice[0]?ui_notice:bs_user_status(client),0x07);
     ui_put(0,24,80," F1 Help   F2 Settings   Tab Files   F8 Cancel   F10 Quit",0x17);
     if(ui_focus && !ui_popup){
         for(i=0;i<2000;i++)ui_frame[i]=(ui_frame[i]&255)|0x0800;
@@ -285,7 +285,7 @@ static void ui_submit(void) {
     if(ui_popup==1) {char absolute[128];ok=_fullpath(absolute,ui_edit,sizeof absolute)!=NULL && bs_queue_peer(client,ui_target_id,absolute);}
     else if(ui_popup==3) {char absolute[128];ok=_fullpath(absolute,ui_edit,sizeof absolute)!=NULL && bs_queue_address(client,ui_target_ip,ui_target_port,absolute);}
     else if(ui_popup==4) ok=(bs_batch_count(client)>1 || bs_batch_is_tree(client)!=0)?bs_accept_batch(client,ui_edit):bs_accept_conflict(client,ui_edit);
-    if(ok) {if(ui_popup==4) ui_resume();else {ui_popup=0;ui_focus=0;}ui_notice[0]=0;}else ui_message(bs_last_error(client));
+    if(ok) {if(ui_popup==4) ui_resume();else {ui_popup=0;ui_focus=0;}ui_notice[0]=0;}else ui_message(bs_user_error(client));
 }
 static void ui_accept_prompt(void) {
     char leaf[13];
@@ -299,14 +299,14 @@ static int ui_key(int key) {
     if(ui_popup) {
         if(ui_popup==9){
             if(key==27)ui_popup=0;
-            else if(key=='r' || key=='R'){if(bs_queue_count(client))bs_queue_continue(client);else if(!bs_retry_failed(client))ui_message(bs_last_error(client));}
+            else if(key=='r' || key=='R'){if(bs_queue_count(client))bs_queue_continue(client);else if(!bs_retry_failed(client))ui_message(bs_user_error(client));}
             else if(key=='p' || key=='P')bs_queue_pause(client);
             else if(key=='s' || key=='S')bs_queue_skip(client);
             else if(key=='c' || key=='C')bs_queue_clear(client);
             ui_dirty=1;return 1;
         }
         if(ui_popup==10){
-            if(key=='t' || key=='T'){const BSPeer *peer=index>=0?bs_peer(client,index):NULL;if(!bs_network_test(client,peer?peer->address:NULL,peer?peer->port:0))ui_message(bs_last_error(client));ui_tools_record=-1;ui_tools_top=0;}
+            if(key=='t' || key=='T'){const BSPeer *peer=index>=0?bs_peer(client,index):NULL;if(!bs_network_test(client,peer?peer->address:NULL,peer?peer->port:0))ui_message(bs_user_error(client));ui_tools_record=-1;ui_tools_top=0;}
             if(key==27)ui_popup=0;
             else if(key=='d' || key=='D'){ui_tools_record=-1;ui_tools_top=0;}
             else if(key=='h' || key=='H'){BSHistoryItem h;ui_tools_record=0;ui_tools_top=0;if(bs_history_item(client,0,&h))ui_tools_serial=h.serial;}
@@ -315,7 +315,7 @@ static int ui_key(int key) {
             else if((key=='n' || key=='N') && ui_tools_record+1<bs_history_count(client)){BSHistoryItem h;ui_tools_record++;ui_tools_top=0;if(bs_history_item(client,ui_tools_record,&h))ui_tools_serial=h.serial;}
             else if((key=='b' || key=='B') && ui_tools_record>0){BSHistoryItem h;ui_tools_record--;ui_tools_top=0;if(bs_history_item(client,ui_tools_record,&h))ui_tools_serial=h.serial;}
             else if(key=='c' || key=='C')bs_conflict_policy(client,(bs_conflict_get(client)+1)%3);
-            else if(key=='r' || key=='R'){BSHistoryItem h;int i;for(i=0;i<bs_history_count(client);i++)if(bs_history_item(client,i,&h) && h.serial==ui_tools_serial){if(!bs_retry_history(client,i))ui_message(bs_last_error(client));break;}}
+            else if(key=='r' || key=='R'){BSHistoryItem h;int i;for(i=0;i<bs_history_count(client);i++)if(bs_history_item(client,i,&h) && h.serial==ui_tools_serial){if(!bs_retry_history(client,i))ui_message(bs_user_error(client));break;}}
             ui_dirty=1;return 1;
         }
         if(ui_popup==8) {

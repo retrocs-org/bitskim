@@ -58,6 +58,7 @@ final class ClientService {
     void stop() { engine.execute(()->{stopPump();uiHeld=false;if(handle!=0){Native.destroy(handle);handle=0;}sending.clear();state=new JSONObject();last="";}); }
     void close() { closed=true;engine.execute(()->{stopPump();if(handle!=0){Native.destroy(handle);handle=0;}sending.clear();});engine.shutdown();copies.shutdown(); }
     void showInvitation(String address,java.util.function.Consumer<String> ready){engine.execute(()->{try{if(handle==0)throw new IOException("Open the local network client first.");String text=Native.invitation(handle,address);if(text.isEmpty())throw new IOException("Enable receiving and certificate encryption before inviting.");main.post(()->ready.accept(text));}catch(Exception failure){fail(failure);}});}
+    void retainedItems(long reviewed,java.util.function.Consumer<List<String>> ready){engine.execute(()->{List<String> items=new ArrayList<>();if(handle!=0 && state.optLong("retainedSerial")==reviewed)for(int i=0;i<state.optInt("retainedCount");i++)items.add(Native.retainedItem(handle,reviewed,i));main.post(()->{if(!closed)ready.accept(items);});});}
     void command(int command,long serial,String argument) { engine.execute(()->{if(handle==0)return;try{if(!Native.action(handle,command,serial,argument))throw new IOException("Action is unavailable or the offer expired.");if(command==6)preferences.edit().putInt("security",(int)serial).apply();if(command==11)preferences.edit().putBoolean("retroMetadata",serial!=0).apply();poll();}catch(Exception e){fail(e);}}); }
     void pauseForUi(Runnable ready) { pauseForUi(ready,()->{}); }
     void pauseForUi(Runnable ready,Runnable failed) { engine.execute(()->{try{if(handle!=0 && !Native.action(handle,7,0,""))throw new IOException("Finish or cancel the current transfer first.");uiHeld=true;main.post(ready);}catch(Exception e){main.post(failed);fail(e);}}); }
@@ -80,6 +81,7 @@ final class ClientService {
                 try(InputStream input=context.getContentResolver().openInputStream(uri);OutputStream output=new FileOutputStream(file)){
                     if(input==null)throw new IOException("Provider could not open this file.");byte[] buffer=new byte[65536];long count=0;int n;while((n=input.read(buffer))!=-1){if(closed)throw new IOException("Import cancelled.");count+=n;if(count>InputPolicy.MAX_FILE)throw new IOException("Files must be smaller than 2 GiB.");output.write(buffer,0,n);}
                 }
+                TransferFiles.preserveDate(file,ProviderFolder.modified(context.getContentResolver(),uri));
                 File committed=new File(pending,UUID.randomUUID().toString());if(!directory.renameTo(committed))throw new IOException("Cannot commit staged file.");staged.set(staged.size()-1,new File(committed,name));
             }
             main.post(()->{releaseUi();if(!closed)ready.accept(true);});

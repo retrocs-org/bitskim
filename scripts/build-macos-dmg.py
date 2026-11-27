@@ -2,6 +2,7 @@
 """Build a drag-to-Applications APFS DMG without automating Finder."""
 from pathlib import Path
 from release_paths import output_dir
+from archive_dates import stamp_tree
 import importlib.util,os,shutil,subprocess
 from ds_store import DSStore
 from build_provenance import begin,finish
@@ -28,6 +29,8 @@ with DSStore.open(str(stage/'.DS_Store'),'w+') as d:
  d['.']['icvl']=(b'type',b'icnv')
  d['.']['icvp']={'viewOptionsVersion':1,'backgroundType':1,'backgroundColorRed':layout.BACKGROUND[0],'backgroundColorGreen':layout.BACKGROUND[1],'backgroundColorBlue':layout.BACKGROUND[2],'iconSize':96.0,'textSize':13.0,'gridOffsetX':0.0,'gridOffsetY':0.0,'gridSpacing':100.0,'arrangeBy':'none','showIconPreview':False,'showItemInfo':False,'labelOnBottom':True,'scrollPositionX':0.0,'scrollPositionY':0.0}
  for name,location in layout.LOCATIONS.items():d[name]['Iloc']=location
+# Apply current package dates only to the disposable staged copy.
+stamp_tree(stage)
 # Native APFS creation preserves the signed bundle without HFS catalog FinderInfo.
 out=output_dir(ROOT) / 'BitSkim-0.2-macOS-arm64.dmg';out.parent.mkdir(parents=True,exist_ok=True)
 subprocess.run(['hdiutil','create','-fs','APFS','-srcfolder',str(stage),'-volname',layout.VOLUME,'-format','UDZO','-ov',str(out)],check=True)

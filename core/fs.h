@@ -70,7 +70,7 @@ void *bsp_dir_open(const char *p){BSFDir *d;if(bsp_path_kind(p)!=2)return NULL;d
 int bsp_dir_next(void *handle,char *name,size_t cap){BSFDir *d=(BSFDir *)handle;if(!ExNext(d->lock,d->info))return IoErr()==ERROR_NO_MORE_ENTRIES?0:-1;if(d->info->fib_DirEntryType!=ST_FILE && d->info->fib_DirEntryType!=ST_USERDIR)return -1;if(strlen(d->info->fib_FileName)>=cap)return -1;strcpy(name,d->info->fib_FileName);return 1;}
 void bsp_dir_close(void *handle){BSFDir *d=(BSFDir *)handle;if(d){UnLock(d->lock);FreeDosObject(DOS_FIB,d->info);free(d);}}
 int bsp_disk_free(const char *p,unsigned long *hi,unsigned long *lo,unsigned long *unit){BPTR lock=Lock((STRPTR)p,ACCESS_READ);struct InfoData *info;int ok=0;if(!lock)return 0;info=(struct InfoData *)AllocVec(sizeof *info,MEMF_PUBLIC|MEMF_CLEAR);if(info){if(Info(lock,info) && info->id_NumBlocks>=info->id_NumBlocksUsed && info->id_BytesPerBlock>0){*unit=(unsigned long)info->id_BytesPerBlock;fs_product((unsigned long)(info->id_NumBlocks-info->id_NumBlocksUsed),*unit,hi,lo);ok=1;}FreeVec(info);}UnLock(lock);return ok;}
-#elif defined(BS_DOS)
+#elif (defined(BS_DOS) || defined(BS_WIN16))
 #include <direct.h>
 typedef struct {struct find_t entry;int first,ended;} BSFDir;
 int bsp_path_kind(const char *p){unsigned attr;if(_dos_getfileattr(p,&attr))return errno==ENOENT?0:-1;return attr&_A_SUBDIR?2:1;}
@@ -114,3 +114,5 @@ int bsp_disk_free(const char *p,unsigned long *hi,unsigned long *lo,unsigned lon
 #endif
 }
 #endif
+
+#include "mtime-platform.h"

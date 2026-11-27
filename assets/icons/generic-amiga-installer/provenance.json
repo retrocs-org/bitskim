@@ -1,13 +1,17 @@
 {
-  "source": "Generic-Amiga-Installer-Icons.zip supplied by project owner",
-  "archive_sha256": "6c0a9eb32ceec69b4f464a1fdbb56141f7299ce04713d67287140f028ced626d",
+  "source": "AmiRocket Amiga installer icons, reused at the project owner's request",
+  "source_files": {
+    "SoftwarePackage.info": "AmiRocket/installer/AmiRocketDrawer.info",
+    "Install.info": "AmiRocket/installer/Install.info"
+  },
   "files": {
-    "SoftwarePackage.info": "c150a0a55709466069be4202f3a3411b157421d3b8a645bd7489f7da09894f3c",
-    "Install.info": "dee9746a9c814fe8977fe222427d441dc97fd35a8dad477d31f04452e49d7fb8"
+    "SoftwarePackage.info": "39e1eb83998ed947e23bbd6820abfce47a7edc823ab8aae452b1cc9c9c63fb89",
+    "Install.info": "4a0b5b63600102a27ac3df08d6a49d52c1797a1e935fd4902313a62a0bf8fdfb"
   },
   "mapping": {
-    "SoftwarePackage.info": "BitSkim drawer icon (WBDRAWER)",
-    "Install.info": "Install-BitSkim project icon (DefaultTool=StartInstaller)"
+    "SoftwarePackage.info": "BitSkim drawer icon (exact AmiRocket drawer DiskObject)",
+    "Install.info": "Install project icon (AmiRocket images; DefaultTool=StartInstaller; AmiRocket tool types removed)"
   },
-  "artwork": "Both planar image states are retained byte-for-byte. Only Workbench metadata and drawer geometry are adapted."
+  "artwork": "Both normal and selected planar image states are retained byte-for-byte. The drawer is copied unchanged; only installer launch metadata is adapted.",
+  "licence": "AmiRocket installer icon-generation code is adapted from Beam68 under MIT; notice retained in LICENSE and THIRD-PARTY-NOTICES.MD"
 }

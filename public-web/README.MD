@@ -5,6 +5,10 @@ PHP templates and CSS with local app captures. Serve this directory as the site 
 [retrocs-org/bitskim](https://github.com/retrocs-org/bitskim). PHP 8.0 or later is required on the web host. No database, external fonts, analytics, cookies,
 JavaScript build step or account integration is required.
 
+## Changelog
+
+See [changelog.md](changelog.md) for website changes and the [app changelog](../CHANGELOG.MD) for client changes. Add website features, enhancements and fixes to the unreleased section when updating this directory; record deployment dates only after deployment is confirmed.
+
 ## Local preview
 
 Run `php -S 127.0.0.1:8765 -t public-web` from the project root. The entry points are `index.php` and `release-notes.php`; shared metadata, header and footer live in `includes/`. The built-in server is for local preview only.

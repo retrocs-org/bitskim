@@ -50,6 +50,7 @@ echo "Multicast/broadcast discovery: $multicast"
 [ -f "work/openssl-ios-$sdk/lib/libssl.a" ] || ./scripts/build-openssl-ios.sh "$sdk"
 command -v xcodegen >/dev/null || { echo 'Install XcodeGen, or set PATH to an existing installation.' >&2; exit 1; }
 mkdir -p build/ios
+python3 -c 'from pathlib import Path; import sys; sys.path.insert(0,"scripts"); from build_identity import write_identity; write_identity(Path.cwd())'
 xcodegen generate --spec clients/ios/project.yml --project build/ios
 # Device builds stay unsigned; --run signs the local test app to run on this Mac.
 signing=NO

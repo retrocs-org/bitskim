@@ -2,8 +2,9 @@
 """Create the current full source ZIP and BitSkim-src.tar.gz, without build tools."""
 from pathlib import Path
 from release_paths import output_dir
-from zipfile import ZipFile,ZIP_DEFLATED
-import datetime,hashlib,io,json,shutil,tarfile,tempfile
+from zipfile import ZIP_DEFLATED
+from archive_dates import PackageZipFile as ZipFile
+import hashlib,io,json,shutil,tarfile,tempfile
 from build_provenance import verify
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -29,13 +30,14 @@ def write_source(out,targets=('amiga',),root=ROOT):
     with tempfile.TemporaryDirectory(dir=out) as temp:
         temp=Path(temp);zpath=temp/zipfile.name;tpath=temp/tarfile_path.name
         with ZipFile(zpath,'w',ZIP_DEFLATED) as z:
+            timestamp=z.timestamp
             z.writestr('BitSkim/BUILD-PROVENANCE.json',json.dumps(records,indent=2)+'\n')
             for name,path in sorted(files.items()):z.write(path,name)
         with ZipFile(zpath) as z,tarfile.open(tpath,'w:gz') as t:
             for item in z.infolist():
                 data=z.read(item);info=tarfile.TarInfo(item.filename);info.size=len(data)
                 info.mode=(item.external_attr>>16)&0o777 or 0o644
-                info.mtime=int(datetime.datetime(*item.date_time).timestamp())
+                info.mtime=timestamp
                 t.addfile(info,io.BytesIO(data))
         with ZipFile(zpath) as z,tarfile.open(tpath,'r:gz') as t:
             if set(z.namelist())!=set(t.getnames()):raise RuntimeError('Source archive inventory mismatch')

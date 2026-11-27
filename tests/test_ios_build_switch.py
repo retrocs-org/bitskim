@@ -7,6 +7,7 @@ class IOSBuildSwitch(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    root=Path(d);(root/'scripts').mkdir();(root/'tools').mkdir();(root/'VERSION').write_text('0.2\n')
    shutil.copyfile(ROOT/'scripts/build-ios.sh',root/'scripts/build-ios.sh')
+   for name in ('build_identity.py','build_provenance.py','release_paths.py'):shutil.copyfile(ROOT/'scripts'/name,root/'scripts'/name)
    (root/'scripts/run-ios.py').write_text('import sys; print("RUN", *sys.argv[1:])\n')
    (root/'scripts/check-ios-build.py').write_text('import sys; print("CHECK", *sys.argv[1:])\n')
    for sdk in ('iphoneos','iphonesimulator'):

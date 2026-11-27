@@ -11,7 +11,7 @@ import java.util.*;
 final class ProviderFolder implements TransferFiles.Source {
     private final ContentResolver resolver;
     private final Uri tree;
-    private static final String[] COLUMNS={DocumentsContract.Document.COLUMN_DOCUMENT_ID,DocumentsContract.Document.COLUMN_DISPLAY_NAME,DocumentsContract.Document.COLUMN_MIME_TYPE,DocumentsContract.Document.COLUMN_SIZE,DocumentsContract.Document.COLUMN_FLAGS};
+    private static final String[] COLUMNS={DocumentsContract.Document.COLUMN_DOCUMENT_ID,DocumentsContract.Document.COLUMN_DISPLAY_NAME,DocumentsContract.Document.COLUMN_MIME_TYPE,DocumentsContract.Document.COLUMN_SIZE,DocumentsContract.Document.COLUMN_FLAGS,DocumentsContract.Document.COLUMN_LAST_MODIFIED};
     ProviderFolder(ContentResolver resolver,Uri tree)throws IOException {if(tree==null||!"content".equals(tree.getScheme())||!DocumentsContract.isTreeUri(tree))throw new IOException("Choose a folder through Android Files.");this.resolver=resolver;this.tree=tree;}
     TransferFiles.Node root()throws IOException {
         String id=DocumentsContract.getTreeDocumentId(tree);try(Cursor cursor=resolver.query(uri(id),COLUMNS,null,null,null)){
@@ -22,13 +22,19 @@ final class ProviderFolder implements TransferFiles.Source {
     private TransferFiles.Node read(Cursor cursor)throws IOException {
         String id=cursor.getString(0),name=cursor.getString(1),mime=cursor.getString(2);if(id==null||name==null)throw new IOException("The provider returned an unnamed item.");
         if(!cursor.isNull(4)&&(cursor.getLong(4)&DocumentsContract.Document.FLAG_VIRTUAL_DOCUMENT)!=0)throw new IOException("This provider exposes a virtual document. Download an ordinary copy first.");
-        return new TransferFiles.Node(id,name,DocumentsContract.Document.MIME_TYPE_DIR.equals(mime),cursor.isNull(3)?-1:cursor.getLong(3));
+        return new TransferFiles.Node(id,name,DocumentsContract.Document.MIME_TYPE_DIR.equals(mime),cursor.isNull(3)?-1:cursor.getLong(3),cursor.isNull(5)?-1:cursor.getLong(5));
     }
     public List<TransferFiles.Node> children(TransferFiles.Node parent)throws IOException {
         List<TransferFiles.Node> children=new ArrayList<>();Uri query=DocumentsContract.buildChildDocumentsUriUsingTree(tree,parent.id);
         try(Cursor cursor=resolver.query(query,COLUMNS,null,null,null)){
             if(cursor==null)throw new IOException("The provider could not list this folder.");while(cursor.moveToNext()){if(children.size()>=TransferFiles.MAX_ENTRIES)throw new IOException("The folder has too many entries.");children.add(read(cursor));}
         }catch(SecurityException e){throw new IOException("Folder permission changed. Choose it again.",e);}return children;
+    }
+    static long modified(ContentResolver resolver,Uri uri){
+        try(Cursor cursor=resolver.query(uri,new String[]{DocumentsContract.Document.COLUMN_LAST_MODIFIED},null,null,null)){
+            if(cursor!=null&&cursor.moveToFirst()&&!cursor.isNull(0))return cursor.getLong(0);
+        }catch(RuntimeException unavailable){/* Optional metadata is not supplied by every provider. */}
+        return -1;
     }
     public InputStream open(TransferFiles.Node file)throws IOException {try{return resolver.openInputStream(uri(file.id));}catch(SecurityException e){throw new IOException("The provider denied access to a file. Choose the folder again.",e);}}
 }

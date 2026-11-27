@@ -123,7 +123,7 @@ static int rexx_dispatch(char *line,char *result,size_t capacity) {
             strcpy(address,a);
         }
         if(!(!strcmp(cmd,"SENDID")?bs_send_peer(client,a,b):bs_send(client,address,port,b)))
-            return rexx_error(result,capacity,20,"SEND_FAILED",bs_last_error(client));
+            return rexx_error(result,capacity,20,"SEND_FAILED",bs_user_error(client));
         rexx_observe();
         if(!strcmp(cmd,"SENDID")) snprintf(result,capacity,"ID=%s",current_transfer.id);
         return 0;
@@ -141,7 +141,7 @@ static int rexx_dispatch(char *line,char *result,size_t capacity) {
     }
     if(!strcmp(cmd,"ENQUEUEID")) {
         if(!rexx_token(&cursor,a,sizeof a) || !rexx_token(&cursor,b,sizeof b) || *cursor)return 10;
-        if(!bs_queue_peer(client,a,b))return rexx_error(result,capacity,20,"QUEUE_FAILED",bs_last_error(client));
+        if(!bs_queue_peer(client,a,b))return rexx_error(result,capacity,20,"QUEUE_FAILED",bs_user_error(client));
         return 0;
     }
     if(!strcmp(cmd,"EVENTS") || !strcmp(cmd,"EVENTDETAILS")) {

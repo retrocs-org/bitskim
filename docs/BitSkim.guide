@@ -92,7 +92,7 @@
  BitSkim drawer; it is the drawer's icon. Inside are the client,
  BitSkimPrefs, the Installer, its launcher, this guide and their icons.
 
- Double-click Install-BitSkim. The project icon runs StartInstaller,
+ Double-click Install. The project icon runs StartInstaller,
  which prefers SYS:System/Installer and falls back to C:Installer.
  Close BitSkimPrefs before installing or updating.
 
@@ -137,7 +137,7 @@
 
  Shell installation alternative, from the unpacked package drawer:
 
-   Installer Install-BitSkim APPNAME BitSkim
+   Installer Install APPNAME BitSkim
 
  The Installer preserves settings and received files. It does not install
  a TCP/IP stack, add an assign or edit startup scripts. Novice mode adds
@@ -575,8 +575,8 @@
    BitSkimPrefs.info        preferences icon
    BitSkim.guide            this AmigaGuide manual
    BitSkim.guide.info       manual project icon (MultiView)
-   Install-BitSkim          Installer script
-   Install-BitSkim.info     installer project icon (StartInstaller)
+   Install                  Installer script
+   Install.info             installer project icon (StartInstaller)
    StartInstaller           system Installer launcher
    StartBitSkim              small WBStartup launcher template
    ARexx/                   example scripts and integration contract
@@ -611,7 +611,7 @@
 @node MAINTENANCE "Update and remove"
 
  Close BitSkim (including iconified copies) and BitSkimPrefs first.
- Run Install-BitSkim from the newly unpacked full archive. Check the
+ Run Install from the newly unpacked full archive. Check the
  installer-displayed directories, then Update BitSkim. Registered copies
  retain the three selectable paths without destination questions.
  Help and settings use their fixed system locations.

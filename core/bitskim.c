@@ -10,7 +10,12 @@
 #include <openssl/rand.h>
 #include <openssl/crypto.h>
 #endif
+#ifndef BS_BUILD_ID
+#define BS_BUILD_ID "unidentified source build"
+#endif
+const char *bs_build_id(void){return BS_BUILD_ID;}
 #define RETRO_METADATA 31
+#define FILE_TIME 33
 #define INVITATION 32
 #define INVITATION_SENDING 20
 #define HELLO 1
@@ -57,6 +62,7 @@
 #define HEADER 12
 #define FRAME_MAX (BS_CHUNK+HEADER)
 #define VERIFY_DISK 18
+#define SESSION_IDLE 21
 #define IDLE 0
 #define CONNECTING 1
 #define GREETING 2
@@ -68,7 +74,7 @@
 /* Per-tick work bounds. Larger budgets let fast hosts fill the link without a
    faster UI timer; classic CPUs keep small slices so the desktop stays responsive.
    Override at build time with -DBS_SEND_BURST=n / -DBS_RECV_FRAMES=n. */
-#if defined(__amigaos__) || defined(__riscos__) || defined(BS_DOS)
+#if defined(__amigaos__) || defined(__riscos__) || (defined(BS_DOS) || defined(BS_WIN16))
 #define BS_CLASSIC 1
 #endif
 #ifndef BS_SEND_BURST
@@ -93,7 +99,7 @@ typedef struct {BSBatchItem item;unsigned long hi,lo,files,dirs;} BSBatchRecord;
 typedef struct {unsigned char token[16];int count,refs,streamed,tree;void *wire_tree;FILE *items;BSBatchItem cache;unsigned long hi,lo,files,dirs;} BSBatch;
 typedef struct BSTreeScan BSTreeScan;
 typedef struct BSTreePlan BSTreePlan;
-typedef struct {BSBatch *manifest;char peer[33],address[48],folder[BS_PATH_MAX+1];unsigned short port;int next,encrypted;unsigned long last_seen;BSTreePlan *plan;} BSBatchApproval;
+typedef struct {BSBatch *manifest;char peer[33],address[48],folder[BS_PATH_MAX+1];unsigned short port;int next,encrypted,resume_existing;unsigned long last_seen;BSTreePlan *plan;} BSBatchApproval;
 typedef struct {char id[33],address[48],path[BS_PATH_MAX+1];unsigned short port;unsigned long total,group,invitation_expires;unsigned char invitation_pin[32],invitation_token[16];int kind;unsigned long report;char relative[256];} BSQueued;
 typedef struct BSRetry BSRetry;
 typedef struct {unsigned long complete,folders,skipped,failed,cancelled;int lost;} BSRun;
@@ -101,11 +107,14 @@ typedef struct {BSQueued q;int result;} BSRunRecord;
 typedef struct {unsigned long rate,credit,stamp,fraction;} BSBucket;
 typedef struct BSFolders BSFolders;
 struct BSState;
+struct BSRetainedReview;
 struct BSClient {
+    struct BSRetainedReview *retained;unsigned long retained_counter;
     struct BSState *saved_state;
     unsigned long issued_expires;unsigned char issued_token[16];
     unsigned long invitation_expires;unsigned char invitation_pin[32],invitation_token[16];int invitation_sent,invitation_received;
     int metadata_enabled,metadata_sent,metadata_received,metadata_outcome;unsigned char metadata[184];
+    int mtime_sent,mtime_received,mtime_outcome;unsigned long source_mtime,received_mtime;int source_mtime_valid;
     BSFolders *folders;
     BSSocket check_socket;int check_pending;unsigned long check_start;
     char check_result[160],check_local[48];
@@ -122,20 +131,22 @@ struct BSClient {
     unsigned char peer_caps_known[BS_MAX_PEERS];char upgrade_id[33];
 #ifdef BS_OPENSSL
     unsigned char pairing_key[32];
-    int resume_enabled,resume_offer,resume_cache;
+    int resume_enabled,resume_offer,resume_cache,resume_completed;
     unsigned long verify_remaining,resume_offset,last_resume_heartbeat;
     unsigned char prefix_digest[32];EVP_MD_CTX *prefix_hash;
     char resume_meta[BS_PATH_MAX+1],trust_directory[BS_PATH_MAX+1];
 #endif
-    int batch_enabled,in_batch_index,out_batch_index;
+    int batch_enabled,in_batch_index,out_batch_index,session_enabled;unsigned long session_since;unsigned char session_token[16];
     unsigned long batch_counter;int list_cursor;
     BSBatch *in_batch,*out_batch;BSBatchApproval *batch_approval;BSTreeScan *tree_scan;unsigned long tree_counter;int queue_dir_request;
     unsigned long transfer_serial; BSResult transfer_result;
-    BSStatus status; char error[256], source[BS_PATH_MAX+1], dest[BS_PATH_MAX+1], temp[BS_PATH_MAX+1];
+    BSRecoveryProgress recovery;int recovery_file_kind;
+    char recovery_message[512];
+    BSErrorCode error_code;unsigned long error_transfer_serial;BSStatus status; char error[256], source[BS_PATH_MAX+1], dest[BS_PATH_MAX+1], temp[BS_PATH_MAX+1];
     BSHistoryItem history[BS_HISTORY_MAX];int history_count,history_next;unsigned long history_serial;
     unsigned long disk_crc,disk_bytes,last_verify;int verified,conflict_policy,replace_pending;
     FILE *file; unsigned long rate_time,rate_bytes,rate;
-    unsigned long crc, last_io, decision_start, last_probe;
+    unsigned long crc, last_io, decision_start, last_probe, handshake_start, last_frame;
     unsigned char rx[RX_CAP],tx[FRAME_MAX]; int rx_count,tx_count,tx_sent,status_dirty;
     /* Sockets closed gracefully: write side shut down, inbound bytes drained until
        EOF or LINGER_SECONDS, so a final CANCEL/ERROR frame is not lost to a reset. */
@@ -147,6 +158,7 @@ struct BSClient {
     FILE *queue_file;unsigned long queue_head;BSBatch *queue_batch;int queue_batch_index;int queue_count,queue_active,queue_paused;unsigned long queue_processed;
 };
 static void copystr(char *d,const char *s,size_t n) { size_t i=0;if(!n)return;if(!s)s="";while(i+1<n && s[i])i++;memmove(d,s,i);memset(d+i,0,n-i); }
+#include "recovery.h"
 static void batch_free(BSBatch *b) {if(b && --b->refs==0){if(b->items)fclose(b->items);if(b->wire_tree)free(b->wire_tree);free(b);}}
 static BSBatch *batch_new(void) {BSBatch *b=(BSBatch *)calloc(1,sizeof *b);if(b){b->refs=1;b->items=bsp_temp_file();if(!b->items){free(b);b=NULL;}}return b;}
 static void wide_add(unsigned long *hi,unsigned long *lo,unsigned long h,unsigned long l){unsigned long old=*lo;*lo=(*lo+l)&0xffffffffUL;*hi=(*hi+h+(*lo<old))&0xffffffffUL;}
@@ -160,15 +172,15 @@ static int batch_append(BSBatch *b,const BSBatchItem *item){BSBatchRecord r;size
 }
 static void tree_plan_free(BSTreePlan *);
 static void tree_scan_free(BSClient *);
-static void batch_revoke(BSClient *c){if(c->batch_approval){tree_plan_free(c->batch_approval->plan);batch_free(c->batch_approval->manifest);free(c->batch_approval);c->batch_approval=NULL;}}
+static void batch_revoke(BSClient *c){if(c->batch_approval){if(c->batch_approval->resume_existing && c->recovery.phase>0 && c->recovery.phase<4)c->recovery.phase=(c->batch_approval->next>=c->batch_approval->manifest->count)?4:5;tree_plan_free(c->batch_approval->plan);batch_free(c->batch_approval->manifest);free(c->batch_approval);c->batch_approval=NULL;}}
 static int wire_filename(const char *path,char out[256]) {
     const char *base=path,*p;
     for(p=path;*p;p++) {
         if(*p=='/')base=p+1;
-#if defined(_WIN32) || defined(BS_DOS) || defined(BS_ATARI)
+#if defined(_WIN32) || (defined(BS_DOS) || defined(BS_WIN16)) || defined(BS_ATARI)
         if(*p=='\\')base=p+1;
 #endif
-#if defined(__amigaos__) || defined(BS_DOS) || defined(BS_ATARI)
+#if defined(__amigaos__) || (defined(BS_DOS) || defined(BS_WIN16)) || defined(BS_ATARI)
         if(*p==':')base=p+1;
 #endif
     }
@@ -288,10 +300,10 @@ static void cleanup_transfer(BSClient *c) {
     c->state=IDLE; c->status.active=0; c->status.awaiting_decision=0;
     c->tx_count=c->tx_sent=c->rx_count=0;
 }
-static void fail(BSClient *c,const char *m) {
+static void fail(BSClient *c,BSErrorCode code,const char *m) {
     batch_revoke(c);
     if(c->transfer_result==BS_RESULT_NONE) c->transfer_result=BS_RESULT_FAILED;
-    cleanup_transfer(c); copystr(c->error,m,sizeof(c->error)); copystr(c->status.message,m,sizeof(c->status.message)); notify(c,BS_EVENT_ERROR);
+    set_error(c,code,m);copystr(c->status.message,c->error,sizeof c->status.message);cleanup_transfer(c);notify(c,BS_EVENT_ERROR);
 }
 static void forget_peer(BSClient *c,const char *ip,unsigned short port,const char *identity) {
     int i,changed=0;
@@ -302,12 +314,12 @@ static void forget_peer(BSClient *c,const char *ip,unsigned short port,const cha
     }
     if(changed) notify(c,BS_EVENT_PEERS);
 }
-static void connection_failed(BSClient *c,const char *reason) {
+static void connection_failed(BSClient *c,BSErrorCode code,const char *reason) {
 #ifdef BS_OPENSSL
     if(bsp_tls_error(c->sock)[0])reason=bsp_tls_error(c->sock);
 #endif
     forget_peer(c,c->status.peer_address,c->remote_port,c->remote_id);
-    fail(c,reason);
+    fail(c,code,reason);
 }
 static int frame_into(unsigned char *out,int type,const void *p,int n) {
     memcpy(out,"BSK1",4); put16(out+4,(unsigned short)type); put16(out+6,0); put32(out+8,(unsigned long)n);
@@ -357,16 +369,16 @@ static void abort_transfer(BSClient *c,int type,const char *wire,const char *loc
             if(bsp_send(c->sock,c->tx,c->tx_count)==c->tx_count) { park_socket(c,c->sock); c->sock=BS_INVALID_SOCKET; }
         }
     }
-    fail(c,local);
+    fail(c,result==BS_RESULT_CANCELLED?BS_ERR_CANCELLED:BS_ERR_TIMEOUT,local);
 }
-static void finish_error(BSClient *c,int type,const char *m) {
+static void finish_error(BSClient *c,int type,BSErrorCode code,const char *m) {
     batch_revoke(c);
     if(c->transfer_result==BS_RESULT_NONE) c->transfer_result=type==DECLINE?BS_RESULT_DECLINED:BS_RESULT_FAILED;
-    if(c->tx_count) { fail(c,m); return; }
+    if(c->tx_count) { fail(c,code,m); return; }
     frame(c,type,m,(int)strlen(m)); c->state=CLOSING; c->status.awaiting_decision=0;
-    copystr(c->error,m,sizeof(c->error));
+    set_error(c,code,m);
     if(type==DECLINE) message(c,m);
-    else { copystr(c->status.message,m,sizeof(c->status.message)); notify(c,BS_EVENT_ERROR); }
+    else { copystr(c->status.message,m,sizeof c->status.message); notify(c,BS_EVENT_ERROR); }
 }
 static int hexval(char v) { if(v>='0'&&v<='9') return v-'0'; if(v>='a'&&v<='f') return v-'a'+10; return -1; }
 static unsigned local_features(const BSClient *c) {
@@ -378,7 +390,8 @@ static unsigned local_features(const BSClient *c) {
     #ifdef BS_OPENSSL
     if(c->trust_directory[0] && c->security_mode && !c->pairing_set)flags|=BS_CAP_INVITATION;
 #endif
-    return flags|(c->metadata_enabled?BS_CAP_RETRO_METADATA:0);
+    if(c->session_enabled)flags|=BS_CAP_SESSION;
+    return flags|(c->metadata_enabled?(BS_CAP_RETRO_METADATA|BS_CAP_FILE_TIMES):0);
 }
 #include "caps.h"
 static unsigned greeting_features(const unsigned char *p,int n) {
@@ -407,19 +420,22 @@ static int parse_greeting(const unsigned char *p,int n,BSPeer *peer) {
 static void send_hello(BSClient *c) { unsigned char p[128]; int n=greeting(c,p); frame(c,HELLO,p,n); }
 #include "rate.h"
 static void reset_status(BSClient *c,int incoming,const char *ip) {
+    if(!c->batch_approval || !c->batch_approval->resume_existing){memset(&c->recovery,0,sizeof c->recovery);}
+    c->recovery_file_kind=0;
     batch_free(c->in_batch);c->in_batch=NULL;c->in_batch_index=0;c->out_batch=NULL;c->out_batch_index=0;
     c->transfer_serial=(c->transfer_serial+1)&0xffffffffUL; if(!c->transfer_serial) c->transfer_serial=1;
     c->active_send_limit=c->send_limit;c->active_receive_limit=c->receive_limit;c->peer_receive_limit=0;limits_reset(c);
     c->invitation_expires=0;c->invitation_sent=c->invitation_received=0;memset(c->invitation_pin,0,sizeof c->invitation_pin);memset(c->invitation_token,0,sizeof c->invitation_token);
     c->metadata_sent=c->metadata_received=c->metadata_outcome=0;memset(c->metadata,0,sizeof c->metadata);
+    c->mtime_sent=c->mtime_received=c->mtime_outcome=c->source_mtime_valid=0;c->source_mtime=c->received_mtime=0;
     c->verified=0;c->replace_pending=0;c->dest[0]=0;
     c->transfer_result=BS_RESULT_NONE;c->remote_features=0;c->last_encrypted=0;c->cap_ready=0;c->upgrade_id[0]=0;memset(&c->remote_caps,0,sizeof c->remote_caps);
 #ifdef BS_OPENSSL
-    c->resume_offer=c->resume_cache=0;c->resume_meta[0]=0;c->resume_offset=c->verify_remaining=0;
+    c->resume_offer=c->resume_cache=c->resume_completed=0;c->resume_meta[0]=0;c->resume_offset=c->verify_remaining=0;
 #endif
     memset(&c->status,0,sizeof(c->status)); c->status.active=1; c->status.incoming=incoming;
     copystr(c->status.peer_address,ip,sizeof(c->status.peer_address)); c->got_hello=0; c->crc=0; c->remote_id[0]=0; c->remote_port=0;
-    c->expected_id[0]=0; c->error[0]=c->temp[0]=c->dest[0]=0; c->rx_count=c->tx_count=c->tx_sent=0; c->last_io=bsp_seconds(); c->rate_time=c->last_io; c->rate_bytes=c->rate=0; c->status_dirty=0;
+    c->expected_id[0]=0; c->error_transfer_serial=0;c->error_code=BS_ERR_NONE; c->error[0]=c->temp[0]=c->dest[0]=0; c->rx_count=c->tx_count=c->tx_sent=0; c->last_io=c->handshake_start=c->last_frame=bsp_seconds(); c->rate_time=c->last_io; c->rate_bytes=c->rate=0; c->status_dirty=0;
 }
 static BSSocket open_socket(BSClient *c,int type) {
     struct sockaddr_in a; BSSocket s; int yes=1;
@@ -452,7 +468,7 @@ static BSClient *create_client(const BSConfig *config,BSCallback cb,void *contex
     for(i=0;i<32;i++) if(hexval(config->id[i])<0) return NULL;
     c=(BSClient *)calloc(1,sizeof(*c)); if(!c) return NULL;
 #ifdef BS_OPENSSL
-    c->security_mode=BS_SECURITY_OPTIONAL;
+    c->security_mode=BS_SECURITY_OPTIONAL;c->session_enabled=1;
 #endif
     c->config=*config; c->config.name[63]=0; c->config.platform[31]=0; c->config.bind_address[47]=0;
     if(!c->config.name[0]) copystr(c->config.name,"BitSkim",64);
@@ -468,7 +484,7 @@ static BSClient *create_client(const BSConfig *config,BSCallback cb,void *contex
 }
 BSClient *bs_create(const BSConfig *config,BSCallback cb,void *context) { return create_client(config,cb,context,0); }
 BSClient *bs_create_manual(const BSConfig *config,BSCallback cb,void *context) { return create_client(config,cb,context,1); }
-void bs_destroy(BSClient *c) { int i; if(!c) return;state_close(c);if(c->check_pending)bsp_close(c->check_socket);retry_free(c);if(c->run_file)fclose(c->run_file);if(c->incoming_results)fclose(c->incoming_results);tree_scan_free(c); if(c->queue_file)fclose(c->queue_file);batch_free(c->queue_batch);batch_free(c->in_batch);batch_revoke(c); cleanup_transfer(c); for(i=0;i<LINGER_MAX;i++) if(c->linger[i]!=BS_INVALID_SOCKET) bsp_close(c->linger[i]); if(c->listener!=BS_INVALID_SOCKET) bsp_close(c->listener); if(c->udp!=BS_INVALID_SOCKET) bsp_close(c->udp);
+void bs_destroy(BSClient *c) { int i; if(!c) return;bs_retained_close(c);state_close(c);if(c->check_pending)bsp_close(c->check_socket);retry_free(c);if(c->run_file)fclose(c->run_file);if(c->incoming_results)fclose(c->incoming_results);tree_scan_free(c); if(c->queue_file)fclose(c->queue_file);batch_free(c->queue_batch);batch_free(c->in_batch);batch_revoke(c); cleanup_transfer(c); for(i=0;i<LINGER_MAX;i++) if(c->linger[i]!=BS_INVALID_SOCKET) bsp_close(c->linger[i]); if(c->listener!=BS_INVALID_SOCKET) bsp_close(c->listener); if(c->udp!=BS_INVALID_SOCKET) bsp_close(c->udp);
 #ifdef BS_OPENSSL
     OPENSSL_cleanse(c->pairing_key,32);
 #endif
@@ -541,20 +557,20 @@ static void discovery(BSClient *c) {
 }
 int bs_send(BSClient *c,const char *ip,unsigned short port,const char *path) {
     struct sockaddr_in a; char wire_name[256]; unsigned long size; BSSocket s; int r;
-    if(c->state!=IDLE) { copystr(c->error,"A transfer is already active",256); return 0; }
-    if(!path || strlen(path)>BS_PATH_MAX || !(bsp_size(path,&size) || (c->queue_dir_request && bsp_path_kind(path)==2 && (size=0,1)))) { copystr(c->error,"Choose a regular file smaller than 2 GiB",256); return 0; }
-    if(!wire_filename(path,wire_name)) {copystr(c->error,"Filename is not portable; rename the file first",256);return 0;}
+    if(c->state!=IDLE) { set_error(c,BS_ERR_BUSY,"A transfer is already active"); return 0; }
+    if(!path || strlen(path)>BS_PATH_MAX || !(bsp_size(path,&size) || (c->queue_dir_request && bsp_path_kind(path)==2 && (size=0,1)))) { set_error(c,BS_ERR_SOURCE,"Choose a regular file smaller than 2 GiB"); return 0; }
+    if(!wire_filename(path,wire_name)) {set_error(c,BS_ERR_LIMIT,"Filename is not portable; rename the file first");return 0;}
     memset(&a,0,sizeof(a)); a.sin_family=AF_INET; a.sin_port=htons(port?port:BS_PORT); a.sin_addr.s_addr=inet_addr(ip);
-    if(a.sin_addr.s_addr==INADDR_NONE || !a.sin_addr.s_addr) { copystr(c->error,"Enter a valid IPv4 address",256); return 0; }
-    s=socket(AF_INET,SOCK_STREAM,0); if(s==BS_INVALID_SOCKET) { copystr(c->error,"Could not create connection",256); return 0; }
+    if(a.sin_addr.s_addr==INADDR_NONE || !a.sin_addr.s_addr) { set_error(c,BS_ERR_NETWORK,"Enter a valid IPv4 address"); return 0; }
+    s=socket(AF_INET,SOCK_STREAM,0); if(s==BS_INVALID_SOCKET) { set_error(c,BS_ERR_NETWORK,"Could not create connection"); return 0; }
 #ifdef SO_NOSIGPIPE
     { int yes=1; setsockopt(s,SOL_SOCKET,SO_NOSIGPIPE,&yes,sizeof(yes)); }
 #endif
-    if(bsp_nonblock(s)<0) { bsp_close(s); copystr(c->error,"Could not configure connection",256); return 0; }
+    if(bsp_nonblock(s)<0) { bsp_close(s); set_error(c,BS_ERR_NETWORK,"Could not configure connection"); return 0; }
 #ifdef BS_OPENSSL
     {int i,encrypted=c->security_mode==BS_SECURITY_REQUIRED;
      for(i=0;i<c->peer_count;i++)if(!strcmp(c->peers[i].address,ip) && c->peers[i].port==(port?port:BS_PORT) && (c->peer_features[i]&BS_CAP_TLS) && !(c->peer_features[i]&BS_CAP_DETAILS) && c->security_mode)encrypted=1;
-     if(!bsp_tls_attach(s,0,c->security_mode,encrypted,c->pairing_set?c->pairing_key:NULL)){bsp_close(s);copystr(c->error,"Cannot allocate encrypted transport",256);return 0;}}
+     if(!bsp_tls_attach(s,0,c->security_mode,encrypted,c->pairing_set?c->pairing_key:NULL)){bsp_close(s);set_error(c,BS_ERR_SECURITY,"Cannot allocate encrypted transport");return 0;}}
 #endif
     bsp_watch_connection(s);
     r=connect(s,(struct sockaddr *)&a,sizeof(a)); if(r<0 && !
@@ -563,19 +579,19 @@ int bs_send(BSClient *c,const char *ip,unsigned short port,const char *path) {
 #else
         bsp_wouldblock()
 #endif
-    ) { bsp_close(s); copystr(c->error,"Could not connect to that computer",256); forget_peer(c,ip,port?port:BS_PORT,""); return 0; }
-    reset_status(c,0,ip); c->remote_port=port?port:BS_PORT; c->sock=s; c->state=CONNECTING; c->status.total=size; copystr(c->source,path,sizeof(c->source)); copystr(c->status.filename,wire_name,sizeof(c->status.filename)); if(!c->queue_count)remember_folder(c,0,path,0);message(c,"Connecting..."); return 1;
+    ) { bsp_close(s); set_error(c,BS_ERR_NETWORK,"Could not connect to that computer"); forget_peer(c,ip,port?port:BS_PORT,""); return 0; }
+    reset_status(c,0,ip); c->remote_port=port?port:BS_PORT; c->sock=s; c->state=CONNECTING; c->status.total=size; copystr(c->source,path,sizeof(c->source)); if(c->metadata_enabled)c->source_mtime_valid=bsp_mtime_get(path,&c->source_mtime); copystr(c->status.filename,wire_name,sizeof(c->status.filename)); if(!c->queue_count)remember_folder(c,0,path,0);message(c,"Connecting..."); return 1;
 }
 int bs_send_peer(BSClient *c,const char *id,const char *path) {
     int i,found=-1; char identity[33],address[48]; unsigned short port;
-    if(c->state!=IDLE) { copystr(c->error,"A transfer is already active",256); return 0; }
-    if(!id || strlen(id)!=32) { copystr(c->error,"Invalid peer ID",256); return 0; }
+    if(c->state!=IDLE) { set_error(c,BS_ERR_BUSY,"A transfer is already active"); return 0; }
+    if(!id || strlen(id)!=32) { set_error(c,BS_ERR_NETWORK,"Invalid peer ID"); return 0; }
     copystr(identity,id,sizeof(identity));
     for(i=0;i<c->peer_count;i++) if(!strcmp(c->peers[i].id,identity)) {
-        if(found>=0) { copystr(c->error,"Peer ID is ambiguous; use a manual address",256); return 0; }
+        if(found>=0) { set_error(c,BS_ERR_NETWORK,"Peer ID is ambiguous; use a manual address"); return 0; }
         found=i;
     }
-    if(found<0) { copystr(c->error,"Peer ID is unavailable",256); return 0; }
+    if(found<0) { set_error(c,BS_ERR_NETWORK,"Peer ID is unavailable"); return 0; }
     copystr(address,c->peers[found].address,sizeof(address)); port=c->peers[found].port;
     if(!bs_send(c,address,port,path)) return 0;
     copystr(c->expected_id,identity,sizeof(c->expected_id)); return 1;
@@ -583,11 +599,11 @@ int bs_send_peer(BSClient *c,const char *id,const char *path) {
 int bs_send_peer_address(BSClient *c,const char *id,const char *address,unsigned short port,const char *path) {
     int i,found=0;char identity[33],ip[48];
     if(!c)return 0;
-    if(c->state!=IDLE){copystr(c->error,"A transfer is already active",256);return 0;}
-    if(!id || strlen(id)!=32 || !address || strlen(address)>=48){copystr(c->error,"Invalid peer endpoint",256);return 0;}
+    if(c->state!=IDLE){set_error(c,BS_ERR_BUSY,"A transfer is already active");return 0;}
+    if(!id || strlen(id)!=32 || !address || strlen(address)>=48){set_error(c,BS_ERR_PROTOCOL,"Invalid peer endpoint");return 0;}
     copystr(identity,id,sizeof identity);copystr(ip,address,sizeof ip);if(!port)port=BS_PORT;
     for(i=0;i<c->peer_count;i++)if(!strcmp(c->peers[i].id,identity) && !strcmp(c->peers[i].address,ip) && c->peers[i].port==port){found=1;break;}
-    if(!found){copystr(c->error,"Selected peer address is unavailable; refresh and try again",256);return 0;}
+    if(!found){set_error(c,BS_ERR_NETWORK,"Selected peer address is unavailable; refresh and try again");return 0;}
     if(!bs_send(c,ip,port,path))return 0;
     copystr(c->expected_id,identity,sizeof c->expected_id);return 1;
 }
@@ -600,8 +616,8 @@ static int storage_resume(BSClient *,const char *,unsigned long);
 int bs_accept(BSClient *c,const char *path) {
     int i;
     if(c->state!=DECISION || !c->status.incoming || !c->status.awaiting_decision || c->tx_count) return 0;
-    if(bs_batch_is_tree(c) && (!c->batch_approval || !c->batch_approval->plan)){copystr(c->error,"Folder transfers require collection approval",256);return 0;}
-    if(!path || !path[0] || strlen(path)>BS_PATH_MAX-32) { copystr(c->error,"Destination path is too long",256); return 0; }
+    if(bs_batch_is_tree(c) && (!c->batch_approval || !c->batch_approval->plan)){set_error(c,BS_ERR_INTERNAL,"Folder transfers require collection approval");return 0;}
+    if(!path || !path[0] || strlen(path)>BS_PATH_MAX-32) { set_error(c,BS_ERR_DESTINATION,"Destination path is too long"); return 0; }
     {char folder[BS_PATH_MAX+1];storage_parent(path,folder);if(!storage_check(c,folder,0))return 0;}
     /* Only create a temporary file after an explicit receiver decision. */
     copystr(c->dest,path,sizeof(c->dest));
@@ -611,21 +627,21 @@ int bs_accept(BSClient *c,const char *path) {
            RISC OS paths are UnixLib-normalised ('/'); AmigaDOS also uses ':'. */
         {
             const char *slash=strrchr(path,'/'); size_t prefix;
-#if defined(_WIN32) || defined(BS_DOS) || defined(BS_ATARI)
+#if defined(_WIN32) || (defined(BS_DOS) || defined(BS_WIN16)) || defined(BS_ATARI)
             const char *backslash=strrchr(path,'\\');
 #endif
-#if defined(__amigaos__) || defined(_WIN32) || defined(BS_DOS) || defined(BS_ATARI)
+#if defined(__amigaos__) || defined(_WIN32) || (defined(BS_DOS) || defined(BS_WIN16)) || defined(BS_ATARI)
             const char *colon=strrchr(path,':');
 #endif
-#if defined(_WIN32) || defined(BS_DOS) || defined(BS_ATARI)
+#if defined(_WIN32) || (defined(BS_DOS) || defined(BS_WIN16)) || defined(BS_ATARI)
             if(backslash && (!slash || backslash>slash)) slash=backslash;
 #endif
-#if defined(__amigaos__) || defined(_WIN32) || defined(BS_DOS) || defined(BS_ATARI)
+#if defined(__amigaos__) || defined(_WIN32) || (defined(BS_DOS) || defined(BS_WIN16)) || defined(BS_ATARI)
             if(colon && (!slash || colon>slash)) slash=colon;
 #endif
             prefix=slash?(size_t)(slash-path)+1:0;
             memcpy(c->temp,path,prefix);
-#if defined(BS_DOS) || defined(BS_ATARI)
+#if (defined(BS_DOS) || defined(BS_WIN16)) || defined(BS_ATARI)
             sprintf(c->temp+prefix,"BS%06lx.T%02x",bsp_seconds()&0xffffffUL,i);
 #elif defined(__amigaos__) || defined(__riscos__)
             sprintf(c->temp+prefix,"BS%06lx%02x",bsp_seconds()&0xffffffUL,i);
@@ -636,11 +652,11 @@ int bs_accept(BSClient *c,const char *path) {
         if(same_local_path(c->temp,path))continue;
         c->file=bsp_create_file(c->temp); if(c->file) break;
     }
-    if(!c->file) { c->temp[0]=0; copystr(c->error,"Cannot create a file in that folder",256); return 0; }
+    if(!c->file) { c->temp[0]=0; set_error(c,BS_ERR_INTERNAL,"Cannot create a file in that folder"); return 0; }
     c->status.awaiting_decision=0; c->state=RECEIVING; c->last_io=bsp_seconds(); frame(c,ACCEPT,NULL,0); if(!c->in_batch)remember_folder(c,1,path,0);message(c,"Receiving file..."); return 1;
 }
 #include "resume.h"
-void bs_decline(BSClient *c) { if(c->status.awaiting_decision) finish_error(c,DECLINE,"Transfer declined"); }
+void bs_decline(BSClient *c) { if(c->status.awaiting_decision) finish_error(c,DECLINE,BS_ERR_DECLINED,"Transfer declined"); }
 void bs_cancel(BSClient *c) {
     if(!c)return;
     retry_free(c);tree_scan_free(c);batch_revoke(c);
@@ -656,10 +672,13 @@ void bs_cancel(BSClient *c) {
 static void begin_offer(BSClient *c) {
     int len;unsigned char offer[270];
     if(c->status.incoming)return;
-    if(c->out_batch && c->out_batch->tree && (!(c->remote_features&BS_CAP_DIRECTORIES) || !(c->remote_features&BS_CAP_COLLECTION))){finish_error(c,FRAME_ERROR,"Recipient does not support folder transfers; update it or send an archive explicitly");return;}
-    if(c->cap_ready && (!(c->remote_caps.receive_features&BS_CAP_DETAILS) || c->status.total>c->remote_caps.max_receive_file || strlen(c->status.filename)>c->remote_caps.wire_name_bytes)) {finish_error(c,FRAME_ERROR,"Receiver cannot accept this file under its reported limits");return;}
+#ifdef BS_OPENSSL
+    c->resume_offer=(local_features(c)&c->remote_features&BS_CAP_RESUME)!=0 && (!c->out_batch || (c->remote_features&BS_CAP_SESSION));
+#endif
+    if(c->out_batch && c->out_batch->tree && (!(c->remote_features&BS_CAP_DIRECTORIES) || !(c->remote_features&BS_CAP_COLLECTION))){finish_error(c,FRAME_ERROR,BS_ERR_LIMIT,"Recipient does not support folder transfers; update it or send an archive explicitly");return;}
+    if(c->cap_ready && (!(c->remote_caps.receive_features&BS_CAP_DETAILS) || c->status.total>c->remote_caps.max_receive_file || strlen(c->status.filename)>c->remote_caps.wire_name_bytes)) {finish_error(c,FRAME_ERROR,BS_ERR_LIMIT,"Receiver cannot accept this file under its reported limits");return;}
             if(c->out_batch && (c->out_batch->count>1 || c->out_batch->tree) && (c->remote_features&BS_CAP_BATCH)) {
-                if(c->remote_features&BS_CAP_COLLECTION){if(c->cap_ready && (unsigned long)c->out_batch->count>c->remote_caps.collection_files){finish_error(c,FRAME_ERROR,"Receiver cannot accept this collection size");return;}collection_send(c,1);message(c,"Sending file list...");return;}
+                if(c->remote_features&BS_CAP_COLLECTION){if(c->cap_ready && (unsigned long)c->out_batch->count>c->remote_caps.collection_files){finish_error(c,FRAME_ERROR,BS_ERR_LIMIT,"Receiver cannot accept this collection size");return;}collection_send(c,1);message(c,"Sending file list...");return;}
                 batch_send_offer(c);c->state=DECISION;c->decision_start=bsp_seconds();message(c,"Waiting for batch approval...");return;
             }
             len=(int)strlen(c->status.filename);
@@ -672,6 +691,7 @@ static void begin_offer(BSClient *c) {
 #endif
             c->state=DECISION; c->decision_start=bsp_seconds(); message(c,"Waiting for the recipient...");
 }
+#include "session.h"
 static int trust_check(BSClient *c);
 static void negotiation_ready(BSClient *c) {
 #ifdef BS_OPENSSL
@@ -679,9 +699,9 @@ static void negotiation_ready(BSClient *c) {
             copystr(c->upgrade_id,c->remote_id,33);frame(c,START_TLS,NULL,0);c->state=TLS_CLIENT;message(c,"Negotiating encryption...");return;
         }
 #endif
-        if(!bs_transfer_encrypted(c) && ((c->status.incoming && c->security_mode==BS_SECURITY_REQUIRED && (!c->remote_caps.security_mode || !(c->remote_caps.send_features&BS_CAP_TLS))) || (!c->status.incoming && c->remote_caps.security_mode==BS_SECURITY_REQUIRED))) {finish_error(c,FRAME_ERROR,"Encryption is required; enable Prefer or Force encryption on both clients");return;}
+        if(!bs_transfer_encrypted(c) && ((c->status.incoming && c->security_mode==BS_SECURITY_REQUIRED && (!c->remote_caps.security_mode || !(c->remote_caps.send_features&BS_CAP_TLS))) || (!c->status.incoming && c->remote_caps.security_mode==BS_SECURITY_REQUIRED))) {finish_error(c,FRAME_ERROR,BS_ERR_SECURITY,"Encryption is required; enable Prefer or Force encryption on both clients");return;}
         if((!c->status.incoming || bs_transfer_encrypted(c)) && !trust_check(c))return;
-        if(!c->status.incoming && c->invitation_expires && !c->invitation_sent){unsigned char token[20];if(!(c->remote_features&BS_CAP_INVITATION)){finish_error(c,FRAME_ERROR,"Receiver cannot validate this invitation");return;}put32(token,c->invitation_expires);memcpy(token+4,c->invitation_token,16);frame(c,INVITATION,token,20);c->invitation_sent=1;c->state=INVITATION_SENDING;return;}
+        if(!c->status.incoming && c->invitation_expires && !c->invitation_sent){unsigned char token[20];if(!(c->remote_features&BS_CAP_INVITATION)){finish_error(c,FRAME_ERROR,BS_ERR_SECURITY,"Receiver cannot validate this invitation");return;}put32(token,c->invitation_expires);memcpy(token+4,c->invitation_token,16);frame(c,INVITATION,token,20);c->invitation_sent=1;c->state=INVITATION_SENDING;return;}
         begin_offer(c);return;
 }
 static int commit_received(BSClient *c) {
@@ -695,7 +715,7 @@ static int commit_received(BSClient *c) {
         if(same_local_path(backup,c->dest))continue;
         if(bsp_commit(c->dest,backup))continue;
         if(!bsp_commit(c->temp,c->dest)){bsp_remove_file(backup);return 0;}
-        if(bsp_commit(backup,c->dest)) {copystr(c->error,"Commit failed; original retained in same-folder BK backup",256);}
+        if(bsp_commit(backup,c->dest)) {set_error(c,BS_ERR_INTERNAL,"Commit failed; original retained in same-folder BK backup");}
         return -1;
     }
     return -1;
@@ -704,7 +724,7 @@ void bs_conflict_policy(BSClient *c,int policy){if(c && policy>=0 && policy<=2)c
 int bs_conflict_get(const BSClient *c){return c?c->conflict_policy:0;}
 int bs_skip_incoming(BSClient *c){
     if(!c || c->state!=DECISION || !c->status.awaiting_decision || c->tx_count)return 0;
-    if(!(c->remote_features&BS_CAP_SKIP)){copystr(c->error,"Sender cannot skip a file; decline or rename instead",256);return 0;}
+    if(!(c->remote_features&BS_CAP_SKIP)){set_error(c,BS_ERR_LIMIT,"Sender cannot skip a file; decline or rename instead");return 0;}
     c->transfer_result=BS_RESULT_SKIPPED;c->status.awaiting_decision=0;
     if(c->batch_approval){c->batch_approval->next=c->in_batch_index+1;c->batch_approval->last_seen=bsp_seconds();if(c->batch_approval->next>=c->in_batch->count)batch_revoke(c);}
     frame(c,SKIP_FILE,NULL,0);c->state=CLOSING;message(c,"Skipped existing file");notify(c,BS_EVENT_COMPLETE);return 1;
@@ -717,29 +737,51 @@ int bs_accept_conflict(BSClient *c,const char *path){
     if(c->conflict_policy==BS_CONFLICT_REPLACE){if(!bs_accept(c,path))return 0;c->replace_pending=1;return 1;}
     slash=strrchr(path,'/');other=strrchr(path,'\\');if(other && (!slash || other>slash))slash=other;other=strrchr(path,':');if(other && (!slash || other>slash))slash=other;
     prefix=slash?(size_t)(slash-path)+1:0;if(!prefix){strcpy(folder,".");leaf=path;}else {if(prefix>BS_PATH_MAX)return 0;memcpy(folder,path,prefix);folder[prefix]=0;leaf=path+prefix;}
-    {char wire[256];if(!bs_to_utf8(leaf,wire,sizeof wire) || !bs_suggest_destination(folder,wire,0,unique,sizeof unique)){copystr(c->error,"Cannot choose a unique destination",256);return 0;}}
+    {char wire[256];if(!bs_to_utf8(leaf,wire,sizeof wire) || !bs_suggest_destination(folder,wire,0,unique,sizeof unique)){set_error(c,BS_ERR_DESTINATION,"Cannot choose a unique destination");return 0;}}
     return bs_accept(c,unique);
 }
 #include "retro-metadata.h"
+static void received_file_complete(BSClient *c){
+    if(c->batch_approval && c->batch_approval->resume_existing){
+        if(c->recovery_file_kind==2)c->recovery.verified++;else if(c->recovery_file_kind==1)c->recovery.resumed++;else c->recovery.received++;
+        if(c->recovery.remaining){c->recovery.remaining--;}
+        c->recovery.phase=3;
+    }
+    if(c->in_batch && c->batch_approval){c->batch_approval->next=c->in_batch_index+1;c->batch_approval->last_seen=bsp_seconds();if(c->batch_approval->next>=c->in_batch->count)batch_revoke(c);}
+}
 static void receive_verified(BSClient *c) {
-        if(commit_received(c)!=0) { finish_error(c,FRAME_ERROR,"Destination exists or cannot be finalized; nothing overwritten"); return; }
+        unsigned char date_result;
+#ifdef BS_OPENSSL
+        if(c->resume_completed){
+            if(!bsp_checkpoint_unmark(c->dest)){finish_error(c,FRAME_ERROR,BS_ERR_STORAGE,"Cannot finalize checkpoint ownership; existing file was kept");return;}
+            if(c->mtime_received){unsigned long stamp;c->mtime_outcome=bsp_mtime_get(c->dest,&stamp) && stamp==c->received_mtime?1:-1;}
+            c->transfer_result=BS_RESULT_COMPLETE;received_file_complete(c);date_result=c->mtime_outcome==1;frame(c,COMPLETE,c->mtime_received?&date_result:NULL,c->mtime_received?1:0);c->state=CLOSING;message(c,"Existing file matches source; written file verified (CRC32)");notify(c,BS_EVENT_COMPLETE);return;
+        }
+#endif
+#ifdef BS_OPENSSL
+        if(c->resume_cache && !bsp_checkpoint_unmark(c->temp)){finish_error(c,FRAME_ERROR,BS_ERR_STORAGE,"Cannot finalize checkpoint ownership; partial data was kept");return;}
+#endif
+        if(c->mtime_received)c->mtime_outcome=bsp_mtime_set(c->temp,c->received_mtime)?1:-1;
+        if(commit_received(c)!=0) {
+#ifdef BS_OPENSSL
+            if(c->resume_cache){FILE *partial=bsp_resume_file(c->temp,c->status.total);if(partial){(void)bsp_checkpoint_mark(partial);fclose(partial);}}
+#endif
+            finish_error(c,FRAME_ERROR,BS_ERR_DESTINATION,"Destination exists or cannot be finalized; nothing overwritten"); return; }
         c->transfer_result=BS_RESULT_COMPLETE; c->temp[0]=0;
         c->metadata_outcome=metadata_finish(c);
-        if(c->in_batch && c->batch_approval) {
-            c->batch_approval->next=c->in_batch_index+1;c->batch_approval->last_seen=bsp_seconds();
-            if(c->batch_approval->next>=c->in_batch->count)batch_revoke(c);
-        }
+        received_file_complete(c);
 #ifdef BS_OPENSSL
         if(c->resume_cache){bsp_remove_file(c->resume_meta);c->resume_meta[0]=0;c->resume_cache=0;}
 #endif
-        frame(c,COMPLETE,NULL,0); c->state=CLOSING; message(c,c->metadata_outcome<0?"File verified; metadata could not be preserved":c->metadata_outcome==2?"File verified; retro metadata preserved in companion file":c->metadata_outcome==1?"File verified; native retro metadata restored":"File received; written file verified (CRC32)"); notify(c,BS_EVENT_COMPLETE); return;
+        date_result=c->mtime_outcome==1;frame(c,COMPLETE,c->mtime_received?&date_result:NULL,c->mtime_received?1:0); c->state=CLOSING; message(c,c->mtime_outcome<0?"File verified; modification date could not be preserved":c->metadata_outcome<0?"File verified; metadata could not be preserved":c->mtime_outcome==1 && c->metadata_outcome>0?"File verified; modification date and retro metadata preserved":c->metadata_outcome==2?"File verified; retro metadata preserved in companion file":c->metadata_outcome==1?"File verified; native retro metadata restored":c->mtime_outcome==1?"File received; written file verified (CRC32); modification date preserved":"File received; written file verified (CRC32)"); notify(c,BS_EVENT_COMPLETE); return;
 }
 static void handle_frame(BSClient *c,int type,const unsigned char *p,int n) {
     BSPeer peer; unsigned long size; char filename[256]; int len;
-    if(type==INVITATION){if(!invitation_frame(c,p,n))finish_error(c,FRAME_ERROR,"Invitation expired or replaced; scan a fresh code");return;}
+    if(c->state==SESSION_IDLE){if(!c->status.incoming || (type!=COLLECTION_REF && type!=TREE_REF)){fail(c,BS_ERR_PROTOCOL,"Unexpected frame between collection files");return;}session_reset(c,1);}
+    if(type==INVITATION){if(!invitation_frame(c,p,n))finish_error(c,FRAME_ERROR,BS_ERR_SECURITY,"Invitation expired or replaced; scan a fresh code");return;}
     if(type==VERIFY_WAIT && n==0 && c->state==FINISHING && (c->remote_features&BS_CAP_DISK_VERIFY))return;
     if(type==SKIP_FILE && n==0 && c->state==DECISION && !c->status.incoming && (c->remote_features&BS_CAP_SKIP)) {
-        c->transfer_result=BS_RESULT_SKIPPED;cleanup_transfer(c);message(c,"Recipient skipped existing file");notify(c,BS_EVENT_COMPLETE);return;
+        c->transfer_result=BS_RESULT_SKIPPED;session_finish(c);message(c,"Recipient skipped existing file");notify(c,BS_EVENT_COMPLETE);return;
     }
     if(type==CANCEL || type==DECLINE || type==FRAME_ERROR) {
         char reason[256]; int i;
@@ -748,16 +790,16 @@ static void handle_frame(BSClient *c,int type,const unsigned char *p,int n) {
         len=n<255?n:255; memcpy(reason,p,(size_t)len); reason[len]=0;
         for(i=0;i<len;i++) if((unsigned char)reason[i]<32 || reason[i]==127) reason[i]=' ';
         if(!valid_utf8((const unsigned char *)reason)) reason[0]=0;
-        fail(c,reason[0]?reason:type==DECLINE?"Transfer declined":type==CANCEL?"Peer cancelled the transfer":"Peer reported an error");
+        fail(c,type==DECLINE?BS_ERR_DECLINED:type==CANCEL?BS_ERR_CANCELLED:BS_ERR_REMOTE,reason[0]?reason:type==DECLINE?"Transfer declined":type==CANCEL?"Peer cancelled the transfer":"Peer reported an error");
         if(type==CANCEL){c->outgoing_run.cancelled+=(unsigned long)(c->queue_count-(c->queue_active && c->queue_count?1:0));c->queue_active=0;bs_queue_clear(c);}
         return;
     }
     if(type==LIMITS && c->state==LIMIT_EXCHANGE) {
-        if(n!=8 || get32(p)>BS_RATE_MAX || get32(p+4)>BS_RATE_MAX){fail(c,"Invalid transfer speed limits");return;}
+        if(n!=8 || get32(p)>BS_RATE_MAX || get32(p+4)>BS_RATE_MAX){fail(c,BS_ERR_LIMIT,"Invalid transfer speed limits");return;}
         c->peer_receive_limit=get32(p+4);limits_reset(c);c->state=GREETING;negotiation_ready(c);return;
     }
     if(type==CAPABILITIES && c->state==NEGOTIATING && !c->cap_ready) {
-        if(!cap_decode(p,n,&c->remote_caps)){fail(c,"Invalid capability profile");return;}
+        if(!cap_decode(p,n,&c->remote_caps)){fail(c,BS_ERR_PROTOCOL,"Invalid capability profile");return;}
         c->cap_ready=1;c->state=GREETING;c->remote_features=(unsigned)(c->status.incoming?c->remote_caps.send_features:c->remote_caps.receive_features);
         if((c->remote_features&BS_CAP_RATE_LIMITS) && (local_features(c)&BS_CAP_RATE_LIMITS)) {
             unsigned char values[8];put32(values,c->active_send_limit);put32(values+4,c->active_receive_limit);frame(c,LIMITS,values,8);c->state=LIMIT_EXCHANGE;return;
@@ -769,75 +811,84 @@ static void handle_frame(BSClient *c,int type,const unsigned char *p,int n) {
         copystr(c->upgrade_id,c->remote_id,33);frame(c,TLS_READY,NULL,0);c->state=TLS_SERVER;return;
     }
     if(type==TLS_READY && n==0 && c->state==TLS_CLIENT && !c->status.incoming) {
-        if(c->rx_count!=HEADER){fail(c,"Unexpected data before TLS upgrade");return;}
-        if(!bsp_tls_upgrade(c->sock)){fail(c,"Cannot enable encrypted transport");return;}
+        if(c->rx_count!=HEADER){fail(c,BS_ERR_SECURITY,"Unexpected data before TLS upgrade");return;}
+        if(!bsp_tls_upgrade(c->sock)){fail(c,BS_ERR_SECURITY,"Cannot enable encrypted transport");return;}
         c->got_hello=c->cap_ready=0;c->state=GREETING;send_hello(c);return;
     }
 #endif
     if(type==HELLO && c->state==GREETING && !c->got_hello) {
-        memset(&peer,0,sizeof(peer)); if(n<20 || n!=20+p[18]+p[19] || !parse_greeting(p,n,&peer)) { fail(c,"Invalid peer greeting"); return; }
-        if(c->expected_id[0] && strcmp(c->expected_id,peer.id)) { connection_failed(c,"Peer identity changed; refresh and try again"); return; }
+        memset(&peer,0,sizeof(peer)); if(n<20 || n!=20+p[18]+p[19] || !parse_greeting(p,n,&peer)) { fail(c,BS_ERR_PROTOCOL,"Invalid peer greeting"); return; }
+        if(c->expected_id[0] && strcmp(c->expected_id,peer.id)) { connection_failed(c,BS_ERR_TRUST,"Peer identity changed; refresh and try again"); return; }
         copystr(c->status.peer_name,peer.name,64); copystr(c->remote_id,peer.id,33); c->remote_port=peer.port; c->remote_features=greeting_features(p,n);c->got_hello=1;
-        if(c->upgrade_id[0] && strcmp(c->upgrade_id,c->remote_id)){connection_failed(c,"Peer identity changed during encryption negotiation");return;}
+        if(c->upgrade_id[0] && strcmp(c->upgrade_id,c->remote_id)){connection_failed(c,BS_ERR_TRUST,"Peer identity changed during encryption negotiation");return;}
         if(c->remote_features&BS_CAP_DETAILS){unsigned char caps[36];cap_encode(c,caps);frame(c,CAPABILITIES,caps,36);c->state=NEGOTIATING;return;}
         if((!c->status.incoming || bs_transfer_encrypted(c)) && !trust_check(c))return;
         begin_offer(c);
         return;
     }
 #ifdef BS_OPENSSL
-    if(c->security_mode==BS_SECURITY_REQUIRED && !bs_transfer_encrypted(c) && (type==OFFER || type==OFFER_RESUME || type==OFFER_BATCH || ((type>=COLLECTION_START && type<=COLLECTION_REF) || type==TREE_START || type==TREE_REF))) {finish_error(c,FRAME_ERROR,"This receiver requires encryption");return;}
+    if(c->security_mode==BS_SECURITY_REQUIRED && !bs_transfer_encrypted(c) && (type==OFFER || type==OFFER_RESUME || type==OFFER_BATCH || ((type>=COLLECTION_START && type<=COLLECTION_REF) || type==TREE_START || type==TREE_REF))) {finish_error(c,FRAME_ERROR,BS_ERR_SECURITY,"This receiver requires encryption");return;}
 #endif
     if((type==OFFER || type==OFFER_RESUME || type==OFFER_BATCH || type==COLLECTION_START || type==COLLECTION_REF || type==TREE_START || type==TREE_REF) && !trust_check(c))return;
-    if(c->cap_ready && (type==OFFER || type==OFFER_RESUME) && n>=10 && (get32(p+4)>c->remote_caps.max_send_file || get16(p+8)>c->remote_caps.wire_name_bytes)) {fail(c,"Sender exceeded its reported file limit or filename limit");return;}
+    if(c->cap_ready && (type==OFFER || type==OFFER_RESUME) && n>=10 && (get32(p+4)>c->remote_caps.max_send_file || get16(p+8)>c->remote_caps.wire_name_bytes)) {fail(c,BS_ERR_LIMIT,"Sender exceeded its reported file limit or filename limit");return;}
 #ifdef BS_OPENSSL
     if(resume_frame(c,type,p,n))return;
 #endif
-    if(c->status.incoming && c->active_receive_limit && !(c->remote_features&BS_CAP_RATE_LIMITS) && (type==OFFER || type==OFFER_RESUME || type==OFFER_BATCH || type==COLLECTION_START || type==COLLECTION_REF || type==TREE_START || type==TREE_REF)) {finish_error(c,FRAME_ERROR,"Receive speed limit needs an updated sender; use Unlimited for legacy clients");return;}
+    if(c->status.incoming && c->active_receive_limit && !(c->remote_features&BS_CAP_RATE_LIMITS) && (type==OFFER || type==OFFER_RESUME || type==OFFER_BATCH || type==COLLECTION_START || type==COLLECTION_REF || type==TREE_START || type==TREE_REF)) {finish_error(c,FRAME_ERROR,BS_ERR_LIMIT,"Receive speed limit needs an updated sender; use Unlimited for legacy clients");return;}
     if(collection_frame(c,type,p,n))return;
     if(type==OFFER_BATCH && c->state==GREETING && c->got_hello && c->status.incoming && (local_features(c)&BS_CAP_BATCH)) {
         batch_receive_offer(c,p,n);return;
     }
     if((type==OFFER || (type==OFFER_RESUME && (local_features(c)&c->remote_features&BS_CAP_RESUME))) && c->state==GREETING && c->got_hello && c->status.incoming) {
         batch_revoke(c);
-        if(n<11 || get32(p)!=0 || get32(p+4)>BS_FILE_MAX) { fail(c,"Unsupported file size"); return; }
-        size=get32(p+4);if(c->cap_ready && size>c->remote_caps.max_send_file){fail(c,"Sender exceeded its reported file limit");return;} len=get16(p+8); if(c->cap_ready && len>c->remote_caps.wire_name_bytes){fail(c,"Sender exceeded its reported filename limit");return;} if(len<1 || len>255 || n!=10+len || memchr(p+10,0,(size_t)len)) { fail(c,"Invalid file offer"); return; }
-        memcpy(filename,p+10,(size_t)len); filename[len]=0; if(!bs_safe_name(filename)) { fail(c,"Unsafe filename rejected"); return; }
+        if(n<11 || get32(p)!=0 || get32(p+4)>BS_FILE_MAX) { fail(c,BS_ERR_LIMIT,"Unsupported file size"); return; }
+        size=get32(p+4);if(c->cap_ready && size>c->remote_caps.max_send_file){fail(c,BS_ERR_LIMIT,"Sender exceeded its reported file limit");return;} len=get16(p+8); if(c->cap_ready && len>c->remote_caps.wire_name_bytes){fail(c,BS_ERR_LIMIT,"Sender exceeded its reported filename limit");return;} if(len<1 || len>255 || n!=10+len || memchr(p+10,0,(size_t)len)) { fail(c,BS_ERR_PROTOCOL,"Invalid file offer"); return; }
+        memcpy(filename,p+10,(size_t)len); filename[len]=0; if(!bs_safe_name(filename)) { fail(c,BS_ERR_INTERNAL,"Unsafe filename rejected"); return; }
 #ifdef BS_OPENSSL
         c->resume_offer=type==OFFER_RESUME;
 #endif
         copystr(c->status.filename,filename,256); c->status.total=size; c->status.awaiting_decision=1; c->state=DECISION; c->decision_start=bsp_seconds(); message(c,"Incoming file - waiting for your decision"); notify(c,BS_EVENT_OFFER); return;
     }
     if(type==ACCEPT && c->state==DECISION && !c->status.incoming && n==0) {
-        c->file=bsp_open_file(c->source,"rb"); if(!c->file) { fail(c,"Source file is no longer readable"); return; }
+        c->file=bsp_open_file(c->source,"rb"); if(!c->file) { fail(c,BS_ERR_SOURCE,"Source file is no longer readable"); return; }
         c->state=SENDING; message(c,"Sending file..."); return;
     }
+    if(type==FILE_TIME){
+        if(c->state!=RECEIVING || c->status.transferred!=c->status.total || c->mtime_received || !c->metadata_enabled || !(c->remote_features&BS_CAP_FILE_TIMES) || n!=12 || get32(p+4)!=c->crc || get32(p+8)!=c->status.total){fail(c,BS_ERR_PROTOCOL,"Invalid or unnegotiated modification date");return;}
+        c->received_mtime=get32(p);c->mtime_received=1;return;
+    }
     if(type==RETRO_METADATA){
-        if(c->state!=RECEIVING || c->status.transferred!=c->status.total || c->metadata_received || !c->metadata_enabled || !(c->remote_features&BS_CAP_RETRO_METADATA) || !metadata_valid(p,n) || (get32(p+16)!=c->crc || get32(p+20)!=c->status.total)){fail(c,"Invalid or unnegotiated retro metadata");return;}
+        if(c->state!=RECEIVING || c->status.transferred!=c->status.total || c->metadata_received || !c->metadata_enabled || !(c->remote_features&BS_CAP_RETRO_METADATA) || !metadata_valid(p,n) || (get32(p+16)!=c->crc || get32(p+20)!=c->status.total)){fail(c,BS_ERR_PROTOCOL,"Invalid or unnegotiated retro metadata");return;}
         memcpy(c->metadata,p,184);c->metadata_received=1;return;
     }
     if(type==DATA && c->state==RECEIVING && n>0 && (unsigned long)n<=c->status.total-c->status.transferred) {
-        if(fwrite(p,1,(size_t)n,c->file)!=(size_t)n) { fail(c,"Could not write file; check free disk space"); return; }
+        if(fwrite(p,1,(size_t)n,c->file)!=(size_t)n) { fail(c,BS_ERR_STORAGE,"Could not write file; check free disk space"); return; }
         c->crc=bs_crc32(c->crc,p,(size_t)n); c->status.transferred+=(unsigned long)n; c->status_dirty=1; return;
     }
     if(type==END && c->state==RECEIVING && n==4 && c->status.transferred==c->status.total) {
-        if(get32(p)!=c->crc) { finish_error(c,FRAME_ERROR,"Checksum mismatch; file not delivered"); return; }
-        { int r=fclose(c->file); c->file=NULL; if(r) { finish_error(c,FRAME_ERROR,"Could not finish writing file"); return; } }
-        c->file=bsp_open_file(c->temp,"rb");
-        if(!c->file){finish_error(c,FRAME_ERROR,"Cannot reopen received file for verification");return;}
+        if(get32(p)!=c->crc) { finish_error(c,FRAME_ERROR,BS_ERR_PROTOCOL,"Checksum mismatch; file not delivered"); return; }
+        { int r=fclose(c->file); c->file=NULL; if(r) { finish_error(c,FRAME_ERROR,BS_ERR_DESTINATION,"Could not finish writing file"); return; } }
+        c->file=
+#ifdef BS_OPENSSL
+            c->resume_completed?bsp_resume_read(c->dest,c->status.total):
+#endif
+            bsp_open_file(c->temp,"rb");
+        if(!c->file){finish_error(c,FRAME_ERROR,BS_ERR_DESTINATION,"Cannot reopen received file for verification");return;}
         c->disk_crc=c->disk_bytes=0;c->last_verify=bsp_seconds();c->state=VERIFY_DISK;message(c,"Checking written file...");return;
     }
 
-    if(type==COMPLETE && (c->state==FINISHING || (c->state==DECISION && c->out_batch && c->out_batch->tree && c->status.filename[0] && c->status.filename[strlen(c->status.filename)-1]=='/')) && n==0) {
-        c->verified=(c->remote_features&BS_CAP_DISK_VERIFY)!=0 && !(c->status.filename[0] && c->status.filename[strlen(c->status.filename)-1]=='/');c->transfer_result=BS_RESULT_COMPLETE; cleanup_transfer(c); message(c,c->verified?"File delivered successfully; receiver verified written file (CRC32)":"File delivered successfully; receiver disk verification not confirmed"); notify(c,BS_EVENT_COMPLETE); return;
+    if(type==COMPLETE && (c->state==FINISHING || (c->state==DECISION && c->out_batch && c->out_batch->tree && c->status.filename[0] && c->status.filename[strlen(c->status.filename)-1]=='/')) && (n==0 || (n==1 && c->mtime_sent==1 && c->metadata_enabled && (c->remote_features&BS_CAP_FILE_TIMES) && p[0]<=1))) {
+        c->mtime_outcome=n?(p[0]?1:-1):(c->mtime_sent==1?2:0);
+        c->verified=(c->remote_features&BS_CAP_DISK_VERIFY)!=0 && !(c->status.filename[0] && c->status.filename[strlen(c->status.filename)-1]=='/');c->transfer_result=BS_RESULT_COMPLETE; session_finish(c); message(c,c->mtime_sent==-1?"File delivered; source modification date unavailable or changed":c->mtime_outcome==1?(c->verified?"File delivered; receiver verified file and preserved modification date":"File delivered; modification date preserved; receiver disk verification not confirmed"):c->mtime_outcome<0?"File delivered; receiver could not preserve modification date":c->mtime_outcome==2?"File delivered; modification date preservation not confirmed":c->verified?"File delivered successfully; receiver verified written file (CRC32)":"File delivered successfully; receiver disk verification not confirmed"); notify(c,BS_EVENT_COMPLETE); return;
     }
-    fail(c,"Unexpected or malformed protocol message");
+    fail(c,BS_ERR_PROTOCOL,"Unexpected or malformed protocol message");
 }
 static int flush(BSClient *c) {
     int n;
     if(!c->tx_count) return 1;
     n=bsp_send(c->sock,c->tx+c->tx_sent,c->tx_count-c->tx_sent);
-    if(n<0) { if(!bsp_wouldblock()) connection_failed(c,"Connection failed while sending"); return 0; }
-    if(!n) { connection_failed(c,"Connection closed while sending"); return 0; }
+    if(n<0) { if(!bsp_wouldblock()) connection_failed(c,BS_ERR_NETWORK,"Connection failed while sending"); return 0; }
+    if(!n) { connection_failed(c,BS_ERR_NETWORK,"Connection closed while sending"); return 0; }
     c->last_io=bsp_seconds(); c->tx_sent+=n;
     if(c->state==SENDING && !strcmp(c->status.message,"Waiting for peer to respond...")) message(c,"Sending file...");
     if(c->tx_sent==c->tx_count) {
@@ -878,6 +929,7 @@ static void tick(BSClient *c) {
     /* Always drain incoming sockets, including when receiving is disabled. */
     s=accept(c->listener,(struct sockaddr *)&from,&addrlen);
     if(s!=BS_INVALID_SOCKET) {
+        if(c->state==SESSION_IDLE)cleanup_transfer(c);
         if(!c->config.receiving) refuse(c,s,"Recipient is not accepting files");
         else if(c->state!=IDLE) refuse(c,s,"Recipient is busy with another transfer; try again shortly");
         else if(bsp_nonblock(s)<0) bsp_close(s);
@@ -899,16 +951,20 @@ static void tick(BSClient *c) {
             got=fread(data,1,BS_CHUNK,c->file);
             if(got){c->disk_crc=bs_crc32(c->disk_crc,data,got);c->disk_bytes+=(unsigned long)got;}
             if(got<BS_CHUNK){int bad=ferror(c->file);fclose(c->file);c->file=NULL;
-                if(bad || c->disk_bytes!=c->status.total || c->disk_crc!=c->crc)finish_error(c,FRAME_ERROR,"Written file failed integrity check; file not delivered");
+                if(bad || c->disk_bytes!=c->status.total || c->disk_crc!=c->crc)finish_error(c,FRAME_ERROR,BS_ERR_PROTOCOL,"Written file failed integrity check; file not delivered");
                 else {c->verified=1;receive_verified(c);}break;
             }
         }
     }
+    if(c->state==SESSION_IDLE && now-c->session_since>=2){cleanup_transfer(c);return;}
     if(c->state==IDLE) return;
+    /* Activity cannot extend an unauthenticated negotiation indefinitely. */
+    if((c->state==CONNECTING || c->state==GREETING || c->state==NEGOTIATING || c->state==LIMIT_EXCHANGE || c->state==TLS_CLIENT || c->state==TLS_SERVER || c->state==INVITATION_SENDING) && now-c->handshake_start>15) {abort_transfer(c,FRAME_ERROR,"Handshake deadline exceeded","Handshake deadline exceeded; reconnect when both clients are ready",BS_RESULT_FAILED);return;}
+    if(c->state==LIST_RECEIVING && (now-c->handshake_start>300 || now-c->last_frame>15)){abort_transfer(c,FRAME_ERROR,"File-list deadline exceeded","File-list deadline exceeded; reconnect and send a smaller collection",BS_RESULT_FAILED);return;}
     if(c->state==DECISION && now-c->decision_start>120) { abort_transfer(c,FRAME_ERROR,"Recipient decision timed out","Recipient decision timed out",BS_RESULT_FAILED); return; }
-    if(c->state!=DECISION && now-c->last_io>30) { connection_failed(c,c->state==FINISHING?"Delivery unconfirmed; check the receiver before retrying":"Peer stopped responding; transfer timed out"); return; }
+    if(c->state!=DECISION && now-c->last_io>30) { connection_failed(c,BS_ERR_TIMEOUT,c->state==FINISHING?"Delivery unconfirmed; check the receiver before retrying":"Peer stopped responding; transfer timed out"); return; }
     if(c->state==CONNECTING) {
-        n=bsp_connected(c->sock); if(n<0) connection_failed(c,"Could not connect; check IP address and firewall");
+        n=bsp_connected(c->sock); if(n<0) connection_failed(c,BS_ERR_NETWORK,"Could not connect; check IP address and firewall");
         else if(n>0) { c->state=GREETING; send_hello(c); }
         return;
     }
@@ -917,7 +973,7 @@ static void tick(BSClient *c) {
     flush(c); if(c->state==IDLE) return;
     if(c->state==TREE_PREPARE && !c->tx_count)tree_prepare_tick(c);
     if(c->state==CLOSING) {
-        if(!c->tx_count) { park_socket(c,c->sock); c->sock=BS_INVALID_SOCKET; cleanup_transfer(c); notify(c,BS_EVENT_STATUS); }
+        if(!c->tx_count) { session_finish(c); notify(c,BS_EVENT_STATUS); }
         return;
     }
 #ifdef BS_OPENSSL
@@ -926,8 +982,8 @@ static void tick(BSClient *c) {
 #ifdef BS_OPENSSL
     if(c->state==INVITATION_SENDING && !c->tx_count)begin_offer(c);
     if(c->state==TLS_SERVER && !c->tx_count) {
-        if(c->rx_count){fail(c,"Unexpected data before TLS upgrade");return;}
-        if(!bsp_tls_upgrade(c->sock)){fail(c,"Cannot enable encrypted transport");return;}
+        if(c->rx_count){fail(c,BS_ERR_SECURITY,"Unexpected data before TLS upgrade");return;}
+        if(!bsp_tls_upgrade(c->sock)){fail(c,BS_ERR_SECURITY,"Cannot enable encrypted transport");return;}
         c->got_hello=c->cap_ready=0;c->state=GREETING;send_hello(c);return;
     }
 #endif
@@ -935,8 +991,8 @@ static void tick(BSClient *c) {
        are handled before reading more, so a peer's final frame precedes its EOF. */
     for(frames=0;frames<BS_RECV_FRAMES && c->state!=IDLE;) {
         if(c->rx_count>=HEADER) {
-            if(memcmp(c->rx,"BSK1",4) || get16(c->rx+6)!=0) { fail(c,"Invalid frame header"); return; }
-            length=get32(c->rx+8); if(length>BS_CHUNK) { fail(c,"Frame too large"); return; }
+            if(memcmp(c->rx,"BSK1",4) || get16(c->rx+6)!=0) { fail(c,BS_ERR_PROTOCOL,"Invalid frame header"); return; }
+            length=get32(c->rx+8); if(length>BS_CHUNK) { fail(c,BS_ERR_LIMIT,"Frame too large"); return; }
             if(c->rx_count>=HEADER+(int)length) {
                 type=get16(c->rx+4);
                 /* Preserve a queued/partial outgoing frame. Terminal peer messages can
@@ -944,7 +1000,7 @@ static void tick(BSClient *c) {
                 if(c->tx_count && !terminal_type(type)) break;
                 if(type==DATA && c->state==RECEIVING && !limits_receive(c,length))break;
                 used=HEADER+(int)length;
-                handle_frame(c,type,c->rx+HEADER,(int)length); frames++;
+                c->last_frame=now;handle_frame(c,type,c->rx+HEADER,(int)length); frames++;
                 if(c->state==IDLE) return;
                 c->rx_count-=used; if(c->rx_count) memmove(c->rx,c->rx+used,(size_t)c->rx_count);
                 if(c->tx_count || c->state==CLOSING) break;
@@ -954,13 +1010,14 @@ static void tick(BSClient *c) {
         if(reads++>=2*BS_RECV_FRAMES+2) break;
         n=bsp_recv(c->sock,c->rx+c->rx_count,RX_CAP-c->rx_count);
         if(n==0) {
+            if(c->state==SESSION_IDLE){cleanup_transfer(c);return;}
             /* Closed before any greeting: the host answered, so keep its catalog entry. */
             if(c->state==GREETING && c->status.incoming && !c->got_hello && !c->rx_count){cleanup_transfer(c);message(c,"Ready on your local network");}
-            else if(c->state==GREETING) fail(c,"Peer closed the connection");
-            else connection_failed(c,c->state==FINISHING?"Completion unconfirmed; check the receiver before retrying":"Peer disconnected; transfer interrupted");
+            else if(c->state==GREETING) fail(c,BS_ERR_NETWORK,"Peer closed the connection");
+            else connection_failed(c,BS_ERR_TIMEOUT,c->state==FINISHING?"Completion unconfirmed; check the receiver before retrying":"Peer disconnected; transfer interrupted");
             return;
         }
-        if(n<0) { if(!bsp_wouldblock()) { if(c->state==GREETING) fail(c,"Network error"); else connection_failed(c,"Network error"); } break; }
+        if(n<0) { if(!bsp_wouldblock()) { if(c->state==SESSION_IDLE){cleanup_transfer(c);return;}if(c->state==GREETING) fail(c,BS_ERR_NETWORK,"Network error"); else connection_failed(c,BS_ERR_NETWORK,"Network error"); } break; }
         c->rx_count+=n; c->last_io=now;
     }
     if(c->state==IDLE) return;
@@ -971,13 +1028,19 @@ static void tick(BSClient *c) {
             length=c->status.total-c->status.transferred; if(length>BS_CHUNK) length=BS_CHUNK;
             length=limits_send(c,length);if(!length)break;
             count=fread(c->tx+HEADER,1,(size_t)length,c->file);
-            if(count!=(size_t)length) { fail(c,"Source file changed or could not be read"); return; }
+            if(count!=(size_t)length) { fail(c,BS_ERR_SOURCE,"Source file changed or could not be read"); return; }
             c->crc=bs_crc32(c->crc,c->tx+HEADER,count); frame(c,DATA,NULL,(int)count);
         } else {
+            if(!c->mtime_sent && c->metadata_enabled && (c->remote_features&BS_CAP_FILE_TIMES)){
+                unsigned char stamp[12];unsigned long current;c->mtime_sent=-1;
+                if(c->source_mtime_valid && bsp_mtime_get(c->source,&current) && current==c->source_mtime){
+                    put32(stamp,c->source_mtime);put32(stamp+4,c->crc);put32(stamp+8,c->status.total);c->mtime_sent=1;frame(c,FILE_TIME,stamp,12);flush(c);continue;
+                }
+            }
             if(!c->metadata_sent && c->metadata_enabled && (c->remote_features&BS_CAP_RETRO_METADATA)){
                 c->metadata_sent=1;if(metadata_source(c)){frame(c,RETRO_METADATA,c->metadata,184);flush(c);continue;}
             }
-            if(fgetc(c->file)!=EOF || ferror(c->file)) { fail(c,"Source file changed while sending"); return; }
+            if(fgetc(c->file)!=EOF || ferror(c->file)) { fail(c,BS_ERR_SOURCE,"Source file changed while sending"); return; }
             fclose(c->file); c->file=NULL; put32(c->tx+HEADER,c->crc); frame(c,END,NULL,4); c->state=FINISHING; message(c,"Verifying delivery...");
         }
         flush(c);
@@ -991,6 +1054,7 @@ static void tick(BSClient *c) {
 void bs_tick(BSClient *c) {
     tick(c);
     queue_tick(c);
+    bs_retained_step(c);
     state_tick(c);
     /* One progress notification per tick, however many chunks moved. */
     if(c->status_dirty) { c->status_dirty=0; if(c->status.active) notify(c,BS_EVENT_STATUS); }
@@ -1069,14 +1133,14 @@ int bs_transfer_encrypted(const BSClient *c) {
 }
 int bs_security_configure(BSClient *c,int mode,const char *key) {
     if(!c)return 0;
-    if(c->status.active || c->queue_count){copystr(c->error,"Wait until the transfer queue is empty before changing encryption",256);return 0;}
-    if(mode<0 || mode>2){copystr(c->error,"Invalid encryption mode",256);return 0;}
+    if(c->status.active || c->queue_count){set_error(c,BS_ERR_SECURITY,"Wait until the transfer queue is empty before changing encryption");return 0;}
+    if(mode<0 || mode>2){set_error(c,BS_ERR_SECURITY,"Invalid encryption mode");return 0;}
 #ifdef BS_OPENSSL
-    {unsigned char decoded[32];int i,a,b;if(mode && key && *key) {if(strlen(key)!=64){copystr(c->error,"Pairing key must contain 64 hexadecimal characters",256);return 0;}
-     for(i=0;i<32;i++){a=hexval((char)tolower((unsigned char)key[i*2]));b=hexval((char)tolower((unsigned char)key[i*2+1]));if(a<0 || b<0){OPENSSL_cleanse(decoded,32);copystr(c->error,"Invalid pairing key",256);return 0;}decoded[i]=(unsigned char)((a<<4)|b);}memcpy(c->pairing_key,decoded,32);c->pairing_set=1;OPENSSL_cleanse(decoded,32);
+    {unsigned char decoded[32];int i,a,b;if(mode && key && *key) {if(strlen(key)!=64){set_error(c,BS_ERR_TRUST,"Pairing key must contain 64 hexadecimal characters");return 0;}
+     for(i=0;i<32;i++){a=hexval((char)tolower((unsigned char)key[i*2]));b=hexval((char)tolower((unsigned char)key[i*2+1]));if(a<0 || b<0){OPENSSL_cleanse(decoded,32);set_error(c,BS_ERR_TRUST,"Invalid pairing key");return 0;}decoded[i]=(unsigned char)((a<<4)|b);}memcpy(c->pairing_key,decoded,32);c->pairing_set=1;OPENSSL_cleanse(decoded,32);
     }else {OPENSSL_cleanse(c->pairing_key,32);c->pairing_set=0;}c->security_mode=mode;bs_refresh(c);return 1;}
 #else
-    (void)key;if(mode){copystr(c->error,"Encryption is unavailable in this client build",256);return 0;}return 1;
+    (void)key;if(mode){set_error(c,BS_ERR_SECURITY,"Encryption is unavailable in this client build");return 0;}return 1;
 #endif
 }
 unsigned bs_peer_features(const BSClient *c,const char *id) {int i;unsigned flags=0;if(!c || !id)return 0;for(i=0;i<c->peer_count;i++)if(!strcmp(c->peers[i].id,id))flags|=c->peer_features[i];return flags;}
@@ -1088,3 +1152,5 @@ unsigned bs_peer_features(const BSClient *c,const char *id) {int i;unsigned flag
 #include "saved-state.h"
 
 #include "invitations.h"
+
+#include "retained.h"

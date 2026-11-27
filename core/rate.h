@@ -7,7 +7,7 @@ int bs_limit_parse(const char *text,unsigned long *out) {
 }
 int bs_limits_configure(BSClient *c,unsigned long send,unsigned long receive) {
     if(!c)return 0;
-    if(send>BS_RATE_MAX || receive>BS_RATE_MAX){copystr(c->error,"Speed limits must be 0..1048575 KiB/s; zero is Unlimited",256);return 0;}
+    if(send>BS_RATE_MAX || receive>BS_RATE_MAX){set_error(c,BS_ERR_LIMIT,"Speed limits must be 0..1048575 KiB/s; zero is Unlimited");return 0;}
     c->send_limit=send;c->receive_limit=receive;return 1;
 }
 void bs_limits_get(const BSClient *c,unsigned long *send,unsigned long *receive){if(send)*send=c?c->send_limit:0;if(receive)*receive=c?c->receive_limit:0;}

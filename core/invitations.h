@@ -37,8 +37,8 @@ int bs_invitation_create(BSClient *c,const char *address,char *out,size_t capaci
 int bs_queue_invitation(BSClient *c,const char *text,const char *path){
 #ifdef BS_OPENSSL
     BSInvitation invitation;BSQueued q;long offset;char icon[BS_PATH_MAX+1];int before;
-    if(!c || !bs_invitation_parse(text,&invitation)){if(c)copystr(c->error,"Invalid or expired invitation; scan a fresh code",256);return 0;}
-    if(!c->security_mode || c->pairing_set){copystr(c->error,"Invitations require certificate encryption; change Security first",256);return 0;}before=c->queue_count;
+    if(!c || !bs_invitation_parse(text,&invitation)){if(c)set_error(c,BS_ERR_SECURITY,"Invalid or expired invitation; scan a fresh code");return 0;}
+    if(!c->security_mode || c->pairing_set){set_error(c,BS_ERR_SECURITY,"Invitations require certificate encryption; change Security first");return 0;}before=c->queue_count;
     if(!bs_queue_add(c,invitation.id,invitation.address,invitation.port,path))return 0;
     if(!queue_read(c,c->queue_count-1,&q))return 0;
     q.invitation_expires=invitation.expires;memcpy(q.invitation_pin,invitation.pin,32);memcpy(q.invitation_token,invitation.token,16);
@@ -50,7 +50,7 @@ int bs_queue_invitation(BSClient *c,const char *text,const char *path){
 }
 static int invitation_send(BSClient *c,const BSQueued *q){
 #ifdef BS_OPENSSL
-    if(q->invitation_expires<(unsigned long)time(NULL)){copystr(c->error,"Invitation expired; scan a fresh code before retrying",256);return 0;}
+    if(q->invitation_expires<(unsigned long)time(NULL)){set_error(c,BS_ERR_SECURITY,"Invitation expired; scan a fresh code before retrying");return 0;}
     if(!bs_send(c,q->address,q->port,q->path))return 0;
     copystr(c->expected_id,q->id,33);c->invitation_expires=q->invitation_expires;memcpy(c->invitation_pin,q->invitation_pin,32);memcpy(c->invitation_token,q->invitation_token,16);return 1;
 #else
@@ -61,7 +61,7 @@ static int invitation_check(BSClient *c){if(!c->invitation_expires)return 1;
 #ifdef BS_OPENSSL
     {unsigned char pin[32];if(c->invitation_expires>=(unsigned long)time(NULL) && bs_transfer_encrypted(c) && bsp_tls_peer_pin(c->sock,pin) && !CRYPTO_memcmp(pin,c->invitation_pin,32))return 1;}
 #endif
-    finish_error(c,FRAME_ERROR,"Invitation identity differs, expired or encryption unavailable");return 0;
+    finish_error(c,FRAME_ERROR,BS_ERR_TRUST,"Invitation identity differs, expired or encryption unavailable");return 0;
 }
 
 static int invitation_frame(BSClient *c,const unsigned char *p,int n){

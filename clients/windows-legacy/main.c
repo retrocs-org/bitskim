@@ -11,7 +11,7 @@
 static unsigned long send_limit,receive_limit;
 static HWND network_window,network_send,network_receive;
 static HWND window,list,address,status,prefs,namebox,visiblebox,receivebox,autobox,themebox,startbox,closebox;
-static int completion_sound;static unsigned long completion_serial;
+static int completion_sound,preserve_dates;static HWND metadatabox;static unsigned long completion_serial;
 static BSClient *client; static char peer_ids[BS_MAX_PEERS][33],ini[MAX_PATH],name[64],identity[33];
 static int visible=1,receiving=1,automatic=0,in_offer=0,peers_dirty=1; static HINSTANCE instance;
 #include "appearance.h"
@@ -46,7 +46,7 @@ static void catalog(void) {
         if(!strcmp(selected,p->id)) SendMessage(list,LB_SETCURSEL,i,0);
     }
 }
-static void error(void) { char text[256]; local(bs_last_error(client),text,sizeof text); MessageBoxA(window,text,"BitSkim",MB_OK|MB_ICONEXCLAMATION); }
+static void error(void) { char text[256]; local(bs_user_error(client),text,sizeof text); MessageBoxA(window,text,"BitSkim",MB_OK|MB_ICONEXCLAMATION); }
 static const char *recent_folder(int incoming){static char native[MAX_PATH];local(bs_last_folder(client,incoming),native,sizeof native);return native;}
 static void send_file_inner(const char *dropped) {
     char path[MAX_PATH]="",utf8[BS_PATH_MAX+1],target[80]; OPENFILENAMEA ofn; int selected,ok;
@@ -113,7 +113,7 @@ static LRESULT CALLBACK network_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
 static LRESULT CALLBACK prefproc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
     int handled; LRESULT painted=paint_theme(w,msg,wp,lp,&handled); if(handled) return painted;
     if(msg==WM_COMMAND && LOWORD(wp)==107){if(!network_window){network_window=CreateWindowA("BitSkimLegacyNetwork","BitSkim Network",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU,CW_USEDEFAULT,CW_USEDEFAULT,380,260,w,NULL,instance,NULL);if(network_window){EnableWindow(w,FALSE);ShowWindow(network_window,SW_SHOW);}}return 0;}
-    if(msg==WM_COMMAND && LOWORD(wp)>=101 && LOWORD(wp)<=105 && HIWORD(wp)==BN_CLICKED) { HWND c=(HWND)lp; set_checked(c,!checked(c)); return 0; }
+    if(msg==WM_COMMAND && LOWORD(wp)>=101 && (LOWORD(wp)<=105 || LOWORD(wp)==108) && HIWORD(wp)==BN_CLICKED) { HWND c=(HWND)lp; set_checked(c,!checked(c)); return 0; }
     if(msg==WM_COMMAND && LOWORD(wp)==106 && HIWORD(wp)==CBN_SELCHANGE) { int selected=(int)SendMessage(themebox,CB_GETCURSEL,0,0); if(selected>=0 && selected<WIN_THEME_COUNT) { theme_index=selected; apply_theme(); } return 0; }
     if(msg==WM_CREATE) {
         int i; char label[128]; saved_theme=theme_index; local(name,label,sizeof label);
@@ -130,7 +130,8 @@ static LRESULT CALLBACK prefproc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
         closebox=control(w,"BUTTON","Close window to the system tray",BS_AUTOCHECKBOX,16,278,320,26,105);
         set_checked(startbox,start_tray); set_checked(closebox,close_tray);
         control(w,"BUTTON","Network transfer limits...",0,16,318,320,28,107);
-        control(w,"BUTTON","Save",BS_DEFPUSHBUTTON,166,374,80,28,1); control(w,"BUTTON","Cancel",0,256,374,80,28,2); return 0;
+        metadatabox=control(w,"BUTTON","Preserve file dates and retro metadata",BS_AUTOCHECKBOX,16,348,320,24,108);set_checked(metadatabox,preserve_dates);
+        control(w,"BUTTON","Save",BS_DEFPUSHBUTTON,166,386,80,28,1); control(w,"BUTTON","Cancel",0,256,386,80,28,2); return 0;
     }
     if(msg==WM_COMMAND && LOWORD(wp)==1) {
         char label[128]; GetWindowTextA(namebox,label,sizeof label); if(!*label || !from_ansi(label,name,sizeof name)) { MessageBoxA(w,"Choose a shorter client name.","BitSkim",MB_OK); return 0; }
@@ -140,6 +141,8 @@ static LRESULT CALLBACK prefproc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
         WritePrivateProfileStringA("BitSkim","Theme",theme()->id,ini);
         WritePrivateProfileStringA("BitSkim","StartTray",start_tray?"1":"0",ini);
         WritePrivateProfileStringA("BitSkim","CloseTray",close_tray?"1":"0",ini);
+        if(checked(metadatabox)!=preserve_dates && (bs_status(client)->active || bs_queue_count(client))){MessageBoxA(w,"Finish or clear queued work before changing preservation.","BitSkim",MB_OK);return 0;}
+        preserve_dates=checked(metadatabox);WritePrivateProfileStringA("BitSkim","Metadata",preserve_dates?"1":"0",ini);bs_metadata_enable(client,preserve_dates);
         bs_configure(client,name,visible,receiving); DestroyWindow(w); return 0;
     }
     if((msg==WM_COMMAND && LOWORD(wp)==2) || msg==WM_CLOSE) { theme_index=saved_theme; apply_theme(); DestroyWindow(w); return 0; }
@@ -169,7 +172,7 @@ static LRESULT CALLBACK procedure(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
         DragAcceptFiles(w,TRUE); SetTimer(w,1,50,NULL); return 0;
     }
     if(msg==WM_TIMER && !in_offer) {
-        const BSStatus *s; char text[600],label[256]; bs_tick(client);if(bs_completion_notice(client,&completion_serial) && completion_sound)MessageBeep(MB_OK); if(peers_dirty) { catalog(); peers_dirty=0; } s=bs_status(client); local(s->message,label,sizeof label);
+        const BSStatus *s; char text[600],label[256]; bs_tick(client);if(bs_completion_notice(client,&completion_serial) && completion_sound)MessageBeep(MB_OK); if(peers_dirty) { catalog(); peers_dirty=0; } s=bs_status(client); local(bs_user_status(client),label,sizeof label);
         if(s->active) {unsigned long position=1,total=1,done=s->transferred>s->total?s->total:s->transferred,pct=0;char filename[256],heading[320];
          local(s->filename,filename,sizeof filename);if(!s->incoming && bs_queue_count(client))bs_queue_progress(client,&position,&total);
          if(s->incoming && (bs_batch_count(client)>1 || bs_batch_is_tree(client)!=0))wsprintfA(heading,"Receiving file %d/%d: %.190s",bs_batch_index(client)+1,bs_batch_count(client),filename);else if(s->incoming)wsprintfA(heading,"Receiving: %.190s",filename);else wsprintfA(heading,"Sending file %lu/%lu: %.190s",position,total,filename);
@@ -193,7 +196,7 @@ static LRESULT CALLBACK procedure(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
         case TRAY_SHOW: show_main(); break;
         case TRAY_PREFS: show_main();
         /* fall through */
-        case 3: if(!prefs) { prefs=CreateWindowA("BitSkimLegacyPrefs","BitSkim Preferences",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU, CW_USEDEFAULT,CW_USEDEFAULT,370,450,w,NULL,instance,NULL); EnableWindow(w,FALSE); ShowWindow(prefs,SW_SHOW); } break;
+        case 3: if(!prefs) { prefs=CreateWindowA("BitSkimLegacyPrefs","BitSkim Preferences",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU, CW_USEDEFAULT,CW_USEDEFAULT,370,470,w,NULL,instance,NULL); EnableWindow(w,FALSE); ShowWindow(prefs,SW_SHOW); } break;
         case 4: case TRAY_CANCEL: bs_cancel(client); break;
         case 5: hide_main(); break;
         case TRAY_QUIT: if(!prefs && (!bs_status(client)->active || MessageBoxA(w,"Cancel the transfer and quit?","BitSkim",MB_YESNO)==IDYES)) DestroyWindow(w); break;
@@ -242,6 +245,7 @@ int WINAPI WinMain(HINSTANCE h,HINSTANCE old,LPSTR cmd,int show) {
     {char store[BS_PATH_MAX+1],*slash;
         if(from_ansi(ini,store,sizeof store)) {slash=strrchr(store,92);if(slash)strcpy(slash+1,"BSFOLD.DAT");bs_folders_configure(client,store);if(slash)strcpy(slash+1,"BSTRANS.DAT");bs_state_configure(client,store);}
     }
+    preserve_dates=GetPrivateProfileIntA("BitSkim","Metadata",0,ini);bs_metadata_enable(client,preserve_dates);
     bs_limits_configure(client,send_limit,receive_limit);bs_batch_enable(client,1);
     memset(&wc,0,sizeof wc); wc.hInstance=h; wc.hCursor=LoadCursor(NULL,IDC_ARROW); wc.hIcon=LoadIconA(h,MAKEINTRESOURCEA(1)); wc.hbrBackground=(HBRUSH)(COLOR_BTNFACE+1); wc.lpfnWndProc=procedure; wc.lpszClassName="BitSkimLegacy"; RegisterClassA(&wc); wc.lpfnWndProc=prefproc; wc.lpszClassName="BitSkimLegacyPrefs"; RegisterClassA(&wc);wc.lpfnWndProc=network_proc;wc.lpszClassName="BitSkimLegacyNetwork";RegisterClassA(&wc);
     window=CreateWindowA("BitSkimLegacy","BitSkim 0.2 - Windows Classic",WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX,CW_USEDEFAULT,CW_USEDEFAULT,600,500,NULL,NULL,h,NULL); if(!window) { bs_destroy(client); bs_platform_cleanup(); return 1; }

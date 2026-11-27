@@ -26,6 +26,7 @@ static int pen,bar_fills;static char last_text[200];
 #define JAM1 1
 static void copy(char *d,const char *s,size_t n){strncpy(d,s,n-1);d[n-1]=0;}
 const BSStatus *bs_status(const BSClient *c){(void)c;return &status;}
+const char *bs_user_status(BSClient *c){(void)c;return status.message;}
 BSResult bs_transfer_result(const BSClient *c){(void)c;return result;}
 unsigned long bs_transfer_serial(const BSClient *c){(void)c;return serial;}
 unsigned long bs_transfer_rate(const BSClient *c){(void)c;return 10;}

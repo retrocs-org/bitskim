@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Package experimental Atari executables, relink objects and matching source."""
 from pathlib import Path
-from zipfile import ZipFile,ZIP_DEFLATED
+from zipfile import ZIP_DEFLATED
+from archive_dates import PackageZipFile as ZipFile
 import hashlib,shutil,sys
 from build_provenance import ROOT,verify
 from source_release import write_source

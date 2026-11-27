@@ -1,6 +1,6 @@
 /* Adapted from NovaDock tools/startinstaller.c (MIT, NovaDock contributors).
  * See assets/licenses/NOVADOCK-LICENSE. */
-/* Workbench entry point for Install-BitSkim. Run the system Installer as
+/* Workbench entry point for Install. Run the system Installer as
  * a synchronous CLI tool with an explicit stack and package directory. */
 #ifndef BS_INSTALLER_TEST
 #include <exec/types.h>
@@ -82,13 +82,13 @@ int main(int argc,char **argv)
      * script. Always resolve our known script beside the actual launcher. */
     if(argc<=1) {
         ok=NameFromLock(GetProgramDir(),script,sizeof script) &&
-           AddPart(script,(STRPTR)"Install-BitSkim",sizeof script);
+           AddPart(script,(STRPTR)"Install",sizeof script);
     } else {
         lock=Lock((STRPTR)argv[1],ACCESS_READ);
         if(lock) { ok=NameFromLock(lock,script,sizeof script); UnLock(lock); }
-        if(ok && !regular_file(script)) ok=AddPart(script,(STRPTR)"Install-BitSkim",sizeof script);
+        if(ok && !regular_file(script)) ok=AddPart(script,(STRPTR)"Install",sizeof script);
     }
-    if(!ok || !regular_file(script)) {problem("Cannot locate the Install-BitSkim script beside StartInstaller. Keep the unpacked package together.");return 20;}
+    if(!ok || !regular_file(script)) {problem("Cannot locate the Install script beside StartInstaller. Keep the unpacked package together.");return 20;}
     /* AmigaOS 3.2 keeps its supported Installer in SYS:System. C: may
      * contain an older third-party copy installed years earlier. */
     if (exists("SYS:System/Installer")) installer="SYS:System/Installer";

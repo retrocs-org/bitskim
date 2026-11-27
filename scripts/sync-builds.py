@@ -38,7 +38,14 @@ def sync(destination,root=ROOT):
                     if data!=source.read_bytes():raise ValueError('Amiga installation archive is stale: '+name)
                     updates.append((data,base/name,((package.getinfo(name).external_attr>>16)&0o777) or 0o644))
             for data,path,mode in updates:copy(data,path,mode)
-            print('Verified unpacked installer: '+str(target)+' (open Install-BitSkim)')
+            if all(name in expected for name in ('BitSkim/Install','BitSkim/Install.info')):
+                for name in ('Install-BitSkim','Install-BitSkim.info'):
+                    old=target/name;safe(old)
+                    if old.exists():
+                        if not old.is_file():raise ValueError('Old installer conflicts with a directory: '+str(old))
+                        saved=backup/old.relative_to(base);saved.parent.mkdir(parents=True,exist_ok=True)
+                        shutil.move(old,saved)
+            print('Verified unpacked installer: '+str(target)+' (open Install)')
     packages=[]
     for file in sorted(out.glob('BitSkim-*')):
         if file.is_file() and (file.name=='BitSkim-0.2.lha' or (file.name.startswith('BitSkim-0.2-Linux-') and file.name.endswith('.tar.gz')) or (file.suffix in ('.zip','.dmg','.exe') and any(part in file.name for part in ('AmigaOS','Atari-','DOS-mTCP','RISCOS3','Windows','macOS')))):packages.append(file)

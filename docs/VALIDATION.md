@@ -2,12 +2,24 @@
 
 Version 0.2 is checked through host regression tests, memory sanitizers, target builds and application startup checks. See [RELEASE-READINESS.md](RELEASE-READINESS.md) for the current release status.
 
-- Mac: application startup, preferences, transfer tools and receive-decision lifetime checks.
-- Windows: x64 build and startup/engine checks. Silent installer lifecycle checks passed on Windows 11; wizard interaction and Windows 10 GUI coverage remain pending.
-- AmigaOS: 68000 build, application startup, preferences and discovery. Broader hardware coverage remains pending.
-- DOS: 8086 build; binary payloads in both directions, discovery, tagged sends, queues, folders and incoming decisions. Physical network cards and older DOS versions remain unverified.
-- Atari: STinG and MiNTNet builds; STinG application startup and transfer tools navigation. Transfers and hardware coverage remain unverified.
-- RISC OS: ARM2 and StrongARM compile/link checks. Application startup and transfers remain unverified.
+<!-- compatibility:start -->
+| Client / target | Checks completed for 0.2 | Still unverified |
+| --- | --- | --- |
+| [macOS](MACOS.md) — Apple silicon; macOS 13+ | Native startup/UI, all themes, Mac/Windows encrypted transfers and mounted/copied notarized app checks. | Human installation review and broader physical-network coverage. |
+| [Windows](WINDOWS.md) — Windows 10/11 x64; unsigned | Windows 11 native engine, high-DPI UI, install/update/uninstall and setup-wizard checks. | Windows 10 GUI/runtime review. |
+| [AmigaOS](AMIGA.md) — AmigaOS 3.x; 68000+; TCP/IP stack | Owner-confirmed native installation, app/Preferences startup and bridged discovery; host LHa/OLHa extraction. | Exact native OLHa/LHa archive check pending; broader hardware and TCP/IP stacks. |
+| [Linux](LINUX.md) — GTK desktop and CLI; arm64/x86-64; Ubuntu 24.04 baseline | arm64 native process/GTK tests; x86-64 process tests through emulation; TLS, folders and result notifications. | Physical x86-64, real Wayland sessions and other distributions. |
+| [DOS / mTCP](DOS.md) — Experimental; 8086; packet driver | DOS runtime transfers in both directions, discovery, queues, folders and receive decisions. | Physical network cards and older DOS versions. |
+| [Atari TOS / MiNTNet](ATARI.md) — Experimental STinG and MiNTNet builds | Target builds; STinG app startup and Transfer tools navigation. | Native transfers and physical hardware. |
+| [RISC OS](RISCOS.md) — Experimental ARM2 and StrongARM builds | Compile/link and package checks for both CPU variants. | Native startup, transfers and physical hardware. |
+| [Windows Classic](WINDOWS-LEGACY.md) — Experimental x86; Windows 95/98/Me/XP targets | PE32/subsystem/import compatibility checks. | Native runtime and hardware. |
+| [iPhone / iPad](IOS.md) — Experimental source-only; iOS 16+ | Local runtime TLS transfers, file/folder review, file management, themes and accessibility layout checks. | Physical devices, authenticated cloud providers and VoiceOver; local Files runtime issue remains documented. |
+| [Android](ANDROID.md) — Experimental source-only; 64-bit Android 8+ target | Android 17 local runtime/JNI TLS transfers, folder staging, minimized-transfer cancellation and accessibility layout checks. | Physical devices, Wi-Fi discovery, older Android versions, authenticated providers and TalkBack. |
+| [Windows 3.x](WINDOWS16.md) — Development-only; Win16; installed Winsock 1.1 | 8086 large-model build; NE format and Win16 import checks. | Native startup, Winsock stacks, transfers, cancellation and keyboard review. |
+| [Classic Mac OS 8/9](MAC-CLASSIC.md) — Port preparation; PowerPC/Open Transport initially | Shared pinned Retro68 PowerPC compiler build. | Networking SDK, safe HFS/Open Transport adapters and all native app/transfer checks; no client binary. |
+
+These are observed 0.2 checks, with limitations retained explicitly. The new file-date extension has host socket coverage; native date preservation still needs review on each target. Release candidates require their own artifact acceptance checks.
+<!-- compatibility:end -->
 
 Run `python3 -m unittest discover -s tests` for the host suite. Build and packaging checks are described in [RELEASING.md](RELEASING.md). Passing builds do not establish compatibility with untested operating-system or hardware configurations.
 
@@ -105,3 +117,30 @@ Mounted/copy testing found the HFS hybrid image added nonzero FinderInfo inside 
 ## Amiga installer confirmation — 19 November 2026
 
 The project owner confirmed installation/update from the refreshed package in the usual bridged Workbench session. BitSkim and BitSkimPrefs opened as version 0.2, and nearby discovery worked. This completes the pending native Amiga installation/startup/discovery review. The existing session and network configuration were preserved. This is a user-reported result; it does not add new transfer, filesystem, physical-hardware or TCP/IP-stack coverage.
+
+
+## LHA path compatibility — 22 November 2026
+
+The existing 30-file BitSkim package reproduced the reported level-0 filename mismatch: Unix LHa extracted its nested tree, while a macOS build of OLHa 0.4.4 stopped after the outer drawer icon. On a temporary copy, changing only filename-field `0xFF` separators to `/` and recalculating the affected header sums let both readers test and extract all 30 files with identical content hashes. Compressed data, file CRCs and DOS timestamps were retained. No released archive was changed.
+
+New Amiga packaging performs that normalization before its existing integrity, full-payload and date checks. `test_lha_compatibility.py` covers nested and empty files, binary payload bytes containing `0xFF`, idempotence, and rejection of malformed headers, checksums, unsupported levels, truncated streams and mismatched/duplicate member inventories without rewriting the input. Set `OLHA=/path/to/a/host/olha` to enable the independent-reader integration test; it reports a skip when OLHa is unavailable. The host OLHa source commit used here was `bb13fd2c0659a5ec4ce18932ffbf8c27f387dc4d` from `https://codeberg.org/MastaTabs/olha`.
+
+The exact native Amiga OLHa 0.4.4 binary test remains pending. These are macOS host results, not a native Amiga compatibility pass or an assignment of fault exclusively to either archiver. The running Amiga sessions and their networking were not changed.
+
+## Connection, key-storage and folder recovery checks
+
+`test_security_deadlines.py` exercises partial-header and partial-manifest activity over real sockets with a controlled clock. `test_collection_sessions.py` checks actual TLS reuse, old-peer fallback, pause/expiry and recipient changes. `test_folder_recovery.py` verifies matching completed files, a mismatched existing file, interrupted partial data after sender restart, unpaired rejection and destination links. Host Java staging checks include a provider-supplied original modification date.
+
+`python3 scripts/fuzz-protocol.py --seconds 30` runs production name, greeting, capability, invitation and frame/manifest decoders under libFuzzer, AddressSanitizer and UBSan. It never accepts destination writes. Install Homebrew LLVM on macOS if Apple's clang lacks libFuzzer; use `CC` for another compatible compiler. This bounded parser run does not establish exhaustive protocol/security coverage.
+
+`python3 scripts/check-key-stores.py macos` checks round-trip/update/delete against a disposable Keychain account; this passed on the build host. The Windows variant compiles an isolated DPAPI migration/update/tamper/delete executable; it must be run under the test Windows user. No production key is inspected. A new Windows 10 runtime, exact native Amiga LHa/OLHa test and physical mobile/provider-date checks are still pending. No emulator profile or bridge configuration was changed.
+
+`python3 scripts/benchmark-core.py --tls --mib 1 --batch-files 64` compares verified 1 KiB TLS files with the same 20 ms host loopback service cadence. The measured development run used 64 connections/36.7 seconds without reuse and one connection/8.1 seconds with reuse, retaining exact payload checks. These are host engine measurements, not native UI, physical-LAN or low-end-hardware throughput claims.
+
+## Build identity, recovery progress and retained-file review
+
+`test_build_identity.py` checks that identical source contents produce identical IDs in different directories, generated outputs do not feed back into the hash, source edits change the ID, and the compiled engine returns the generated value. The ordinary platform build scripts inject the same source fingerprint into their C engine.
+
+`test_release_polish.py` exercises actual cleanup against private temporary files: owned checkpoint pairs, completed lookalikes without a local marker, final-file preservation, changed content, locked files, linked/replaced directories, obsolete confirmation tokens, busy transfers and bounded scans. It also checks all-existing and mixed verified/resumed/new folder jobs. Cleanup never runs automatically or without confirmation. Windows uses handle-based file operations; POSIX targets use checked directory descriptors and exclusive quarantine renames. Native Windows cleanup acceptance is still required.
+
+The iOS runtime suite includes a real interrupted checkpoint followed by confirmed cleanup while retaining an existing completed destination. Android JNI runtime checks exercise locally marked checkpoint cleanup alongside existing TLS and file-provider tests. The native Mac startup renderer includes the actual retained-files view in every shared theme. These local runtime checks remain separate from physical-device, cloud-provider and native Windows acceptance.

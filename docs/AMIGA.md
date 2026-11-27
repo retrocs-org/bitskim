@@ -17,7 +17,7 @@ This compiles the C engine/client twice, once for BitSkim and once with BITSKIM_
 Outputs under `build/amiga/`:
 
 - BitSkim and BitSkimPrefs, with their distinct application .info files.
-- Install-BitSkim, its project icon, StartInstaller and the small StartBitSkim boot launcher.
+- Install, its project icon, StartInstaller and the small StartBitSkim boot launcher.
 - BitSkim.guide and its MultiView project icon.
 - InstallAssets settings-drawer, settings-project and Startup.info templates.
 - BitSkimDrawer.info, used as the distribution drawer icon.

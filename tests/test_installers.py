@@ -22,13 +22,13 @@ class AmigaInstaller(unittest.TestCase):
  def test_installer_command_names_script_and_rejects_drawer(self):
   out=ctypes.create_string_buffer(2200)
   self.lib.build_command.argtypes=[ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_char_p]
-  self.assertEqual(self.lib.build_command(out,len(out),b'SYS:System/Installer',b'Bin:BitSkim/Install-BitSkim'),1)
-  self.assertTrue(out.value.startswith(b'"SYS:System/Installer" "Bin:BitSkim/Install-BitSkim" '))
+  self.assertEqual(self.lib.build_command(out,len(out),b'SYS:System/Installer',b'Bin:BitSkim/Install'),1)
+  self.assertTrue(out.value.startswith(b'"SYS:System/Installer" "Bin:BitSkim/Install" '))
   self.assertNotIn(b'\n',out.value)
   self.assertEqual(self.lib.build_command(out,len(out),b'C:Installer',b'Bin:BitSkim/'),0)
-  self.assertEqual(self.lib.build_command(out,10,b'C:Installer',b'Bin:BitSkim/Install-BitSkim'),0)
+  self.assertEqual(self.lib.build_command(out,10,b'C:Installer',b'Bin:BitSkim/Install'),0)
  def test_script_owned_paths_and_balanced_forms(self):
-  text=(ROOT/'build/amiga/Install-BitSkim').read_text();depth=0;quoted=False;escape=False
+  text=(ROOT/'build/amiga/Install').read_text();depth=0;quoted=False;escape=False
   for line in text.splitlines():
    if line.lstrip().startswith(';'):continue
    for c in line:
@@ -53,13 +53,13 @@ class AmigaInstaller(unittest.TestCase):
   self.assertIn('Abort Install to stop',text)
   self.assertNotIn('\\\\n',text)
  def test_three_destinations_and_package_only_installer(self):
-  text=(ROOT/'build/amiga/Install-BitSkim').read_text()
+  text=(ROOT/'build/amiga/Install').read_text()
   self.assertEqual(text.count('(askdir'),3)
   self.assertIn('(set #appdefault "SYS:Utilities")',text)
   self.assertIn('(set #prefsdefault "SYS:Prefs")',text)
   self.assertRegex(text,r'\(source \(tackon #src "BitSkimPrefs"\)\) \(dest #prefdest\)')
   self.assertRegex(text,r'\(source \(tackon #src "BitSkim"\)\) \(dest #dest\)')
-  for name in ('Install-BitSkim','Install-BitSkim.info','StartInstaller'):
+  for name in ('Install','Install.info','StartInstaller'):
    self.assertNotIn('(source (tackon #src "'+name+'"))',text)
   self.assertIn('(set #shareddefault "SYS:")',text)
   self.assertIn('(set #shared (tackon #sharedparent "BitSkim"))',text)
@@ -77,7 +77,7 @@ class AmigaInstaller(unittest.TestCase):
    self.assertNotIn('(delete (tackon #shared "'+leaf+'")',text)
   self.assertLess(text.index('A destination cannot'),text.index('(makedir #dest'))
  def test_fixed_settings_help_icons_and_hidden_shared_drawer(self):
-  text=(ROOT/'build/amiga/Install-BitSkim').read_text()
+  text=(ROOT/'build/amiga/Install').read_text()
   self.assertNotIn('Installing shared drawer icon',text)
   self.assertIn('(delete (cat #shared ".info")',text)
   self.assertIn('(setdefaulttool (tackon #prefdest "BitSkimPrefs"))',text)
@@ -85,7 +85,7 @@ class AmigaInstaller(unittest.TestCase):
   # Path records are replaced rather than appended on repeated updates.
   self.assertLess(text.index('(delete "ENVARC:BitSkim/app.path"'),text.index('(textfile (dest "ENVARC:BitSkim/app.path")'))
  def test_novice_startup_is_owned_and_uses_a_fixed_safe_launch_command(self):
-  text=(ROOT/'build/amiga/Install-BitSkim').read_text()
+  text=(ROOT/'build/amiga/Install').read_text()
   self.assertIn('(set #novice (= @user-level 0))',text)
   self.assertIn('(run "T:BitSkim-InstallLaunch")',text)
   self.assertIn('(newname "BitSkimStart")',text)
@@ -103,11 +103,13 @@ class AmigaInstaller(unittest.TestCase):
    self.assertEqual(data[48],kind)
    if kind==4:self.assertTrue(data.endswith(b'SYS:Prefs/BitSkimPrefs\0'))
  def test_supplied_icons_keep_images_and_workbench_metadata(self):
-  data=(ROOT/'build/amiga/Install-BitSkim.info').read_bytes()
+  data=(ROOT/'build/amiga/Install.info').read_bytes()
   self.assertEqual(struct.unpack_from('>H',data)[0],0xe310)
   self.assertEqual(data[48],4)
   self.assertEqual(struct.unpack_from('>I',data,50)[0],1)
   self.assertTrue(data.endswith(b'StartInstaller\0'))
+  self.assertEqual(struct.unpack_from('>I',data,54)[0],0)
+  self.assertNotIn(b'AmiRocket',data)
   import importlib.util
   spec=importlib.util.spec_from_file_location('package_icons',ROOT/'scripts/amiga_package_icons.py');module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
   template=(ROOT/'assets/icons/generic-amiga-installer/Install.info').read_bytes()
@@ -116,5 +118,6 @@ class AmigaInstaller(unittest.TestCase):
   self.assertEqual(drawer[48],2);self.assertNotEqual(struct.unpack_from('>I',drawer,66)[0],0)
   template=(ROOT/'assets/icons/generic-amiga-installer/SoftwarePackage.info').read_bytes()
   self.assertEqual(module.images(template)[0],module.images(drawer)[0])
+  self.assertEqual(template,drawer)
 
 

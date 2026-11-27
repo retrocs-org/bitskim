@@ -25,3 +25,5 @@
 .manual-retro{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}.manual-retro>summary{font-size:13px;color:var(--accent)}
 
 .download-status{font-size:12px;color:var(--muted);margin:-12px 0 25px}.download-status a{color:var(--ink);text-decoration:underline}.client-links>span{display:inline-flex;align-items:center;gap:9px;flex-wrap:wrap}.client-links .checksum-link{font-size:9px;color:var(--muted);border-color:var(--line)}
+
+.compatibility-scroll{overflow-x:auto;margin:1rem 0}.compatibility-table{width:100%;min-width:620px;border-collapse:collapse;font-size:1rem}.compatibility-table th,.compatibility-table td{padding:.8rem;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}.compatibility-table th{color:var(--ink)}.compatibility-table small{font-weight:400;color:var(--muted)}

@@ -4,6 +4,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.security.*;
 import java.util.*;
 import java.util.function.BooleanSupplier;
@@ -21,8 +22,9 @@ final class TransferFiles {
         boolean matches(Snapshot other){return root.equals(other.root)&&MessageDigest.isEqual(signature,other.signature);}
     }
     static final class Node {
-        final String id,name; final boolean directory; final long size;
-        Node(String id,String name,boolean directory,long size){this.id=id;this.name=name;this.directory=directory;this.size=size;}
+        final String id,name; final boolean directory; final long size,modifiedMillis;
+        Node(String id,String name,boolean directory,long size){this(id,name,directory,size,-1);}
+        Node(String id,String name,boolean directory,long size,long modifiedMillis){this.id=id;this.name=name;this.directory=directory;this.size=size;this.modifiedMillis=modifiedMillis;}
     }
     interface Source { List<Node> children(Node directory)throws IOException; InputStream open(Node file)throws IOException; }
     private static MessageDigest digest(){try{return MessageDigest.getInstance("SHA-256");}catch(NoSuchAlgorithmException e){throw new AssertionError(e);}}
@@ -76,7 +78,13 @@ final class TransferFiles {
                 byte[] buffer=new byte[65536];int n;while((n=input.read(buffer))!=-1){if(cancelled.getAsBoolean())throw new IOException("Import cancelled.");bytes+=n;if(bytes>InputPolicy.MAX_FILE)throw new IOException("A file exceeds the transfer limit.");out.write(buffer,0,n);}
                 if(node.size>=0&&bytes!=node.size)throw new IOException("A provider file changed or was incomplete. Choose the folder again.");
             }
+            preserveDate(output,node.modifiedMillis);
         }
+    }
+    static void preserveDate(File file,long modifiedMillis)throws IOException {
+        if(modifiedMillis<0)return;
+        Files.setLastModifiedTime(file.toPath(),FileTime.fromMillis(modifiedMillis));
+        if(Math.abs(Files.getLastModifiedTime(file.toPath()).toMillis()-modifiedMillis)>1000)throw new IOException("Cannot preserve the provider file date.");
     }
     static File batch(File pending,File file)throws IOException {
         Path base=pending.getCanonicalFile().toPath(),path=file.getCanonicalFile().toPath();if(!path.startsWith(base))return null;Path relative=base.relativize(path);

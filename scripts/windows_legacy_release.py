@@ -1,7 +1,8 @@
 """Package the verified experimental Windows Classic client."""
 import json,hashlib
 from pathlib import Path
-from zipfile import ZipFile,ZIP_DEFLATED
+from zipfile import ZIP_DEFLATED
+from archive_dates import PackageZipFile as ZipFile
 from build_provenance import ROOT,verify
 def write_windows_legacy(out, root=ROOT):
  ROOT=Path(root)

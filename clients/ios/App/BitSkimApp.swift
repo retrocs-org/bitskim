@@ -91,6 +91,8 @@ struct MobileHome: View {
                     }
                     Section("Transfer") {
                         Text(client.status)
+                        if client.recoveryActions & UInt32(BS_ERROR_RETRY) != 0 { Button("Retry") { client.retryFailure() } }
+                        if client.recoveryActions & UInt32(BS_ERROR_TEST_CONNECTION) != 0 { Button("Test connection") { client.testFailureConnection() } }
                         if client.importing { ProgressView("Preparing files…") }
                         if client.active {
                             Text(client.progress.filename).font(.headline).lineLimit(2)
@@ -146,7 +148,7 @@ struct MobileHome: View {
                         }
                     }
                     Section("Retro files") {
-                        Toggle("Preserve retro metadata",isOn:Binding(get:{client.retroMetadata},set:{client.setMetadata($0)})).disabled(client.active || client.progress.queued>0)
+                        Toggle("Preserve file dates and retro metadata",isOn:Binding(get:{client.retroMetadata},set:{client.setMetadata($0)})).disabled(client.active || client.progress.queued>0)
                         Text("Retains optional Amiga attributes/comments and RISC OS filetypes in a .bskmeta companion for onward transfer.").font(.footnote)
                     }
                     Section("Encryption") {
@@ -157,11 +159,13 @@ struct MobileHome: View {
                     }
                     Section {
                         Button("Clear saved transfer history…",role:.destructive){clearHistory=true}
+                        NavigationLink("Retained partial files",destination:MobileRetainedFiles(client:client))
                         NavigationLink("Diagnostics", destination: MobileDiagnostics(client: client))
                     }
                     Section {
                         Link("Website", destination: URL(string: "https://bitskim.retrocs.org")!)
                         Link("Source code", destination: URL(string: "https://github.com/retrocs-org/bitskim")!)
+                        Text("BitSkim 0.2 · Build " + String(cString:bs_build_id())).textSelection(.enabled)
                         Text("Experimental iPhone/iPad client. No always-on background receiving.").font(.footnote).foregroundStyle(theme?.muted ?? Color.secondary)
                     }
                 }.navigationTitle("Settings")
@@ -290,9 +294,31 @@ struct IncomingOffer: View {
                     Text(client.spaceReport(incoming)).font(.caption).foregroundStyle(theme?.muted ?? Color.secondary)
                     if let error = client.error { Text(error).foregroundStyle(.red) }
                     Button("Accept and receive") { client.accept(incoming) }
+                    if client.canResumeFolder(incoming) {
+                        Text("Resume checks matching completed files and partial data. Differences stop the job; other files are kept.").font(.caption)
+                        Button("Resume existing folder") { client.accept(incoming, resumeExisting: true) }
+                    }
                     Button("Decline", role: .destructive) { client.decline(incoming) }
                 }
             }.navigationTitle("Incoming transfer")
         }
+    }
+}
+
+struct MobileRetainedFiles: View {
+    @ObservedObject var client: IOSClient
+    @State private var confirmation=false
+    @State private var reviewed: UInt=0
+    var body: some View {
+        MobileList {
+            Section { Text(client.retainedReport.isEmpty ? "Review the Received folder for interrupted transfers." : client.retainedReport);Text("Completed files are kept. Removing checkpoints discards their resume progress.").font(.footnote) }
+            Section("Reviewed files") { ForEach(Array(client.retainedItems.enumerated()),id:\.offset) { _,item in Text(item).font(.caption).textSelection(.enabled) } }
+            Section {
+                Button("Scan Received again"){client.scanRetainedFiles()}.disabled(client.active || client.progress.queued>0 || client.retainedPhase==3)
+                Button("Remove reviewed partial files…",role:.destructive){reviewed=client.retainedSerial;confirmation=true}.disabled(client.retainedPhase != 2 || client.retainedCount==0 || client.active || client.progress.queued>0)
+                if let error=client.error {Text(error).foregroundStyle(.red)}
+            }
+        }.navigationTitle("Retained partial files").onAppear {client.scanRetainedFiles()}.onDisappear {client.closeRetainedFiles()}
+        .alert("Remove \(client.retainedCount) partial files?",isPresented:$confirmation){Button("Keep files",role:.cancel){};Button("Remove partials",role:.destructive){client.removeRetainedFiles(reviewed)}} message: {Text("You will lose their resume progress. Completed files are kept; changed or locked checkpoints are preserved.")}
     }
 }

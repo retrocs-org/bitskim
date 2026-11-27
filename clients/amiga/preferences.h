@@ -89,13 +89,13 @@ static void pref_draw(PrefEditor *e) {
     } else if(e->section==2) {
         pref_text(rp,207,65,text,"Visible on network");
         pref_text(rp,207,95,text,"Allow incoming transfers");
-        pref_text(rp,207,120,text,"Preserve retro attributes and .info");
+        pref_text(rp,207,120,text,"Preserve dates, attributes and .info");
         pref_text(rp,172,139,muted,"Transfer limits (KiB/s; 0 = Unlimited)");
         pref_text(rp,172,157,text,"Send");
         pref_text(rp,172,187,text,"Receive");
         pref_text(rp,172,209,muted,"Limits apply starting with the next file.");
     } else {
-        pref_text(rp,172,65,text,"BitSkim 0.2");
+        {char build[100];sprintf(build,"BitSkim 0.2 / %s",bs_build_id());pref_text(rp,172,65,text,build);}
         pref_text(rp,172,86,muted,"Source repository:");
         pref_text(rp,172,104,text,"https://github.com/retrocs-org/bitskim");
         pref_text(rp,172,126,muted,"Website:");

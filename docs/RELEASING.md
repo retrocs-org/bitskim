@@ -185,6 +185,10 @@ Without `--output`, the artifact directory is `outputs/`, with state in `outputs
 
 A full release requires `BITSKIM_LINUX_INSTANCE` to name an existing configured Lima build instance. Both `arm64` and `x86_64` are required; `BITSKIM_LINUX_ARCHES` defaults to `arm64,x86_64` and cannot select a partial release. Build individual Linux targets using the standalone commands in [LINUX.md](LINUX.md). The inventory checks all intended packages, even when no Linux archive exists, and names missing or unexpected files.
 
+## Package dates
+
+Release ZIP, LHA and tar.gz entries use the build host’s current date and time when packaging, including generated files and RISC OS date metadata. The staged Mac DMG contents use the current packaging time too. Original source/build file timestamps are preserved; only archive metadata and disposable staging copies change. ZIP and classic LHA dates have two-second resolution. The host clock must be correct before packaging. Repackaging changes archive checksums, so prepare the release manifest from the final archives and retain those exact bytes for publication.
+
 ## Repository asset inventory
 
 For 0.2, upload these seventeen packages and one matching `<filename>.sha256` each—**34 uploaded assets** on each host:
@@ -224,9 +228,11 @@ bitskim.lha
 bitskim.readme
 ```
 
+New Amiga LHAs are created with generic level-0 headers and slash-separated filenames. The packager validates header sizes, checksums and the complete member inventory, normalizes only `0xFF` filename separators to `/`, and updates the affected header sums before testing/extracting the archive. Compressed data, file CRCs and timestamps are retained. This is part of building new archives; released or retained publication bytes are never rewritten.
+
 The LHA is an unchanged copy of the verified versioned Amiga LHA; renaming must not rebuild it. The readme's Version field identifies the release. Do not upload other clients, the website, source ZIP or checksums as the Aminet application archive.
 
-The generator writes ASCII/LF text, at most 76 columns, with these header fields in order: `Short`, `Author`, `Uploader`, `Type`, `Version`, `Architecture`, `Requires`, `Distribution`, `URL`. BitSkim uses category `comm/tcp` and architecture `m68k-amigaos >= 3.0.0`. The body contains the description, FEATURES, INSTALLATION, SOURCE AND LICENCE, and the full matching VERSION CHANGELOG grouped as Features/Enhancements/Bugs. Markdown syntax and decorative Unicode are removed. The uploader email is public.
+The generator writes ASCII/LF text, at most 76 columns, with these header fields in order: `Short`, `Author`, `Uploader`, `Type`, `Version`, `Architecture`, `Requires`, `Distribution`, `URL`. BitSkim uses category `comm/tcp` and architecture `m68k-amigaos >= 3.0.0`. The body contains the description, FEATURES, INSTALLATION, SOURCE AND LICENCE, and the complete VERSION CHANGELOG for every version in `CHANGELOG.MD`, including the latest. Version headings, dates and all entries are retained in changelog order, grouped as Features/Enhancements/Bugs; the initial 0.1 bullets appear under Features. Repository release descriptions continue to contain only their current-version changelog. Markdown syntax and decorative Unicode are removed. The uploader email is public.
 
 With `aminet: true` and uploader configured, ordinary release preparation creates `<output>/aminet/`. Review both files before selecting Aminet explicitly:
 
@@ -319,4 +325,4 @@ python3 scripts/check-macos-dmg.py --require-notarization --native-views \
 
 This mounts only its own read-only image, copies the app into a temporary installation directory and checks version, strict signatures, tickets and Gatekeeper. This is separate from a human drag-to-Applications review.
 
-For Amiga, keep the existing bridged Workbench session and its network settings. Use the unpacked `Builds:BitSkim/Install-BitSkim` package, review the displayed application/Prefs/shared destinations and settings preservation, and check the installed 0.2 app/preferences and discovery. Do not substitute a non-networked profile or silently change the running profile to obtain a pass. Keep native reports/screenshots locally; compiler and installer-flow tests do not establish a native GUI/network result.
+For Amiga, keep the existing bridged Workbench session and its network settings. Use the unpacked `Builds:BitSkim/Install` package, review the displayed application/Prefs/shared destinations and settings preservation, and check the installed 0.2 app/preferences and discovery. Do not substitute a non-networked profile or silently change the running profile to obtain a pass. Keep native reports/screenshots locally; compiler and installer-flow tests do not establish a native GUI/network result.

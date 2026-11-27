@@ -17,6 +17,7 @@ struct ReceivedStore {
         if actual != root.standardizedFileURL.resolvingSymlinksInPath() { _ = try checked(folder) }
         return try FileManager.default.contentsOfDirectory(at: actual, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles])
             .filter { (try? $0.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true }
+            .filter { !$0.lastPathComponent.hasSuffix(".bsk-part") && !$0.lastPathComponent.hasSuffix(".bsk-resume") }
             .filter { search.isEmpty || $0.lastPathComponent.localizedStandardContains(search) }
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }

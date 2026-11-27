@@ -1,13 +1,14 @@
 """RISC OS packages with Acorn filetypes, matching source and relink material."""
 from pathlib import Path
-from zipfile import ZipFile,ZipInfo,ZIP_DEFLATED
-import os,time,struct
+from zipfile import ZipInfo,ZIP_DEFLATED
+from archive_dates import PackageZipFile as ZipFile
+import os,struct
 from build_provenance import verify
 
 def acorn_add(z,source,name,filetype):
-    info=ZipInfo(name,time.localtime(source.stat().st_mtime)[:6])
+    info=ZipInfo(name,z.entry_date_time)
     info.compress_type=ZIP_DEFLATED
-    centiseconds=int((source.stat().st_mtime+2208988800)*100)
+    centiseconds=(z.timestamp+2208988800)*100
     load=0xfff00000 | (filetype<<8) | ((centiseconds>>32)&255)
     info.extra=struct.pack('<HH4sIIII',0x4341,20,b'ARC0',load,centiseconds&0xffffffff,0x33,0)
     z.writestr(info,source.read_bytes())

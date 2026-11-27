@@ -18,12 +18,18 @@ static size_t test_fwrite(const void *p,size_t size,size_t count,FILE *file){
     return got;
 }
 static int test_fclose(FILE *file){int result=fclose(file);if(close_failed && file==receive_file){close_failed=0;errno=ENOSPC;return EOF;}return result;}
+static int mtime_failed,connect_failed,connect_count;
+int bs_test_connect_count(void){return connect_count;}
+void bs_test_fail_connect(int value){connect_failed=value;}
+static int test_connect(BSSocket s,const struct sockaddr *address,BSSockLen size){connect_count++;if(connect_failed){errno=ECONNREFUSED;return -1;}return connect(s,address,size);}
+void bs_test_fail_mtime(int value){mtime_failed=value;}
+static int test_mtime_set(const char *path,unsigned long seconds){return mtime_failed?0:bsp_mtime_set(path,seconds);}
 static int blocked,send_limit,broadcasts,temp_failed,space_mode=-1;static unsigned long space_hi,space_lo,space_unit;
 void bs_test_space(int mode,unsigned long hi,unsigned long lo,unsigned long unit){space_mode=mode;space_hi=hi;space_lo=lo;space_unit=unit;}
 static int test_disk_free(const char *path,unsigned long *hi,unsigned long *lo,unsigned long *unit){if(space_mode<0)return bsp_disk_free(path,hi,lo,unit);*hi=space_hi;*lo=space_lo;*unit=space_unit;return space_mode;}
 void bs_test_fail_temp(int value){temp_failed=value;}
 static FILE *test_tmpfile(void){return temp_failed?NULL:tmpfile();}
-void bs_test_reset(void) { write_remaining=-1;close_failed=0;receive_file=NULL;clock_offset=millis_offset=0; blocked=0; send_limit=0; broadcasts=0; temp_failed=0;space_mode=-1; }
+void bs_test_reset(void) { write_remaining=-1;mtime_failed=connect_failed=connect_count=0;close_failed=0;receive_file=NULL;clock_offset=millis_offset=0; blocked=0; send_limit=0; broadcasts=0; temp_failed=0;space_mode=-1; }
 void bs_test_advance(unsigned long seconds) { clock_offset+=seconds; }
 void bs_test_send_limit(int value) { send_limit=value; }
 void bs_test_block_send(int value) { blocked=value; }
@@ -35,6 +41,8 @@ static int test_send(BSSocket s,const void *p,int n) {
 }
 static void test_broadcast(BSSocket s,const void *p,int n,unsigned short port) { broadcasts++; bsp_broadcast(s,p,n,port); }
 int bs_test_broadcast_count(void) { return broadcasts; }
+#define connect test_connect
+#define bsp_mtime_set test_mtime_set
 #define bsp_create_file test_create_file
 #define fwrite test_fwrite
 #define fclose test_fclose
@@ -51,3 +59,7 @@ void bs_test_peer_endpoint(BSClient *c,const char *id,const char *address,unsign
     BSPeer *p;if(c->peer_count>=BS_MAX_PEERS)return;p=&c->peers[c->peer_count++];memset(p,0,sizeof *p);
     copystr(p->id,id,sizeof p->id);copystr(p->address,address,sizeof p->address);copystr(p->name,"Test endpoint",sizeof p->name);p->port=port;p->last_seen=bsp_seconds();
 }
+
+#ifdef BS_OPENSSL
+int bs_test_checkpoint_mark(const char *path){FILE *file=fopen(path,"r+b");int result;if(!file)return 0;result=bsp_checkpoint_mark(file);fclose(file);return result;}
+#endif

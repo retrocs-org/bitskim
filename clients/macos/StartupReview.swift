@@ -22,6 +22,8 @@ enum MacStartupReview {
             guard Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == "0.2" else { throw fail("Packaged application version is not 0.2") }
             try autoreleasepool {
                 let model = ClientModel(defaults: defaults, storageDirectory: profile)
+                guard String(cString:bs_build_id()).range(of:"^[a-f0-9]{12}$",options:.regularExpression) != nil else { throw fail("Source build identity missing") }
+                model.retainedFolder=received.path;model.retainedReport="2 recognized partial files contain 6144 bytes, with about 8192 bytes allocated. Completed files are kept.";model.retainedCount=2;model.retainedPhase=2;model.retainedItems=["Nested/Example.bin · 4 KiB",String(repeating:"Long folder name/",count:8)+"Möte.txt · 2 KiB"]
                 guard model.engine != nil else { throw fail("Native listener/security initialization failed. Close another BitSkim copy and retry.") }
                 RunLoop.current.run(until: Date().addingTimeInterval(0.12))
                 guard model.status.lowercased().contains("ready") else { throw fail("Native startup status: " + model.status) }
@@ -33,7 +35,8 @@ enum MacStartupReview {
                     let screens: [(String, AnyView, NSSize)] = [
                         ("main", AnyView(MainView(model: model)), NSSize(width: 420, height: 380)),
                         ("preferences", AnyView(PreferencesView(model: model, close: {})), NSSize(width: 620, height: 650)),
-                        ("tools", AnyView(TransferToolsView(model: model)), NSSize(width: 720, height: 620))
+                        ("tools", AnyView(TransferToolsView(model: model)), NSSize(width: 720, height: 620)),
+                        ("retained", AnyView(RetainedFilesView(model:model)), NSSize(width:620,height:500))
                     ]
                     for (name, view, size) in screens {
                         let host = NSHostingView(rootView: view); window.setContentSize(size); window.contentView = host

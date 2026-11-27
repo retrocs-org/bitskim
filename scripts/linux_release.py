@@ -10,6 +10,7 @@ import tempfile
 
 from build_provenance import ROOT, verify
 from release_paths import output_dir
+from archive_dates import current_timestamp
 
 ARCHES = ('arm64', 'x86_64')
 INSTALL_SCRIPT = b'''#!/bin/sh
@@ -93,10 +94,11 @@ def package(out, arch, cli_only=False, root=ROOT):
     with tempfile.NamedTemporaryFile(dir=out, suffix='.tar.gz', delete=False) as temporary:
         temporary_path = Path(temporary.name)
     try:
+        timestamp = current_timestamp()
         with tarfile.open(temporary_path, 'w:gz') as archive:
             for name, (data, mode) in files.items():
                 info = tarfile.TarInfo(stem(arch, cli_only) + '/' + name)
-                info.size, info.mode, info.mtime = len(data), mode, 0
+                info.size, info.mode, info.mtime = len(data), mode, timestamp
                 archive.addfile(info, io.BytesIO(data))
         verify_archive(temporary_path, arch, cli_only, root)
         temporary_path.replace(destination)

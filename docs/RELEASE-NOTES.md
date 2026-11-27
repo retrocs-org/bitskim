@@ -4,6 +4,16 @@ Direct local-network file sharing between modern desktops and classic computers,
 
 ## Features
 
+- Absolute negotiation and file-list deadlines stop partial-frame trickle attacks without shortening recipient approval or active transfer verification.
+- Android provider staging preserves an available original file modification date, including files inside selected folders.
+- macOS pairing keys use Keychain; modern Windows keys use user-scoped DPAPI. Legacy plaintext settings migrate only after verified storage, and storage errors fail closed.
+- Stable typed error codes and an explicit written-file verification API; remote error wording cannot choose local recovery actions.
+- Negotiated collection connections reuse the same socket for successive files, retain per-file readback verification, and fall back to separate connections for older clients.
+- Explicit recovery of interrupted folders from a trusted encrypted peer: re-approve the manifest, verify completed files and partial prefixes, preserve mismatches and unlisted files, then receive remaining data.
+- Experimental Windows 3.x development client with native Win16/Winsock 1.1 build and import checks. Classic Mac OS 8/9 compiler/SDK preparation is documented; its network client is not ready.
+- Opt-in file modification-date preservation, negotiated per transfer with content-bound records, verified temporary-file restoration and explicit success/failure receipts; disabled and older peers retain the original transfer protocol.
+- Contextual recovery guidance for transfer errors, safe current-transfer retry actions and connection/folder shortcuts while retaining raw diagnostic errors.
+- One maintained compatibility record generates the README, validation summary and public support table, distinguishing completed checks from unverified platforms.
 - Nearby discovery through UDP broadcasts, or manual IPv4 connections.
 - Files and folder collections on capable clients, approval prompts, progress, cancellation, session queues/history and conflict choices.
 - Written-file CRC32 verification and compatibility/discovery diagnostics.
@@ -12,7 +22,7 @@ Direct local-network file sharing between modern desktops and classic computers,
 
 ## Installation
 
-Choose the package for your platform from the tagged release. macOS uses the signed/notarized Apple silicon DMG or ZIP; modern Windows uses its x64 setup or portable ZIP. Windows packages are unsigned. Unpack the Amiga archive and open Install-BitSkim; the Amiga requires AmigaOS 3.x and a compatible TCP/IP stack. DOS, Atari, RISC OS and Windows Classic packages have limited validation; consult their platform guides before installation.
+Choose the package for your platform from the tagged release. macOS uses the signed/notarized Apple silicon DMG or ZIP; modern Windows uses its x64 setup or portable ZIP. Windows packages are unsigned. Unpack the Amiga archive and open Install; the Amiga requires AmigaOS 3.x and a compatible TCP/IP stack. DOS, Atari, RISC OS and Windows Classic packages have limited validation; consult their platform guides before installation.
 
 Linux desktop+CLI tar.gz archives target arm64/x86-64 with distribution-provided GTK 4.12+, GLib/GIO and OpenSSL 3; see docs/LINUX.md for installation and limits.
 
@@ -33,6 +43,16 @@ BitSkim-owned code is MIT licensed. Third-party components retain their own term
 
 #### Features
 
+- Absolute negotiation and file-list deadlines stop partial-frame trickle attacks without shortening recipient approval or active transfer verification.
+- Android provider staging preserves an available original file modification date, including files inside selected folders.
+- macOS pairing keys use Keychain; modern Windows keys use user-scoped DPAPI. Legacy plaintext settings migrate only after verified storage, and storage errors fail closed.
+- Stable typed error codes and an explicit written-file verification API; remote error wording cannot choose local recovery actions.
+- Negotiated collection connections reuse the same socket for successive files, retain per-file readback verification, and fall back to separate connections for older clients.
+- Explicit recovery of interrupted folders from a trusted encrypted peer: re-approve the manifest, verify completed files and partial prefixes, preserve mismatches and unlisted files, then receive remaining data.
+- Experimental Windows 3.x development client with native Win16/Winsock 1.1 build and import checks. Classic Mac OS 8/9 compiler/SDK preparation is documented; its network client is not ready.
+- Opt-in file modification-date preservation, negotiated per transfer with content-bound records, verified temporary-file restoration and explicit success/failure receipts; disabled and older peers retain the original transfer protocol.
+- Contextual recovery guidance for transfer errors, safe current-transfer retry actions and connection/folder shortcuts while retaining raw diagnostic errors.
+- One maintained compatibility record generates the README, validation summary and public support table, distinguishing completed checks from unverified platforms.
 - iOS and Android native folder selection with read-only provider staging, nested/empty directory preservation, full content review and explicit send confirmation.
 - Linux desktop completion/failure notifications with grouped results, verified-receipt counts, Open folder and a saved per-profile notification preference.
 - Linux GTK desktop and separate headless CLI for arm64/x86-64, with discovery, file/folder approval, TLS pairing, disk verification, saved queues/history, shared themes, diagnostics and QR invitations.
@@ -55,6 +75,9 @@ BitSkim-owned code is MIT licensed. Third-party components retain their own term
 
 #### Enhancements
 
+- About/Settings and diagnostics show a short source build fingerprint, stable across checkout paths and available without Git metadata.
+- Folder recovery distinguishes checking existing content from transferring remaining data, with verified/resumed/received/remaining counts and checked-byte progress.
+- Explicit retained-partial review shows recognized files and allocated space, requires confirmation, blocks concurrent transfers and preserves completed, changed, locked, linked and unrecognized files.
 - Mobile send reviews keep Send/Cancel visible while folder contents scroll, wrap full paths, support large text and provide explicit accessibility labels and keyboard cancellation.
 - Isolated native Mac view/startup checks and Windows installer wizard acceptance tools support review of packaged applications without changing existing user profiles.
 - Mobile folder reviews use bounded manifests and background hashing; changed content requires a new review, and provider copy failures leave originals untouched.
@@ -70,6 +93,10 @@ BitSkim-owned code is MIT licensed. Third-party components retain their own term
 
 #### Bugs
 
+- Fully verified existing files now advance folder recovery exactly once, including jobs containing only completed files.
+- Corrected outdated batch-resume and website-launch wording in apps, guides and public website copy.
+- Queued preconnection failures receive a fresh failed receipt, preserving history identity and allowing result notifications instead of reusing the previous successful transfer.
+- Amiga LHA packaging normalizes level-0 path separators and header checksums for consistent nested extraction across LHa and OLHa readers.
 - Mac disk images preserve the signed app metadata and validate the mounted/copied app; HFS hybrid metadata no longer invalidates the installed bundle signature.
 - Full 0.2 releases require all intended Linux desktop/CLI archives for both architectures; missing packages are named and cannot silently reduce the publication inventory.
 - Release inventory and iOS folder/background documentation now match the current application behavior.

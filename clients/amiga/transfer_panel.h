@@ -21,7 +21,7 @@ static void transfer_summary(char *title,char *detail,unsigned long *done,unsign
         transfer_details(s->transferred,s->total,bs_transfer_rate(client),detail);
         *done=s->transferred;*total=s->total;
     } else {
-        snprintf(title,100,"%.69s",s->message);
+        snprintf(title,100,"%.69s",bs_user_status(client));
         if(bs_queue_count(client))snprintf(detail,100,"%d queued%s | Use Queue menu",bs_queue_count(client),bs_queue_paused(client)?" - paused":"");
         else if(summary_last_transfer_valid) {
             transfer_details(summary_last_transfer.transferred,summary_last_transfer.total,0,detail);

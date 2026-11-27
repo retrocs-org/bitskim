@@ -3,7 +3,8 @@ void bs_local_capabilities(const BSClient *c,BSCapabilities *out) {
     if(!out)return;
     memset(out,0,sizeof *out);if(!c)return;
     out->send_features=BS_CAP_DIRECTORIES|(BS_CAP_RATE_LIMITS|BS_CAP_SKIP|BS_CAP_DISK_VERIFY)|BS_CAP_DETAILS|BS_CAP_BATCH|BS_CAP_COLLECTION;
-if(c->metadata_enabled)out->send_features|=BS_CAP_RETRO_METADATA;
+if(c->session_enabled)out->send_features|=BS_CAP_SESSION;
+if(c->metadata_enabled)out->send_features|=BS_CAP_RETRO_METADATA|BS_CAP_FILE_TIMES;
 #ifdef BS_OPENSSL
     out->send_features|=BS_CAP_TLS;
     if(c->resume_enabled)out->send_features|=BS_CAP_RESUME;
@@ -21,7 +22,7 @@ if(c->metadata_enabled)out->send_features|=BS_CAP_RETRO_METADATA;
     out->name_policy=1;out->local_name_bytes=30;
 #elif defined(__riscos__)
     out->name_policy=1;out->local_name_bytes=10;
-#elif defined(BS_DOS) || defined(BS_ATARI_STING)
+#elif (defined(BS_DOS) || defined(BS_WIN16)) || defined(BS_ATARI_STING)
     out->name_policy=2;out->local_name_bytes=12;out->path_bytes=127;
 #elif defined(BS_ATARI)
     out->name_policy=3;

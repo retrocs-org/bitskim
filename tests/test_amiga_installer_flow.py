@@ -83,7 +83,7 @@ class InstallerDiscovery(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
   subprocess.run(['python3','scripts/build-amiga-installer.py'],cwd=ROOT,check=True,stdout=subprocess.DEVNULL)
-  text=(ROOT/'build/amiga/Install-BitSkim').read_text()
+  text=(ROOT/'build/amiga/Install').read_text()
   cls.flow=text.split('; BEGIN installation discovery',1)[1].split('; END installation discovery',1)[0]
   cls.stopping=text.split('; BEGIN stop running clients',1)[1].split('; END stop running clients',1)[0]
   cls.pathchecks=text.split('; BEGIN installation path checks',1)[1].split('; END installation path checks',1)[0]
@@ -211,6 +211,6 @@ class UpdateLifecycle(unittest.TestCase):
    else:f.run(self.stopping)
    self.assertNotIn('T:BitSkim-InstallStop',f.files)
  def test_shutdown_precedes_installed_file_changes(self):
-  text=(ROOT/'build/amiga/Install-BitSkim').read_text()
+  text=(ROOT/'build/amiga/Install').read_text()
   self.assertLess(text.index('; END stop running clients'),text.index('; BEGIN preserve blocking drawer'))
   self.assertLess(text.index('; END stop running clients'),text.index('(source (tackon #src "BitSkim"))'))

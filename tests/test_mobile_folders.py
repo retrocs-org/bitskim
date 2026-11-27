@@ -22,9 +22,10 @@ public class FolderChecks {
  static void check(boolean value){if(!value)throw new AssertionError("Folder check failed");}
  public static void main(String[] args)throws Exception{
   File base=new File(args[0]),pending=new File(base,"pending");pending.mkdir();
-  TransferFiles.Node tree=new TransferFiles.Node("root","Tree",true,0),empty=new TransferFiles.Node("empty","Empty",true,0),file=new TransferFiles.Node("file","Möte.txt",false,3);
+  TransferFiles.Node tree=new TransferFiles.Node("root","Tree",true,0),empty=new TransferFiles.Node("empty","Empty",true,0),file=new TransferFiles.Node("file","Möte.txt",false,3,946684800000L);
   TransferFiles.Source provider=new TransferFiles.Source(){public List<TransferFiles.Node> children(TransferFiles.Node n){return n.id.equals("root")?Arrays.asList(empty,file):Collections.emptyList();}public InputStream open(TransferFiles.Node n){return new ByteArrayInputStream(new byte[]{1,2,3});}};
   File staged=TransferFiles.stage(provider,tree,pending,()->false);check(new File(staged,"Empty").isDirectory());check(Arrays.equals(Files.readAllBytes(new File(staged,"Möte.txt").toPath()),new byte[]{1,2,3}));
+  check(new File(staged,"Möte.txt").lastModified()==946684800000L);
   TransferFiles.Snapshot original=TransferFiles.inspect(staged);check(original.total==3&&original.entries.size()==3);
   Files.write(new File(staged,"Möte.txt").toPath(),new byte[]{3,2,1});check(!original.matches(TransferFiles.inspect(staged)));
   TransferFiles.markQueued(pending,staged);check(new File(pending,".queued-"+staged.getParentFile().getName()).isFile());check(new File(staged,"Möte.txt").isFile());

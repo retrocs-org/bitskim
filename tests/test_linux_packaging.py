@@ -3,6 +3,7 @@ import json
 import sys
 import tarfile
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -33,9 +34,11 @@ class LinuxPackages(unittest.TestCase):
                 (build / binary).write_bytes(b'checked payload ' + binary.encode())
                 begin(target, root)
                 finish(target, root)
+            before = int(time.time())
             desktop = package(root / 'outputs', 'arm64', root=root)
             with tarfile.open(desktop) as archive:
                 prefix = desktop.name.removesuffix('.tar.gz')
+                self.assertTrue(all(before <= member.mtime <= int(time.time()) for member in archive))
                 self.assertEqual(archive.extractfile(prefix + '/bin/bitskim-cli').read(),
                                  (build / 'bitskim-cli').read_bytes())
                 self.assertEqual(archive.getmember(prefix + '/bin/bitskim').mode, 0o755)

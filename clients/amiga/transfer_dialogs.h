@@ -119,14 +119,14 @@ static void dialog_submit(void) {
     if(!path[0]) { dialog_error("Enter the full file or directory path."); return; }
     if(d->mode==DIALOG_BATCH) {
         if(!bs_status(client)->awaiting_decision || bs_transfer_serial(client)!=d->serial) {dialog_close();return;}
-        if(!bs_accept_batch(client,path)) {dialog_error(bs_last_error(client));return;}
+        if(!bs_accept_batch(client,path)) {dialog_error(bs_user_error(client));return;}
     } else if(d->mode==DIALOG_SEND) {
         if(!prepare_single_send(client)) { dialog_error("A transfer is already in progress."); return; }
-        if(!gui_send(client,&d->target,path)) { dialog_error(bs_last_error(client)); return; }
+        if(!gui_send(client,&d->target,path)) { dialog_error(bs_user_error(client)); return; }
     } else {
         if(!bs_status(client)->awaiting_decision || bs_transfer_serial(client)!=d->serial) { dialog_close(); return; }
         copy(destination,path,sizeof destination);
-        if(!bs_accept_conflict(client,destination)) { dialog_error(bs_last_error(client)); return; }
+        if(!bs_accept_conflict(client,destination)) { dialog_error(bs_user_error(client)); return; }
     }
     dialog_close();
 }
@@ -135,7 +135,7 @@ static void begin_send_file(const char *path) {
     if(window && ipg) copy(manual_ip,((struct StringInfo *)ipg->SpecialInfo)->Buffer,sizeof(manual_ip));
     if(!gui_target(&target,selected_id,manual_ip)) { client_notice("Select a peer or enter a valid IP address and port."); return; }
     if(path && !prepare_single_send(client)) { client_notice("A transfer is already in progress."); return; }
-    if(path) { if(transfer_dialog.mode==DIALOG_SEND) dialog_close(); if(!gui_send(client,&target,path)) client_notice(bs_last_error(client)); return; }
+    if(path) { if(transfer_dialog.mode==DIALOG_SEND) dialog_close(); if(!gui_send(client,&target,path)) client_notice(bs_user_error(client)); return; }
     if(transfer_dialog.w) { WindowToFront(transfer_dialog.w); ActivateWindow(transfer_dialog.w); return; }
     snprintf(recipient,sizeof(recipient),"To: %s:%u",target.address,target.port);
     if(target.id[0]) {
@@ -156,7 +156,7 @@ static void incoming(void) {
     if(transfer_dialog.w && (transfer_dialog.mode==DIALOG_OFFER || transfer_dialog.mode==DIALOG_BATCH) && transfer_dialog.serial==bs_transfer_serial(client)) return;
     if((bs_batch_count(client)>1 || bs_batch_is_tree(client)!=0)) {
         if(auto_accept && !ask_location) {
-            if(!bs_accept_batch(client,download)) {copy(failure,bs_last_error(client),sizeof failure);bs_decline(client);client_notice(failure);}return;
+            if(!bs_accept_batch(client,download)) {copy(failure,bs_user_error(client),sizeof failure);bs_decline(client);client_notice(failure);}return;
         }
         if(iconified && !restore_ui()) {bs_decline(client);return;}
         if(transfer_dialog.w)dialog_close();
@@ -170,7 +170,7 @@ static void incoming(void) {
     if(!AddPart((STRPTR)original,(STRPTR)local_file,sizeof(original))) { bs_decline(client); client_notice("Destination path is too long."); return; }
     if(auto_accept && !ask_location && !renamed) {
         if(strlen(original)>=sizeof destination) { bs_decline(client); client_notice("Cannot choose an unused destination name."); }
-        else if((copy(destination,original,sizeof destination),!bs_accept_conflict(client,destination))) { copy(failure,bs_last_error(client),sizeof(failure)); bs_decline(client); client_notice(failure); }
+        else if((copy(destination,original,sizeof destination),!bs_accept_conflict(client,destination))) { copy(failure,bs_user_error(client),sizeof(failure)); bs_decline(client); client_notice(failure); }
         return;
     }
     if(iconified && !restore_ui()) { bs_decline(client); return; }
@@ -202,8 +202,8 @@ static void dialog_tick(void) {
             if(id==43){if(bs_tools_line(client,d->history_index,d->list_top+12,line,sizeof line))d->list_top+=12;else d->list_top=0;}
             else if(id==44){d->history_index=d->history_index<0?0:-1;d->list_top=0;if(bs_history_item(client,d->history_index,&h))d->serial=h.serial;}
             else if(id==45){d->history_index++;if(d->history_index>=bs_history_count(client))d->history_index=0;d->list_top=0;if(bs_history_item(client,d->history_index,&h))d->serial=h.serial;}
-            else if(id==46){int i;for(i=0;i<bs_history_count(client);i++)if(bs_history_item(client,i,&h) && h.serial==d->serial){if(!bs_retry_history(client,i))dialog_error(bs_last_error(client));break;}}
-            else if(id==48){if(!bs_network_test(client,manual_ip[0]?manual_ip:NULL,0))dialog_error(bs_last_error(client));d->history_index=-1;d->list_top=0;}
+            else if(id==46){int i;for(i=0;i<bs_history_count(client);i++)if(bs_history_item(client,i,&h) && h.serial==d->serial){if(!bs_retry_history(client,i))dialog_error(bs_user_error(client));break;}}
+            else if(id==48){if(!bs_network_test(client,manual_ip[0]?manual_ip:NULL,0))dialog_error(bs_user_error(client));d->history_index=-1;d->list_top=0;}
             else if(id==47)bs_conflict_policy(client,(bs_conflict_get(client)+1)%3);
             dialog_draw();RefreshGList(d->gadgets,d->w,NULL,-1);
         }

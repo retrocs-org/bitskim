@@ -102,3 +102,17 @@ All clients now use disk-backed queues with a portable 32,760-file count ceiling
 Settings remain in `%APPDATA%\BitSkim\preferences.ini` (Roaming AppData), independent of the program folder. Older registered per-user installations must be uninstalled before the all-users installer proceeds; settings are preserved.
 
 Device identities and remembered peer pins are stored beside preferences in the `Trust` directory and loaded before networking can establish an encrypted session. A storage initialization failure stops startup; existing identities are not silently replaced.
+
+## Pairing-key storage
+
+The modern client stores the optional shared key as a user-scoped DPAPI value named `PairingKeyProtected` in its preferences INI. This is tied to the Windows user's protection context; copying the INI to another account is not a key-export mechanism. Legacy `PairingKey` values are removed only after encryption and successful readback. A damaged protected record fails closed rather than falling back to plaintext. The Security page masks the key and offers Show key when you deliberately need to inspect/copy it.
+
+For an isolated native migration/update/tamper/delete check, run `python3 scripts/check-key-stores.py windows` on the build host, then `build/key-store-review/KeyStoreCheck.exe` in Windows. The test creates its own temporary INI and deletes it afterward.
+
+## Build identity and retained partial files
+
+About/Settings and Diagnostics display the source build fingerprint alongside version 0.2. It identifies the source contents, including uncommitted edits, independently of checkout path or Git history. Direct compiler invocations that omit the generated identity header are explicitly labeled as unidentified. Regenerate builds with the supplied scripts after source changes. Different target configurations may share a source ID; it is not a binary checksum.
+
+Open **Retained partial files** from Settings/Preferences or Linux Transfer tools. Desktop clients let you choose a receive folder; mobile clients review Received. The bounded scan lists recognized checkpoint pairs and their disk usage. Review every listed entry, then confirm **Remove reviewed partials** to discard that resume progress. Completed files, unrecognized files, links and changed/locked checkpoints are kept. Older unmarked checkpoints and volumes that cannot store the local marker are excluded from cleanup; they remain usable for resume. Transfers or queued work prevent cleanup; any intervening transfer requires another scan. Closing the review stops further cleanup. A limit notice means only the listed files were reviewed; other files are kept.
+
+During folder recovery, progress distinguishes checking existing content from transferring remaining data, with counts for verified, resumed, received and remaining files. Hashing bytes are shown as checked bytes, not network payload.

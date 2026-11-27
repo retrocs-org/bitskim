@@ -28,8 +28,15 @@ struct MobileHistory: Identifiable, Equatable {
     @Published var trusted = false
     @Published var otherCode = ""
     @Published var diagnostics = ""
+    @Published var retainedReport = ""
+    @Published var retainedItems: [String] = []
+    @Published var retainedPhase = 0
+    @Published var retainedCount = 0
+    private var retainedListKey = ""
+
     @Published var history: [MobileHistory] = []
     @Published var error: String?
+    @Published var recoveryActions: UInt32 = 0
     @Published var importing = false
     @Published var filePicker = false
     @Published var folderPicker = false
@@ -125,7 +132,7 @@ struct MobileHistory: Identifiable, Equatable {
             bs_metadata_enable(client,retroMetadata ? 1:0)
             bs_conflict_policy(client, BS_CONFLICT_RENAME)
             bs_batch_enable(client, 1)
-            bs_resume_enable(client, 0)
+            bs_resume_enable(client, 1)
             timer = Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.tick() }
             }
@@ -149,7 +156,8 @@ struct MobileHistory: Identifiable, Equatable {
     private func tick() {
         guard let client = engine else { return }
         bs_service(client, 4)
-        let state = bs_status(client)!.pointee, serial = bs_transfer_serial(client)
+        var state = bs_status(client)!.pointee
+        var recovery = BSRecoveryProgress(); if bs_recovery_progress(client,&recovery) != 0 && recovery.phase == 2 { state.transferred = recovery.checked_bytes; state.total = recovery.check_total };let serial = bs_transfer_serial(client)
         if offer != nil && (state.awaiting_decision == 0 || serial != displayedOffer) { offer = nil }
         if state.awaiting_decision != 0 && serial != displayedOffer {
             displayedOffer = serial; filePicker = false
@@ -161,12 +169,14 @@ struct MobileHistory: Identifiable, Equatable {
         }
         guard Date().timeIntervalSince(lastDisplay) >= 0.2 else { return }
         lastDisplay = Date()
+        refreshRetainedFiles()
         if Date().timeIntervalSince(lastAddressUpdate) >= 5 {
             let nextAddresses = Self.lanAddresses(); if addresses != nextAddresses { addresses = nextAddresses }
             lastAddressUpdate = Date()
         }
         if active != (state.active != 0) { active = state.active != 0 }
-        let message = wireText(state.message); if status != message { status = message }
+        let nextActions = bs_error_actions(client); if recoveryActions != nextActions { recoveryActions = nextActions }
+        let message = String(cString:bs_user_status(client)); if status != message { status = message }
         if transferred != state.transferred { transferred = state.transferred }; if total != state.total { total = state.total }
         let next = (0..<Int(bs_peer_count(client))).compactMap { i -> MobilePeer? in
             guard let p = bs_peer(client, Int32(i))?.pointee else { return nil }
@@ -223,16 +233,29 @@ struct MobileHistory: Identifiable, Equatable {
         guard matches(serial), let client = engine, let item = bs_batch_item(client, Int32(index))?.pointee else { return "Offer expired" }
         return wireText(item.filename)
     }
-    func accept(_ incoming: MobileOffer) {
+    func canResumeFolder(_ incoming: MobileOffer) -> Bool { matches(incoming.id) && engine.map { bs_batch_can_resume($0) != 0 } == true }
+    func scanRetainedFiles() {
+        guard let engine else{return};if bs_retained_scan(engine,received.path)==0 { error=String(cString:bs_user_error(engine));return };retainedListKey="";retainedItems=[];refreshRetainedFiles()
+    }
+    private func refreshRetainedFiles() {
+        guard let engine else{return};var report=[CChar](repeating:0,count:1024);_ = bs_retained_summary(engine,&report,report.count);let value=String(cString:report);if retainedReport != value { retainedReport=value }
+        let phase=Int(bs_retained_phase(engine)),count=Int(bs_retained_count(engine));if retainedPhase != phase { retainedPhase=phase };if retainedCount != count { retainedCount=count }
+        let key="\(bs_retained_serial(engine)):\(phase):\(count)"
+        if key != retainedListKey && phase != 1 && phase != 3 { retainedListKey=key;retainedItems=(0..<count).compactMap { index in var item=BSRetainedItem();guard bs_retained_item(engine,Int32(index),&item) != 0 else{return nil};return wireText(item.path)+" · \(item.bytes) bytes"+(item.removed==1 ? " · Removed" : item.removed == -2 ? " · Not fully removed" : item.removed<0 ? " · Kept (changed or locked)" : "") } }
+    }
+    var retainedSerial: UInt { engine.map {bs_retained_serial($0)} ?? 0 }
+    func removeRetainedFiles(_ reviewed: UInt) { guard let engine else{return};if bs_retained_remove(engine,reviewed)==0 {error=String(cString:bs_user_error(engine))};refreshRetainedFiles() }
+    func closeRetainedFiles() { if let engine {bs_retained_close(engine)};retainedPhase=0;retainedItems=[];retainedReport="" }
+    func accept(_ incoming: MobileOffer, resumeExisting: Bool = false) {
         guard matches(incoming.id), let client = engine else { return }
         let success: Int32
-        if incoming.count > 0 { success = bs_accept_batch(client, received.path) }
+        if incoming.count > 0 { success = resumeExisting ? bs_accept_batch_resume(client, received.path) : bs_accept_batch(client, received.path) }
         else {
             var path = [CChar](repeating: 0, count: Int(BS_PATH_MAX) + 1)
             guard bs_suggest_destination(received.path, incoming.name, 0, &path, path.count) != 0 else { error = "Cannot choose a safe destination."; return }
             success = bs_accept(client, String(cString: path))
         }
-        if success == 0 { error = String(cString: bs_last_error(client)); return }
+        if success == 0 { error = String(cString: bs_user_error(client)); return }
         offer = nil
     }
     func decline(_ incoming: MobileOffer) {
@@ -240,10 +263,12 @@ struct MobileHistory: Identifiable, Equatable {
     }
     func trust() {
         guard let client = engine, !code.isEmpty else { return }
-        if bs_trust_current(client, otherCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()) == 0 { error = String(cString: bs_last_error(client)) }
+        if bs_trust_current(client, otherCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()) == 0 { error = String(cString: bs_user_error(client)) }
         else { trusted = true; otherCode = ""; error = nil }
     }
     func cancel() { if let client = engine { bs_cancel(client) }; offer = nil; tick() }
+    func retryFailure() { guard let client=engine else{return};if bs_error_retry(client)==0 { error=String(cString:bs_user_error(client)) };tick() }
+    func testFailureConnection() { guard let client=engine else{return};let address=wireText(bs_status(client)!.pointee.peer_address);if bs_network_test(client,address,0)==0 { error=String(cString:bs_user_error(client)) };tick() }
     func retry() { if let client = engine { bs_queue_continue(client) } }
     func refresh() { if let client = engine { bs_refresh(client) }; refreshSharedFiles() }
     func setSecurity(_ value: Int) {
@@ -394,7 +419,7 @@ struct MobileHistory: Identifiable, Equatable {
         do {
             for file in files {
                 let ok = invitationText.map{bs_queue_invitation(client,$0,file.path)} ?? destination.peer.map { bs_queue_peer_address(client, $0, destination.address, destination.port, file.path) } ?? bs_queue_address(client, destination.address, destination.port, file.path)
-                guard ok != 0 else { throw messageError(String(cString: bs_last_error(client))) }
+                guard ok != 0 else { throw messageError(String(cString: bs_user_error(client))) }
             }
             guard bs_state_flush(client) != 0 else { throw messageError(String(cString: bs_state_error(client))) }
             for file in files { for root in roots { try ShareInbox.markQueued(file, inbox: root) } }

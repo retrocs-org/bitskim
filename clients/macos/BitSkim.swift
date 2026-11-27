@@ -1,3 +1,31 @@
+import Security
+
+private enum PairingKeyStore {
+    private static func query(_ account: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "org.bitskim.pairing-key.v1", kSecAttrAccount as String: account]
+    }
+    static func load(_ account: String) throws -> String? {
+        var request = query(account); request[kSecReturnData as String] = true; request[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: CFTypeRef?; let status = SecItemCopyMatching(request as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let data = result as? Data, let key = String(data: data, encoding: .utf8) else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+        return key
+    }
+    static func save(_ key: String, account: String) throws {
+        let request = query(account)
+        if key.isEmpty {
+            let status = SecItemDelete(request as CFDictionary)
+            guard status == errSecSuccess || status == errSecItemNotFound else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }; return
+        }
+        let value = [kSecValueData as String: Data(key.utf8)]
+        var status = SecItemUpdate(request as CFDictionary, value as CFDictionary)
+        if status == errSecItemNotFound {
+            var item = request; item.merge(value) { _, new in new }; item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            status = SecItemAdd(item as CFDictionary, nil)
+        }
+        guard status == errSecSuccess, try load(account) == key else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+    }
+}
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
@@ -90,6 +118,7 @@ final class ClientModel: ObservableObject {
     @Published var sendLimitKiB: String
     @Published var receiveLimitKiB: String
     @Published var securityMode: Int
+    private var storedPairingKey = ""
     @Published var pairingKey: String
     @Published var retroMetadata = false
     @Published var invitationOpen = false
@@ -133,6 +162,14 @@ final class ClientModel: ObservableObject {
     @Published var conflictPolicy = 0
     @Published var otherPairingCode = ""
     @Published var progressSummary = ""
+    @Published var retainedOpen = false
+    @Published var retainedReport = ""
+    @Published var retainedFolder = ""
+    @Published var retainedItems: [String] = []
+    @Published var retainedPhase = 0
+    @Published var retainedCount = 0
+    private var retainedListKey = ""
+
     @Published var testAddress = ""
     func configureFolders(_ client: OpaquePointer) {
         let directory = storageDirectory
@@ -148,7 +185,7 @@ final class ClientModel: ObservableObject {
     }
     func testConnection() {
         guard let engine else { return }
-        if bs_network_test(engine, testAddress, 0) == 0 { error(String(cString: bs_last_error(engine))) }
+        if bs_network_test(engine, testAddress, 0) == 0 { error(String(cString: bs_user_error(engine))) }
     }
     func diagnostics() -> String {
         guard let engine else { return startupError }
@@ -175,7 +212,7 @@ final class ClientModel: ObservableObject {
     }
     func historySerial(_ index: Int) -> UInt {guard let engine else {return 0};var item=BSHistoryItem();return bs_history_item(engine,Int32(index),&item) != 0 ? item.serial : 0}
     func retryHistory(_ serial: UInt) {
-        guard let engine else { return }; let index=bs_history_find(engine,serial); if index<0 || bs_retry_history(engine, index) == 0 { error(String(cString: bs_last_error(engine))) }
+        guard let engine else { return }; let index=bs_history_find(engine,serial); if index<0 || bs_retry_history(engine, index) == 0 { error(String(cString: bs_user_error(engine))) }
     }
     func revealHistory(_ serial: UInt) {
         guard let engine else { return }; var item = BSHistoryItem()
@@ -190,7 +227,7 @@ final class ClientModel: ObservableObject {
     var trustedDevice: Bool { engine.map { bs_trust_status($0) == 1 } ?? false }
     func trustDevice() {
         guard let engine else { return }
-        if bs_trust_current(engine, otherPairingCode.uppercased()) == 0 { error(String(cString: bs_last_error(engine))) }
+        if bs_trust_current(engine, otherPairingCode.uppercased()) == 0 { error(String(cString: bs_user_error(engine))) }
         else { otherPairingCode = ""; objectWillChange.send() }
     }
     func forgetDevice() {
@@ -226,8 +263,16 @@ final class ClientModel: ObservableObject {
         if startInMenuBar { keepInMenuBar = true }
         let id = defaults.string(forKey: "installationID") ?? UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
         defaults.set(id, forKey: "installationID")
+        var keyStoreReady = true
+        do {
+            let account = self.storageDirectory.standardizedFileURL.path
+            if let saved = try PairingKeyStore.load(account) { pairingKey = saved }
+            else if !pairingKey.isEmpty { try PairingKeyStore.save(pairingKey, account: account) }
+            storedPairingKey = pairingKey
+            defaults.removeObject(forKey: "pairingKey")
+        } catch { startupError = "Cannot access the saved pairing key in Keychain. Unlock your login keychain and retry."; keyStoreReady = false }
         platformReady = bs_platform_init() != 0
-        if platformReady { engine = bs_create_app(wireName, "macOS", id, visible ? 1 : 0, receiving ? 1 : 0) }
+        if platformReady && keyStoreReady { engine = bs_create_app(wireName, "macOS", id, visible ? 1 : 0, receiving ? 1 : 0) }
         if let engine {
             configureFolders(engine)
 
@@ -238,7 +283,7 @@ final class ClientModel: ObservableObject {
                 if bs_trust_configure(engine, directory.path) == 0 { startupError = "Cannot initialize saved device identities." }
             } catch { startupError = "Cannot open the device trust folder: \(error.localizedDescription)" }
             if bs_security_configure(engine, Int32(securityMode), pairingKey) == 0 {
-                startupError = String(cString: bs_last_error(engine))
+                startupError = String(cString: bs_user_error(engine))
                 bs_destroy(engine); self.engine = nil
             }
             if self.engine != nil {
@@ -272,23 +317,27 @@ final class ClientModel: ObservableObject {
     func savePreferences() {
         var up: UInt = 0, down: UInt = 0
         guard bs_limit_parse(sendLimitKiB, &up) != 0, bs_limit_parse(receiveLimitKiB, &down) != 0 else { error("Speed limits: enter 0–1048575 KiB/s. Zero means Unlimited."); return }
+        if !active && queued == 0 {
+            guard pairingKey.isEmpty || (pairingKey.utf8.count == 64 && pairingKey.utf8.allSatisfy({ (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) })) else { error("Use an empty pairing key or exactly 64 hexadecimal characters."); return }
+            do { if pairingKey != storedPairingKey { try PairingKeyStore.save(pairingKey, account: storageDirectory.standardizedFileURL.path); storedPairingKey = pairingKey }; defaults.removeObject(forKey: "pairingKey") }
+            catch { self.error("Could not save the pairing key in Keychain. Preferences were not saved."); return }
+        }
         if engine == nil && platformReady {
             let candidate = bs_create_app(wireName, "macOS", defaults.string(forKey: "installationID")!, visible ? 1 : 0, receiving ? 1 : 0)
             if let candidate {
                 configureFolders(candidate)
                 if bs_security_configure(candidate, Int32(securityMode), pairingKey) == 0 {
-                    let message = String(cString: bs_last_error(candidate)); bs_destroy(candidate); error(message); return
+                    let message = String(cString: bs_user_error(candidate)); bs_destroy(candidate); error(message); return
                 }
                 engine = candidate; bs_batch_enable(candidate, 1); startupError = ""
             }
         }
         if let engine, !active, queued == 0 {
             guard bs_security_configure(engine, Int32(securityMode), pairingKey) != 0 else {
-                error(String(cString: bs_last_error(engine))); return
+                error(String(cString: bs_user_error(engine))); return
             }
             bs_resume_enable(engine, resumable ? 1 : 0)
             defaults.set(securityMode, forKey: "securityMode")
-            defaults.set(pairingKey, forKey: "pairingKey")
             defaults.set(resumable, forKey: "resumable")
         }
         if let engine {bs_limits_configure(engine,up,down);if !active {bs_metadata_enable(engine,retroMetadata ? 1 : 0)}}
@@ -336,11 +385,14 @@ final class ClientModel: ObservableObject {
         let now = Date()
         guard now.timeIntervalSince(lastDisplayUpdate) >= 0.2 else { return }
         lastDisplayUpdate = now
+        refreshRetained()
         if bs_completion_notice(engine, &completionSerial) != 0 && completionSound { NSSound.beep() }
         queued = Int(bs_queue_count(engine)); waiting = Int(bs_queue_waiting(engine)); queuePaused = bs_queue_paused(engine) != 0
         scanning = bs_queue_scanning(engine) != 0
         encrypted = bs_transfer_encrypted(engine) != 0
-        let snapshot = bs_status(engine)!.pointee
+        var snapshot = bs_status(engine)!.pointee
+        var recovery = BSRecoveryProgress(); let checking = bs_recovery_progress(engine,&recovery) != 0 && recovery.phase == 2
+        if checking { snapshot.transferred = recovery.checked_bytes; snapshot.total = recovery.check_total }
         var position: UInt = 0, count: UInt = 0
         bs_queue_progress(engine, &position, &count)
         if snapshot.active != 0 && snapshot.incoming != 0 && (bs_batch_count(engine) > 1 || bs_batch_is_tree(engine) != 0) {
@@ -352,7 +404,7 @@ final class ClientModel: ObservableObject {
         let summaryText = String(cString: report)
         if progressSummary != summaryText { progressSummary = summaryText }
         let code = verificationCode
-        let nextStatus = text(snapshot.message) + (snapshot.active != 0 && !code.isEmpty ? " · Verify: " + code : ""), nextFilename = text(snapshot.filename)
+        let nextStatus = String(cString: bs_user_status(engine)) + (snapshot.active != 0 && !code.isEmpty ? " · Verify: " + code : ""), nextFilename = text(snapshot.filename)
         let nextActive = snapshot.active != 0
         let nextFraction = snapshot.total == 0 ? 0 : Double(snapshot.transferred) / Double(snapshot.total)
         if status != nextStatus { status = nextStatus }
@@ -360,7 +412,7 @@ final class ClientModel: ObservableObject {
         if active != nextActive { active = nextActive }
         if fraction != nextFraction { fraction = nextFraction }
         let done = min(snapshot.transferred, snapshot.total)
-        let amounts = "\(byteSize(done)) / \(byteSize(snapshot.total)) · \(Int(nextFraction * 100))% · \(byteSize(snapshot.total - done)) left"
+        let amounts = (checking ? "Checked " : "") + "\(byteSize(done)) / \(byteSize(snapshot.total)) · \(Int(nextFraction * 100))% · \(byteSize(snapshot.total - done)) left"
         let speed = byteSize(bs_transfer_rate(engine)) + "/s"
         if transferAmounts != amounts { transferAmounts = amounts }
         if transferSpeed != speed { transferSpeed = speed }
@@ -385,8 +437,28 @@ final class ClientModel: ObservableObject {
         revealWindow?()
         let alert = NSAlert(); alert.messageText = "BitSkim"; alert.informativeText = message
         alert.addButton(withTitle: "OK")
-        if let window = NSApp.keyWindow { alert.beginSheetModal(for: window) }
-        else { alert.runModal() }
+        var actions: [Int] = []
+        if let engine, message == String(cString: bs_user_error(engine)) {
+            let mask = bs_error_actions(engine)
+            if mask & UInt32(BS_ERROR_RETRY) != 0 { actions.append(1); alert.addButton(withTitle: "Retry") }
+            if mask & UInt32(BS_ERROR_TEST_CONNECTION) != 0 { actions.append(2); alert.addButton(withTitle: "Test connection") }
+            if mask & UInt32(BS_ERROR_OPEN_FOLDER) != 0 { actions.append(3); alert.addButton(withTitle: "Open folder") }
+        }
+        let failedEngine = engine
+        let serial = engine.map { bs_transfer_serial($0) }
+        let respond: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+            guard let self, let engine = self.engine, engine == failedEngine, serial == bs_transfer_serial(engine) else { return }
+            let index = response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue - 1
+            guard index >= 0, index < actions.count else { return }
+            switch actions[index] {
+            case 1: if bs_error_retry(engine) == 0 { self.error(String(cString: bs_user_error(engine))) }
+            case 2: self.testConnection()
+            case 3: let path = String(cString: bs_last_folder(engine, 1)); if !path.isEmpty { NSWorkspace.shared.open(URL(fileURLWithPath: path, isDirectory: true)) }
+            default: break
+            }
+        }
+        if let window = NSApp.keyWindow { alert.beginSheetModal(for: window, completionHandler: respond) }
+        else { respond(alert.runModal()) }
     }
     func generateKey() {
         var bytes = [CChar](repeating: 0, count: 65)
@@ -400,7 +472,7 @@ final class ClientModel: ObservableObject {
         let result: Int32
         if peer.id.count > 32 { result = bs_queue_peer_address(engine, String(peer.id.prefix(32)), peer.address, peer.port, url.path) }
         else { result = bs_queue_address(engine, peer.address, peer.port, url.path) }
-        if result == 0 { error(String(cString: bs_last_error(engine))) }
+        if result == 0 { error(String(cString: bs_user_error(engine))) }
         else if !wasPaused { bs_queue_continue(engine) }
     }
     func chooseFile(for peer: Peer) {
@@ -513,13 +585,39 @@ final class ClientModel: ObservableObject {
             guard let self, let engine = self.engine, self.offerMatches(serial) else { return }
             self.conflictPolicy = policy.indexOfSelectedItem; bs_conflict_policy(engine, Int32(self.conflictPolicy))
             if response == .alertThirdButtonReturn {
-                if bs_trust_current(engine, code) == 0 { let reason = String(cString: bs_last_error(engine)); bs_decline(engine); self.error(reason); return }
+                if bs_trust_current(engine, code) == 0 { let reason = String(cString: bs_user_error(engine)); bs_decline(engine); self.error(reason); return }
                 self.chooseDestination(file, serial: serial)
             } else if response == .alertFirstButtonReturn { self.chooseDestination(file, serial: serial) } else { bs_decline(engine) }
         }
         incomingAlert = alert
         presentIncomingAlert(alert, serial: serial, decision: decision)
     }
+    func reviewRetainedFiles() {
+        guard engine != nil, !active, queued == 0 else { error("Finish or clear queued transfers first."); return }
+        let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.allowsMultipleSelection = false
+        panel.title = "Review retained partial files"; panel.prompt = "Review"; panel.message = "Choose a receive folder. Only recognized BitSkim checkpoint pairs can be removed; completed files are kept."
+        panel.directoryURL = URL(fileURLWithPath: recentFolder(true))
+        panel.begin { [weak self] response in
+            guard let self, response == .OK, let folder = panel.url, let engine = self.engine else { return }
+            if bs_retained_scan(engine,folder.path) == 0 { self.error(String(cString:bs_user_error(engine))); return }
+            self.retainedFolder = folder.path; self.retainedListKey = ""; self.retainedOpen = true; self.refreshRetained()
+        }
+    }
+    func refreshRetained() {
+        guard retainedOpen, let engine else { return }; var bytes = [CChar](repeating:0,count:1024)
+        _ = bs_retained_summary(engine,&bytes,bytes.count); let report=String(cString:bytes);if retainedReport != report { retainedReport=report }
+        let phase=Int(bs_retained_phase(engine)), count=Int(bs_retained_count(engine));if retainedPhase != phase { retainedPhase=phase };if retainedCount != count { retainedCount=count }
+        let key="\(bs_retained_serial(engine)):\(phase):\(count)"
+        if key != retainedListKey && phase != 1 && phase != 3 {
+            retainedListKey=key;retainedItems=(0..<count).compactMap { index in var item=BSRetainedItem();guard bs_retained_item(engine,Int32(index),&item) != 0 else{return nil};return text(item.path)+" · \(byteSize(item.bytes))"+(item.removed==1 ? " · Removed" : item.removed == -2 ? " · Not fully removed" : item.removed<0 ? " · Kept (changed or locked)" : "") }
+        }
+    }
+    func removeRetainedFiles() {
+        guard let engine, retainedPhase == 2, retainedCount > 0 else { return };let serial=bs_retained_serial(engine)
+        let alert=NSAlert();alert.messageText="Remove these \(retainedCount) partial files?";alert.informativeText=retainedReport+"\nYou will lose their resume progress. Completed files are kept. Changed or locked checkpoints are preserved.";alert.addButton(withTitle:"Keep files");alert.addButton(withTitle:"Remove reviewed partials")
+        if alert.runModal() == .alertSecondButtonReturn { if bs_retained_remove(engine,serial) == 0 { error(String(cString:bs_user_error(engine))) };refreshRetained() }
+    }
+    func closeRetainedFiles() { if let engine { bs_retained_close(engine) };retainedOpen=false;retainedItems=[] }
     private func spaceReport(_ destination: String, collection: Bool) -> String {
         guard let engine else { return "" };var bytes=[CChar](repeating:0,count:256)
         _ = bs_destination_space_report(engine,destination,collection ? 1 : 0,&bytes,bytes.count);return String(cString:bytes)
@@ -529,11 +627,12 @@ final class ClientModel: ObservableObject {
         bs_conflict_policy(engine, Int32(conflictPolicy))
         let serial = bs_transfer_serial(engine)
         let first = Int(bs_batch_index(engine)), count = Int(bs_batch_count(engine))
+        var recoverExisting = false
         let receive: (URL) -> Void = { [weak self] url in
             guard let self, let engine = self.engine, bs_transfer_serial(engine) == serial,
                   bs_status(engine)!.pointee.awaiting_decision != 0 else { return }
-            if bs_accept_batch(engine, url.path) == 0 {
-                let reason = String(cString: bs_last_error(engine)); bs_decline(engine); self.error(reason)
+            if (recoverExisting ? bs_accept_batch_resume(engine, url.path) : bs_accept_batch(engine, url.path)) == 0 {
+                let reason = String(cString: bs_user_error(engine)); bs_decline(engine); self.error(reason)
             }
         }
         let choose: () -> Void = { [weak self] in
@@ -542,7 +641,7 @@ final class ClientModel: ObservableObject {
             if !self.askLocation { receive(URL(fileURLWithPath: self.recentFolder(true))); return }
             let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
             panel.allowsMultipleSelection = false; panel.title = "Save all incoming files"; panel.prompt = "Receive all"
-            panel.message = "The hierarchy is preserved in a new folder; existing roots are kept. " + self.spaceReport(self.folder, collection: true)
+            panel.message = recoverExisting ? "Choose the parent of the existing folder. Matching files are verified, partial files resumed, and differences stop the job. Unlisted files are kept." : "The hierarchy is preserved in a new folder; existing roots are kept. " + self.spaceReport(self.folder, collection: true)
             panel.directoryURL = URL(fileURLWithPath: self.recentFolder(true))
             self.incomingPanel = panel
             panel.begin { response in
@@ -564,8 +663,10 @@ final class ClientModel: ObservableObject {
         let policy = NSPopUpButton(frame: NSRect(x: 0, y: 228, width: 460, height: 26))
         policy.addItems(withTitles: ["Existing files: Rename safely", "Existing files: Skip", "Existing files: Replace"])
         policy.selectItem(at: conflictPolicy)
-        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 260))
-        accessory.addSubview(scroll); accessory.addSubview(policy); alert.accessoryView = accessory
+        let recovery = NSButton(checkboxWithTitle: "Resume existing folder: verify matches; stop on differences", target: nil, action: nil)
+        recovery.frame = NSRect(x: 0, y: 262, width: 460, height: 28); recovery.isEnabled = bs_batch_can_resume(engine) != 0
+        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 294))
+        accessory.addSubview(scroll); accessory.addSubview(policy); accessory.addSubview(recovery); alert.accessoryView = accessory
         alert.informativeText = spaceReport(folder, collection: true) + "\nAccepting applies only to this list. Choose one folder for all files. Existing files use the session conflict policy in Transfer tools. Sender names are unverified."
         alert.addButton(withTitle: "Accept all"); alert.addButton(withTitle: "Decline")
         var report = [CChar](repeating: 0, count: 256)
@@ -578,9 +679,10 @@ final class ClientModel: ObservableObject {
             _ = source // Keep the lazy table source alive for the approval sheet.
             guard let engine = self?.engine, bs_transfer_serial(engine) == serial,
                   bs_status(engine)!.pointee.awaiting_decision != 0 else { return }
+            recoverExisting = recovery.isEnabled && recovery.state == .on
             self?.conflictPolicy = policy.indexOfSelectedItem; bs_conflict_policy(engine, Int32(policy.indexOfSelectedItem))
             if response == .alertThirdButtonReturn {
-                if bs_trust_current(engine, code) == 0 { let reason = String(cString: bs_last_error(engine)); bs_decline(engine); self?.error(reason); return }; choose()
+                if bs_trust_current(engine, code) == 0 { let reason = String(cString: bs_user_error(engine)); bs_decline(engine); self?.error(reason); return }; choose()
             } else if response == .alertFirstButtonReturn { choose() } else { bs_decline(engine) }
         }
         incomingAlert = alert
@@ -602,8 +704,8 @@ final class ClientModel: ObservableObject {
         var destination = url
         if FileManager.default.fileExists(atPath: url.path) {
             switch conflictPolicy {
-            case 1: if bs_skip_incoming(engine) == 0 { error(String(cString: bs_last_error(engine))) }; return
-            case 2: if bs_accept_conflict(engine, url.path) == 0 { error(String(cString: bs_last_error(engine))) }; return
+            case 1: if bs_skip_incoming(engine) == 0 { error(String(cString: bs_user_error(engine))) }; return
+            case 2: if bs_accept_conflict(engine, url.path) == 0 { error(String(cString: bs_user_error(engine))) }; return
             default: destination = uniqueURL(url)
             }
         }
@@ -619,7 +721,7 @@ final class ClientModel: ObservableObject {
             if answer == .alertSecondButtonReturn { restart = 1 }
         }
         if bs_accept_resumable(engine, destination.path, restart) == 0 {
-            let reason = String(cString: bs_last_error(engine)); bs_decline(engine); error(reason)
+            let reason = String(cString: bs_user_error(engine)); bs_decline(engine); error(reason)
         }
     }
     private func chooseDestination(_ file: String, serial: UInt) {
@@ -841,7 +943,8 @@ struct PreferencesView: View {
                         Text("Prefer encrypts automatically when both clients allow it; otherwise it uses plaintext. Force rejects plaintext. Without a pairing key, encryption does not authenticate the peer. An optional matching key authenticates paired computers. Discovery remains public.")
                             .font(.system(size: 10)).foregroundStyle(model.theme.muted)
                         Toggle("Retain interrupted downloads for resume", isOn: $model.resumable)
-                        Text("Resume works with capable clients. Explicit cancellation removes the current checkpoint. Updated peers can accept a displayed batch once; older peers ask per file. Batch transfers restart interrupted files from the beginning.").font(.system(size: 10)).foregroundStyle(model.theme.muted)
+                        Button("Review retained partial files…") { model.reviewRetainedFiles() }
+                        Text("Resume works with capable clients. Explicit cancellation removes the current checkpoint. Updated peers can accept a displayed batch once; older peers ask per file. Trusted encrypted peers can explicitly resume existing folders; matching files and partial data are verified before continuing.").font(.system(size: 10)).foregroundStyle(model.theme.muted)
                     }.padding(6).disabled(model.active || model.queued > 0)
                 } label: { Text("Transfers & encryption").font(.system(size: 11, weight: .semibold)) }
                 GroupBox {
@@ -850,6 +953,7 @@ struct PreferencesView: View {
                             .accessibilityLabel("BitSkim source repository on GitHub")
                         Link("bitskim.retrocs.org", destination: URL(string: "https://bitskim.retrocs.org")!)
                             .accessibilityLabel("BitSkim website")
+                        Text("Build " + String(cString:bs_build_id())).textSelection(.enabled)
                         Text("Direct local transfers. No account required.")
                             .font(.system(size: 10)).foregroundStyle(model.theme.muted)
                     }.padding(6).frame(maxWidth: .infinity, alignment: .leading)
@@ -865,6 +969,9 @@ struct PreferencesView: View {
                 .keyboardShortcut("w", modifiers: .command)
         }.padding(12).font(.system(size: 11))
         }.onExitCommand { model.savePreferences(); close() }
+        .sheet(isPresented:$model.retainedOpen,onDismiss:{model.closeRetainedFiles()}) {
+            RetainedFilesView(model:model)
+        }
         .foregroundStyle(model.theme.text).background(model.theme.base).tint(model.theme.accent)
             .preferredColorScheme(model.theme.dark ? .dark : .light)
     }
@@ -891,7 +998,7 @@ struct TransferToolsView: View {
                     } else { Text("Pair during an encrypted connection. Shared-key connections use the existing key instead. Retro clients without TLS cannot pair.") }
                     Button("Forget current or last device") { model.forgetDevice() }
                     Button("Invite a phone with QR") { model.invitationAddress=model.invitationAddresses.first ?? "";model.invitationText="";model.invitationImage=nil;model.invitationOpen=true }
-                    Toggle("Preserve retro metadata and companion .info files",isOn:$model.retroMetadata).disabled(model.active || model.queued>0).onChange(of:model.retroMetadata){_ in model.savePreferences()}
+                    Toggle("Preserve file dates, retro metadata and .info files",isOn:$model.retroMetadata).disabled(model.active || model.queued>0).onChange(of:model.retroMetadata){_ in model.savePreferences()}
                     Text("Optional Amiga attributes/comments and RISC OS filetypes. Other systems retain a bound .bskmeta companion for onward transfer.").font(.caption)
                     Divider(); Text("Network status").font(.headline)
                     HStack { TextField("IPv4 address or IPv4:port", text: $model.testAddress); Button("Test connection") { model.testConnection() } }
@@ -919,5 +1026,18 @@ struct TransferToolsView: View {
             }
         }.padding(20).frame(width: 600, height: 600).foregroundStyle(model.theme.text).background(model.theme.base)
         .sheet(isPresented:$model.invitationOpen){VStack(spacing:14){Text("Connect a phone").font(.title2);Picker("LAN address",selection:$model.invitationAddress){ForEach(model.invitationAddresses,id:\.self){Text($0).tag($0)}};Button("Generate invitation"){model.makeInvitation()};TimelineView(.periodic(from:.now,by:1)){context in if context.date<model.invitationExpires,let image=model.invitationImage {Image(nsImage:image).interpolation(.none).resizable().frame(width:300,height:300).padding(16).background(Color.white);Text("Expires in \(Int(model.invitationExpires.timeIntervalSince(context.date))) seconds")}else if !model.invitationText.isEmpty {Text("Invitation expired. Generate a new code.")}};Text("Scan in BitSkim. The code checks this device’s identity; you still approve incoming files.").font(.caption);Button("Close"){model.invitationOpen=false;model.invitationImage=nil;model.invitationText=""}}.padding(24).frame(width:400)}
+    }
+}
+
+struct RetainedFilesView: View {
+    @ObservedObject var model: ClientModel
+    var body: some View {
+            VStack(alignment:.leading,spacing:14) {
+                Text("Retained partial files").font(.title2)
+                Text(model.retainedFolder).font(.caption).textSelection(.enabled)
+                Text(model.retainedReport).fixedSize(horizontal:false,vertical:true)
+                ScrollView { VStack(alignment:.leading,spacing:10) { ForEach(model.retainedItems,id:\.self) { Text($0).font(.system(.body,design:.monospaced)).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading) } } }.frame(minHeight:200)
+                HStack { Button("Close",action:model.closeRetainedFiles).keyboardShortcut(.cancelAction);Spacer();Button("Remove reviewed partials…",action:model.removeRetainedFiles).disabled(model.retainedPhase != 2 || model.retainedCount == 0 || model.active || model.queued > 0) }
+            }.padding(20).frame(width:620,height:500).foregroundStyle(model.theme.text).background(model.theme.base)
     }
 }

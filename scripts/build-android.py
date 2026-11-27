@@ -44,13 +44,15 @@ def main():
  if not abis or len(set(abis))!=len(abis) or any(abi not in ABIS for abi in abis):parser.error('Supported ABIs: arm64-v8a,x86_64')
  tools,sdk,env=locations();ndk=sdk/'ndk'/CONFIG['ndk']
  if not ndk.is_dir() or not gradle(tools).is_file() or not (sdk/'platforms'/CONFIG['platform']/'android.jar').is_file():raise SystemExit('Prepare shared tools first: python3 scripts/bootstrap-android.py --install-sdk')
+ from build_identity import write_identity
+ identity=write_identity(ROOT)
  native_root=ROOT/'build/android/jniLibs';native_root.mkdir(parents=True,exist_ok=True)
  for folder in native_root.iterdir():
   if folder.is_dir() and folder.name not in abis:shutil.rmtree(folder)
  host=next((ndk/'toolchains/llvm/prebuilt').iterdir());binary=host/'bin'
  for abi in abis:
   prefix=tls(tools,sdk,env,abi);output=native_root/abi/'libbitskim.so';output.parent.mkdir(parents=True,exist_ok=True)
-  command=[str(binary/(ABIS[abi][0]+str(CONFIG['min_sdk'])+'-clang')),'-std=c99','-O2','-fPIC','-fvisibility=hidden','-shared','-DBS_OPENSSL','-I'+str(ROOT/'core'),'-I'+str(prefix/'include'),str(ROOT/'core/bitskim.c'),str(ROOT/'core/platform.c'),str(ROOT/'clients/android/native/bridge.c'),str(prefix/'lib/libssl.a'),str(prefix/'lib/libcrypto.a'),'-Wl,--no-undefined','-Wl,-soname,libbitskim.so','-Wl,-z,max-page-size=16384','-Wl,-z,common-page-size=16384','-ldl','-lm','-pthread','-o',str(output)]
+  command=[str(binary/(ABIS[abi][0]+str(CONFIG['min_sdk'])+'-clang')),'-include',str(identity),'-std=c99','-O2','-fPIC','-fvisibility=hidden','-shared','-DBS_OPENSSL','-I'+str(ROOT/'core'),'-I'+str(prefix/'include'),str(ROOT/'core/bitskim.c'),str(ROOT/'core/platform.c'),str(ROOT/'clients/android/native/bridge.c'),str(prefix/'lib/libssl.a'),str(prefix/'lib/libcrypto.a'),'-Wl,--no-undefined','-Wl,-soname,libbitskim.so','-Wl,-z,max-page-size=16384','-Wl,-z,common-page-size=16384','-ldl','-lm','-pthread','-o',str(output)]
   if args.discovery=='off':command.insert(1,'-DBS_NO_BROADCAST')
   subprocess.run(command,env=env,check=True)
  assets=ROOT/'build/android/assets';assets.mkdir(parents=True,exist_ok=True);shutil.copyfile(tools/'openssl-src'/('openssl-'+OPENSSL)/'LICENSE.txt',assets/'OPENSSL-LICENSE.txt')

@@ -7,22 +7,22 @@ static void network_check_finish(BSClient *c,const char *result) {
 int bs_network_test(BSClient *c,const char *ip,unsigned short port) {
     struct sockaddr_in address;int result;char entered[64],*colon,*end;unsigned long number;
     if(!c)return 0;
-    if(c->check_pending){copystr(c->error,"A connection test is already running",256);return 0;}
+    if(c->check_pending){set_error(c,BS_ERR_BUSY,"A connection test is already running");return 0;}
     if(!ip || !*ip){
         if(c->status.peer_address[0]){ip=c->status.peer_address;if(!port)port=c->remote_port;}
         else if(c->peer_count){ip=c->peers[0].address;if(!port)port=c->peers[0].port;}
-        else{copystr(c->error,"Select a computer or enter an IPv4 address to test",256);return 0;}
+        else{set_error(c,BS_ERR_NETWORK,"Select a computer or enter an IPv4 address to test");return 0;}
     }
-    if(strlen(ip)>=sizeof entered){copystr(c->error,"Address is too long",256);return 0;}
+    if(strlen(ip)>=sizeof entered){set_error(c,BS_ERR_NETWORK,"Address is too long");return 0;}
     copystr(entered,ip,sizeof entered);colon=strchr(entered,':');
-    if(colon){*colon++=0;number=strtoul(colon,&end,10);if(!*colon || *end || !number || number>65535){copystr(c->error,"Enter a valid port",256);return 0;}port=(unsigned short)number;}
+    if(colon){*colon++=0;number=strtoul(colon,&end,10);if(!*colon || *end || !number || number>65535){set_error(c,BS_ERR_INPUT,"Enter a valid port");return 0;}port=(unsigned short)number;}
     ip=entered;
     memset(&address,0,sizeof address);address.sin_family=AF_INET;
     address.sin_addr.s_addr=inet_addr(ip);address.sin_port=htons(port?port:BS_PORT);
-    if(!address.sin_addr.s_addr || address.sin_addr.s_addr==INADDR_NONE){copystr(c->error,"Enter a valid IPv4 address",256);return 0;}
+    if(!address.sin_addr.s_addr || address.sin_addr.s_addr==INADDR_NONE){set_error(c,BS_ERR_NETWORK,"Enter a valid IPv4 address");return 0;}
     c->check_socket=socket(AF_INET,SOCK_STREAM,0);
-    if(c->check_socket==BS_INVALID_SOCKET){copystr(c->error,"Cannot create test socket",256);return 0;}
-    if(bsp_nonblock(c->check_socket)<0){bsp_close(c->check_socket);copystr(c->error,"Cannot configure test socket",256);return 0;}
+    if(c->check_socket==BS_INVALID_SOCKET){set_error(c,BS_ERR_NETWORK,"Cannot create test socket");return 0;}
+    if(bsp_nonblock(c->check_socket)<0){bsp_close(c->check_socket);set_error(c,BS_ERR_NETWORK,"Cannot configure test socket");return 0;}
     c->check_pending=1;c->check_start=bsp_seconds();
     sprintf(c->check_result,"Testing TCP %.47s:%u...",ip,port?port:BS_PORT);
     result=connect(c->check_socket,(struct sockaddr *)&address,sizeof address);

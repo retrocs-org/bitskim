@@ -8,6 +8,12 @@
 #include <stddef.h>
 #if defined(BS_ATARI_STING)
 #include "atari-net.h"
+#elif defined(BS_WIN16)
+#include <windows.h>
+#include <winsock.h>
+typedef SOCKET BSSocket;
+typedef int BSSockLen;
+#define BS_INVALID_SOCKET INVALID_SOCKET
 #elif defined(BS_DOS)
 #include "dos-net.h"
 #elif defined(_WIN32)
@@ -63,6 +69,8 @@ int bsp_recv(BSSocket, void *, int);
 unsigned long bsp_seconds(void);
 unsigned long bsp_millis(void);
 int bsp_size(const char *, unsigned long *);
+int bsp_mtime_get(const char *,unsigned long *);
+int bsp_mtime_set(const char *,unsigned long);
 FILE *bsp_open_file(const char *, const char *);
 int bsp_remove_file(const char *);
 FILE *bsp_create_file(const char *);
@@ -73,6 +81,12 @@ FILE *bsp_temp_file(void);
 #endif
 #ifdef BS_OPENSSL
 FILE *bsp_resume_file(const char *,unsigned long expected_size);
+FILE *bsp_resume_read(const char *,unsigned long expected_size);
+typedef struct {unsigned long word[16];} BSFileStamp;
+int bsp_checkpoint_mark(FILE *);
+int bsp_checkpoint_unmark(const char *);
+int bsp_retained_pair(const char *root,const char *relative,unsigned char *header,int *length,unsigned long *bytes,BSFileStamp *part,BSFileStamp *meta);
+int bsp_retained_unlink(const char *root,const char *relative,const BSFileStamp *part,const BSFileStamp *meta);
 #endif
 /* kind: 0 missing, 1 regular file, 2 directory, -1 unsafe/unsupported/error. */
 int bsp_path_kind(const char *);

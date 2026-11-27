@@ -42,6 +42,8 @@
 #define PREF_KEY 218
 #define PREF_GENERATE 219
 #define PREF_RESUME 220
+#define PREF_SHOW_KEY 233
+#define PREF_RETAINED 234
 #define PREF_NAV 200
 #define PREF_NAME 201
 #define PREF_VISIBLE 202
@@ -69,6 +71,7 @@ typedef struct {
     unsigned long send_limit,receive_limit;
 } Preferences;
 static HINSTANCE instance;
+static HWND retained_window;static char retained_root[PATH_CAP];
 static HWND main_window,prefs_window,peer_list,ip_edit,status_text,progress_bar,amount_text,speed_text;
 static HWND pref_nav,pref_controls[32]; static int pref_control_count,pref_section,pref_bad_limits;
 static Preferences prefs,draft;
@@ -92,7 +95,7 @@ static void text(HWND w,const wchar_t *s) { SetWindowTextW(w,s); }
 static int utf8(const wchar_t *s,char *out,int cap) { return WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,s,-1,out,cap,NULL,NULL)!=0; }
 static void utf16(const char *s,wchar_t *out,int cap) { if(!MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s,-1,out,cap)) lstrcpynW(out,L"Unrepresentable text",cap); }
 static void error_box(HWND owner,const wchar_t *message) { MessageBoxW(owner,message,L"BitSkim 0.2",MB_OK|MB_ICONEXCLAMATION); }
-static void core_error(void) { wchar_t message[512]; utf16(bs_last_error(client),message,512); error_box(main_window,message); }
+static void core_error(void) { wchar_t message[512]; utf16(bs_user_error(client),message,512); error_box(main_window,message); }
 static int theme_for(HWND owner) { return (prefs_window && (owner==prefs_window || GetParent(owner)==prefs_window))?draft.theme:prefs.theme; }
 static HWND control(HWND parent,const wchar_t *cls,const wchar_t *label,DWORD style,int id) {
     HWND w=CreateWindowExW(0,cls,label,WS_CHILD|WS_VISIBLE|style,0,0,0,0,parent,(HMENU)(INT_PTR)id,instance,NULL);
@@ -168,6 +171,7 @@ static void quit(void) {
     if(bs_status(client)->active && MessageBoxW(main_window,L"Cancel the current transfer and quit?",L"BitSkim",MB_YESNO|MB_ICONQUESTION)!=IDYES) return;
     DestroyWindow(main_window);
 }
+#include "pairing-store.h"
 static void load_preferences(void) {
     wchar_t appdata[PATH_CAP],value[128]; PWSTR downloads=NULL; unsigned char bytes[16]; char name[64]; int i;
     ZeroMemory(&prefs,sizeof prefs); prefs.security=prefs.resume=1; prefs.visible=prefs.receiving=prefs.ask=prefs.tray=1; prefs.theme=WIN_THEME_DEFAULT;
@@ -194,7 +198,7 @@ static void load_preferences(void) {
     retro_metadata=GetPrivateProfileIntW(L"BitSkim",L"RetroMetadata",0,ini_path)!=0;
     completion_alerts=GetPrivateProfileIntW(L"BitSkim",L"CompletionAlerts",1,ini_path)!=0;
     prefs.security=(int)GetPrivateProfileIntW(L"BitSkim",L"Security",1,ini_path);
-    GetPrivateProfileStringW(L"BitSkim",L"PairingKey",L"",prefs.key,65,ini_path);
+    if(!pairing_load(prefs.key)){error_box(NULL,L"Cannot unlock or migrate the saved pairing key. Existing protected settings were retained.");ExitProcess(1);}
     prefs.theme=(int)GetPrivateProfileIntW(L"BitSkim",L"Theme",WIN_THEME_DEFAULT,ini_path); if(prefs.theme<0 || prefs.theme>=WIN_THEME_COUNT) prefs.theme=WIN_THEME_DEFAULT;
     if(!prefs.tray) prefs.start=0;
 }
@@ -211,7 +215,8 @@ static int save_preferences(void) {
     WRITE_STR(L"Name",prefs.name); WRITE_STR(L"Folder",prefs.folder); utf16(prefs.id,value,64); WRITE_STR(L"ID",value);
     WRITE_NUM(L"Visible",prefs.visible); WRITE_NUM(L"Receiving",prefs.receiving); WRITE_NUM(L"AutoAccept",prefs.automatic); WRITE_NUM(L"TrustedAutoAcceptOnly",prefs.trusted_auto); WRITE_NUM(L"AskLocation",prefs.ask);
     WRITE_NUM(L"SendLimitKiB",prefs.send_limit/1024UL);WRITE_NUM(L"ReceiveLimitKiB",prefs.receive_limit/1024UL);
-    WRITE_NUM(L"Security",prefs.security); WRITE_NUM(L"Resume",prefs.resume); WRITE_STR(L"PairingKey",prefs.key);
+    if(!pairing_save(prefs.key))return 0;
+    WRITE_NUM(L"Security",prefs.security); WRITE_NUM(L"Resume",prefs.resume);
     WRITE_NUM(L"KeepTray",prefs.tray); WRITE_NUM(L"StartInTray",prefs.start); WRITE_NUM(L"Theme",prefs.theme);
 #undef WRITE_STR
 #undef WRITE_NUM
@@ -415,7 +420,7 @@ static int check_tools_view(HWND parent){
 static int CALLBACK recent_browse(HWND w,UINT msg,LPARAM arg,LPARAM context){(void)arg;if(msg==BFFM_INITIALIZED && context)SendMessageW(w,BFFM_SETSELECTIONW,TRUE,context);return 0;}
 static void send_folder(void){BROWSEINFOW browse;PIDLIST_ABSOLUTE item;wchar_t path[PATH_CAP],initial[PATH_CAP];utf16(bs_last_folder(client,0),initial,PATH_CAP);ZeroMemory(&browse,sizeof browse);browse.hwndOwner=main_window;browse.lpszTitle=L"Choose a folder to send (links are not followed)";browse.lpfn=recent_browse;browse.lParam=(LPARAM)initial;browse.ulFlags=BIF_RETURNONLYFSDIRS|BIF_NEWDIALOGSTYLE;item=SHBrowseForFolderW(&browse);if(item){if(SHGetPathFromIDListW(item,path))send_file(path);CoTaskMemFree(item);}}
 static void incoming_batch(void) {
-    wchar_t folder[PATH_CAP];char destination[PATH_CAP];int accept=1,automatic=prefs.automatic && (!prefs.trusted_auto || bs_trust_status(client)==1);
+    wchar_t folder[PATH_CAP];char destination[PATH_CAP];int recover=0,accept=1,automatic=prefs.automatic && (!prefs.trusted_auto || bs_trust_status(client)==1);
     unsigned long serial=bs_transfer_serial(client);BROWSEINFOW browse;PIDLIST_ABSOLUTE item;
     if(!automatic) {show_main();accept=collection_confirm(main_window,client);}
     if(bs_transfer_serial(client)!=serial || !bs_status(client)->awaiting_decision)return;
@@ -428,9 +433,11 @@ static void incoming_batch(void) {
             item=SHBrowseForFolderW(&browse);accept=item && SHGetPathFromIDListW(item,folder);if(item)CoTaskMemFree(item);
         }
         if(bs_transfer_serial(client)!=serial || !bs_status(client)->awaiting_decision)return;
-        if(accept && (!utf8(folder,destination,sizeof destination) || !bs_tools_space(main_window,client,destination,1,!automatic)))accept=0;
+        if(accept && !automatic && bs_batch_can_resume(client)){int choice=MessageBoxW(main_window,L"Resume a matching existing folder under the selected parent? Completed files are verified, partial files resumed, and differences stop the job. Unlisted files are kept.\n\nChoose No to receive into a new folder.",L"Resume existing folder?",MB_YESNOCANCEL|MB_DEFBUTTON2|MB_ICONQUESTION);recover=choice==IDYES;if(choice==IDCANCEL)accept=0;}
         if(bs_transfer_serial(client)!=serial || !bs_status(client)->awaiting_decision)return;
-        if(accept && !bs_accept_batch(client,destination)){core_error();accept=0;}
+        if(accept && (!utf8(folder,destination,sizeof destination) || (!recover && !bs_tools_space(main_window,client,destination,1,!automatic))))accept=0;
+        if(bs_transfer_serial(client)!=serial || !bs_status(client)->awaiting_decision)return;
+        if(accept && !(recover?bs_accept_batch_resume(client,destination):bs_accept_batch(client,destination))){core_error();accept=0;}
     }
     if(!accept && bs_transfer_serial(client)==serial && bs_status(client)->awaiting_decision)bs_decline(client);
 }
@@ -500,24 +507,26 @@ static void refresh(void) {
         }
         SendMessageW(peer_list,WM_SETREDRAW,TRUE,0); InvalidateRect(peer_list,NULL,TRUE); peer_dirty=0;
     }
-    utf16(s->message,message,512);{char code[20];if(s->active && bs_pairing_code(client,code)){wchar_t wide[24];utf16(code,wide,24);wcscat(message,L"  |  Verify: ");wcscat(message,wide);}}text(status_text,message);
+    utf16(bs_user_status(client),message,512);{char code[20];if(s->active && bs_pairing_code(client,code)){wchar_t wide[24];utf16(code,wide,24);wcscat(message,L"  |  Verify: ");wcscat(message,wide);}}text(status_text,message);
     if(s->active) {
         wchar_t done[32],total[32],left[32],rate[32],name[256];
         unsigned long transferred=s->transferred>s->total?s->total:s->transferred;
         byte_size(transferred,done); byte_size(s->total,total); byte_size(s->total-transferred,left); byte_size(bs_transfer_rate(client),rate);
         swprintf(message,512,L"%ls / %ls  |  %lu%%  |  %ls left",done,total,s->total?(unsigned long)((uint64_t)transferred*100/s->total):0,left); text(amount_text,message);
         swprintf(message,512,L"%ls/s",rate); {char summary[256];bs_progress_summary(client,summary,sizeof summary);utf16(summary,message,512);}text(speed_text,message);
-        utf16(s->filename,name,256); utf16(s->message,message,512);
+        utf16(s->filename,name,256); utf16(bs_user_status(client),message,512);
         { wchar_t title[800];unsigned long position=1,count=1;
           if(!s->incoming && bs_queue_count(client))bs_queue_progress(client,&position,&count);
           if(s->incoming && (bs_batch_count(client)>1 || bs_batch_is_tree(client)!=0))swprintf(title,800,L"Receiving file %d/%d: %ls",bs_batch_index(client)+1,bs_batch_count(client),name);
           else if(s->incoming)swprintf(title,800,L"Receiving: %ls",name);
           else swprintf(title,800,L"Sending file %lu/%lu: %ls",position,count,name);
+          {BSRecoveryProgress recovery;if(bs_recovery_progress(client,&recovery) && recovery.phase==2)swprintf(title,800,L"Checking existing files: %ls",name);}
           text(status_text,title); }
     }
     ShowWindow(amount_text,s->active?SW_SHOW:SW_HIDE);
     ShowWindow(progress_bar,s->active?SW_SHOW:SW_HIDE);
     SendMessageW(progress_bar,PBM_SETPOS,s->total?(WPARAM)((uint64_t)s->transferred*100/s->total):0,0);
+    {BSRecoveryProgress r;if(bs_recovery_progress(client,&r) && r.phase==2){wchar_t checked[32],total[32];byte_size(r.checked_bytes,checked);byte_size(r.check_total,total);swprintf(message,512,L"Checked %ls / %ls",checked,total);text(amount_text,message);SendMessageW(progress_bar,PBM_SETPOS,r.check_total?(WPARAM)((uint64_t)r.checked_bytes*100/r.check_total):0,0);}}
     EnableWindow(GetDlgItem(main_window,ID_CANCEL),s->active || bs_queue_scanning(client)); EnableWindow(GetDlgItem(main_window,ID_SEND),bs_queue_count(client)<BS_QUEUE_MAX);
     {wchar_t rate[32];byte_size(bs_transfer_rate(client),rate);
      swprintf(message,512,L"%ls%ls%d waiting%ls",s->active?rate:L"",s->active?L"/s  |  ":L"",(s->active && s->incoming && (bs_batch_count(client)>1 || bs_batch_is_tree(client)!=0)?bs_batch_count(client)-bs_batch_index(client)-1:bs_queue_waiting(client)),bs_queue_paused(client)?(s->active?L"  |  Stops after this file":L"  |  Queue paused"):L"");{char summary[256];bs_progress_summary(client,summary,sizeof summary);utf16(summary,message,512);}text(speed_text,message);}
@@ -602,10 +611,12 @@ static void build_page(void) {
         w=page_control(L"COMBOBOX",L"",WS_TABSTOP|CBS_DROPDOWNLIST,PREF_SECURITY,170,68,370,180);
         SendMessageW(w,CB_ADDSTRING,0,(LPARAM)L"Disable encryption"); SendMessageW(w,CB_ADDSTRING,0,(LPARAM)L"Prefer encryption"); SendMessageW(w,CB_ADDSTRING,0,(LPARAM)L"Force encryption");SendMessageW(w,CB_SETCURSEL,draft.security,0);
         page_control(L"STATIC",L"Optional pairing key (64 hexadecimal characters)",0,0,170,106,370,22);
-        w=page_control(L"EDIT",draft.key,WS_TABSTOP|WS_BORDER|ES_AUTOHSCROLL,PREF_KEY,170,130,370,28);SendMessageW(w,EM_SETLIMITTEXT,64,0);
+        w=page_control(L"EDIT",draft.key,WS_TABSTOP|WS_BORDER|ES_AUTOHSCROLL|ES_PASSWORD,PREF_KEY,170,130,370,28);SendMessageW(w,EM_SETLIMITTEXT,64,0);
         page_control(L"BUTTON",L"Generate random key",WS_TABSTOP|BS_OWNERDRAW,PREF_GENERATE,170,166,200,28);
+        page_control(L"BUTTON",L"Show key",WS_TABSTOP|BS_OWNERDRAW,PREF_SHOW_KEY,382,166,158,28);
         page_check(L"Retain interrupted files for resume",PREF_RESUME,draft.resume,202);
-        page_control(L"STATIC",L"Prefer encrypts automatically when possible; Force rejects plaintext. Without a matching optional pairing key, peers are not authenticated. Discovery remains public.",0,0,170,240,370,68);
+        page_control(L"BUTTON",L"Review retained partial files...",WS_TABSTOP|BS_OWNERDRAW,PREF_RETAINED,170,236,370,28);
+        page_control(L"STATIC",L"Prefer can use plaintext. Force requires encryption. Compare codes or use a matching key to authenticate devices.",0,0,170,274,370,38);
     } else if(pref_section==5) {
         wchar_t number[32];
         page_control(L"STATIC",L"Transfer limits (KiB/s)",0,0,170,68,370,22);
@@ -615,12 +626,43 @@ static void build_page(void) {
         w=page_control(L"EDIT",number,WS_TABSTOP|WS_BORDER|ES_NUMBER,PREF_RECEIVE_LIMIT,330,144,180,28);SendMessageW(w,EM_SETLIMITTEXT,7,0);
         page_control(L"STATIC",L"0 = Unlimited. File contents only; limits start with the next file. Receive caps require an updated sender.",0,0,170,198,370,86);
     } else {
+        {wchar_t build[100];char value[80];sprintf(value,"Build %s",bs_build_id());utf16(value,build,100);page_control(L"STATIC",build,0,0,170,184,370,24);}
         page_control(L"STATIC",L"BitSkim 0.2\r\n\r\nLocal file sharing for modern and retro computers.\r\n\r\nTCP/UDP 46440 - optional TLS",0,0,170,68,370,108);
-        page_control(L"BUTTON",L"github.com/retrocs-org/bitskim",WS_TABSTOP|BS_OWNERDRAW,PREF_GITHUB,170,188,370,28);
-        page_control(L"BUTTON",L"bitskim.retrocs.org",WS_TABSTOP|BS_OWNERDRAW,PREF_WEBSITE,170,224,370,28);
-        page_control(L"STATIC",L"Website planned for a future launch.\r\nMIT license; Catppuccin MIT notices included.",0,0,170,264,370,48);
+        page_control(L"BUTTON",L"github.com/retrocs-org/bitskim",WS_TABSTOP|BS_OWNERDRAW,PREF_GITHUB,170,212,370,28);
+        page_control(L"BUTTON",L"bitskim.retrocs.org",WS_TABSTOP|BS_OWNERDRAW,PREF_WEBSITE,170,248,370,28);
+        page_control(L"STATIC",L"MIT license; Catppuccin MIT notices included.",0,0,170,284,370,28);
     }
     repaint(prefs_window);
+}
+#define RETAINED_LIST 810
+#define RETAINED_REMOVE 811
+#define RETAINED_RESCAN 812
+#define RETAINED_CLOSE 813
+static void retained_refresh(HWND w){char report[1024],key[80];wchar_t wide[1500];int phase=bs_retained_phase(client),count=bs_retained_count(client),i;HWND list=GetDlgItem(w,RETAINED_LIST);char *previous=(char *)GetPropW(w,L"RetainedListKey");
+    bs_retained_summary(client,report,sizeof report);utf16(report,wide,1500);text(GetDlgItem(w,814),wide);
+    sprintf(key,"%lu:%d:%d",bs_retained_serial(client),phase,count);
+    if((phase==2 || phase==4 || phase==5) && (!previous || strcmp(previous,key))){int widest=0;HDC dc=GetDC(list);SendMessageW(list,WM_SETREDRAW,FALSE,0);SendMessageW(list,LB_RESETCONTENT,0,0);
+        for(i=0;i<count;i++){BSRetainedItem item;char line[1300];SIZE size;if(!bs_retained_item(client,i,&item))continue;sprintf(line,"%s - %lu bytes%s",item.path,item.bytes,item.removed==1?" - Removed":item.removed==-2?" - Not fully removed":item.removed<0?" - Kept (changed or locked)":"");utf16(line,wide,1500);SendMessageW(list,LB_ADDSTRING,0,(LPARAM)wide);if(GetTextExtentPoint32W(dc,wide,lstrlenW(wide),&size) && size.cx>widest)widest=size.cx;}
+        ReleaseDC(list,dc);SendMessageW(list,LB_SETHORIZONTALEXTENT,widest+S(24),0);SendMessageW(list,WM_SETREDRAW,TRUE,0);InvalidateRect(list,NULL,TRUE);if(previous){RemovePropW(w,L"RetainedListKey");free(previous);}previous=(char *)malloc(80);if(previous){strcpy(previous,key);SetPropW(w,L"RetainedListKey",previous);}
+    }
+    EnableWindow(GetDlgItem(w,RETAINED_REMOVE),phase==2 && count>0 && !bs_status(client)->active && !bs_queue_count(client));EnableWindow(GetDlgItem(w,RETAINED_RESCAN),phase!=3 && !bs_status(client)->active && !bs_queue_count(client));
+}
+static LRESULT CALLBACK retained_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp){
+    if(msg==WM_CREATE){HWND child;wchar_t folder[PATH_CAP];utf16(retained_root,folder,PATH_CAP);child=CreateWindowW(L"STATIC",folder,WS_CHILD|WS_VISIBLE,0,0,0,0,w,(HMENU)815,instance,NULL);SendMessageW(child,WM_SETFONT,(WPARAM)font,TRUE);child=CreateWindowW(L"STATIC",L"Reviewing receive folder...",WS_CHILD|WS_VISIBLE,0,0,0,0,w,(HMENU)814,instance,NULL);SendMessageW(child,WM_SETFONT,(WPARAM)font,TRUE);
+        child=CreateWindowExW(WS_EX_CLIENTEDGE,L"LISTBOX",L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_VSCROLL|WS_HSCROLL|LBS_NOINTEGRALHEIGHT,0,0,0,0,w,(HMENU)RETAINED_LIST,instance,NULL);SendMessageW(child,WM_SETFONT,(WPARAM)font,TRUE);button(w,L"Scan again",RETAINED_RESCAN);button(w,L"Remove reviewed partials...",RETAINED_REMOVE);button(w,L"Close",RETAINED_CLOSE);SetTimer(w,1,200,NULL);return 0;}
+    if(msg==WM_SIZE){RECT area;int width,height;GetClientRect(w,&area);width=area.right;height=area.bottom;MoveWindow(GetDlgItem(w,815),S(16),S(12),width-S(32),S(26),TRUE);MoveWindow(GetDlgItem(w,814),S(16),S(44),width-S(32),S(82),TRUE);MoveWindow(GetDlgItem(w,RETAINED_LIST),S(16),S(132),width-S(32),height-S(194),TRUE);MoveWindow(GetDlgItem(w,RETAINED_RESCAN),S(16),height-S(48),S(110),S(30),TRUE);MoveWindow(GetDlgItem(w,RETAINED_REMOVE),S(140),height-S(48),S(230),S(30),TRUE);MoveWindow(GetDlgItem(w,RETAINED_CLOSE),width-S(108),height-S(48),S(92),S(30),TRUE);return 0;}
+    if(msg==WM_GETMINMAXINFO){MINMAXINFO *limits=(MINMAXINFO *)lp;limits->ptMinTrackSize.x=S(480);limits->ptMinTrackSize.y=S(360);return 0;}
+    if(msg==WM_TIMER){retained_refresh(w);return 0;}
+    if(msg==WM_COMMAND){int id=LOWORD(wp);if(id==RETAINED_CLOSE || id==IDCANCEL){DestroyWindow(w);return 0;}if(id==RETAINED_RESCAN){if(!bs_retained_scan(client,retained_root))core_error();retained_refresh(w);return 0;}if(id==RETAINED_REMOVE){unsigned long reviewed=bs_retained_serial(client);wchar_t prompt[1600];char report[1024];bs_retained_summary(client,report,sizeof report);utf16(report,prompt,1500);wcscat(prompt,L"\n\nRemove all listed partial files? You will lose their resume progress. Completed files are kept; changed or locked checkpoints are preserved.");if(MessageBoxW(w,prompt,L"Remove reviewed partial files?",MB_YESNO|MB_DEFBUTTON2|MB_ICONQUESTION)==IDYES && !bs_retained_remove(client,reviewed))core_error();retained_refresh(w);return 0;}}
+    if(msg==WM_CTLCOLORSTATIC || msg==WM_CTLCOLORLISTBOX){const WinTheme *theme=&win_themes[prefs.theme];SetTextColor((HDC)wp,theme->text);SetBkColor((HDC)wp,msg==WM_CTLCOLORSTATIC?theme->base:theme->surface);return (LRESULT)(msg==WM_CTLCOLORSTATIC?base_brush[prefs.theme]:surface_brush[prefs.theme]);}
+    if(msg==WM_DRAWITEM){draw_control((DRAWITEMSTRUCT *)lp,w);return TRUE;}
+    if(msg==WM_PAINT){PAINTSTRUCT paint;RECT area;HDC dc=BeginPaint(w,&paint);GetClientRect(w,&area);fill(dc,area,win_themes[prefs.theme].base);EndPaint(w,&paint);return 0;}
+    if(msg==WM_DESTROY){char *key=(char *)RemovePropW(w,L"RetainedListKey");free(key);KillTimer(w,1);bs_retained_close(client);retained_window=NULL;return 0;}
+    return DefWindowProcW(w,msg,wp,lp);
+}
+static void review_retained(void){WNDCLASSW cls;BROWSEINFOW browse;PIDLIST_ABSOLUTE item;wchar_t path[PATH_CAP];if(retained_window){SetForegroundWindow(retained_window);return;}if(bs_status(client)->active || bs_queue_count(client)){error_box(prefs_window,L"Finish or clear queued transfers first.");return;}
+    ZeroMemory(&browse,sizeof browse);browse.hwndOwner=prefs_window;browse.lpszTitle=L"Choose a receive folder to review partial files";browse.ulFlags=BIF_RETURNONLYFSDIRS|BIF_NEWDIALOGSTYLE;browse.lpfn=recent_browse;browse.lParam=(LPARAM)prefs.folder;item=SHBrowseForFolderW(&browse);if(!item)return;if(!SHGetPathFromIDListW(item,path)){CoTaskMemFree(item);return;}CoTaskMemFree(item);if(!utf8(path,retained_root,sizeof retained_root) || !bs_retained_scan(client,retained_root)){core_error();return;}
+    ZeroMemory(&cls,sizeof cls);cls.hInstance=instance;cls.lpfnWndProc=retained_proc;cls.hCursor=LoadCursor(NULL,IDC_ARROW);cls.lpszClassName=L"BitSkimRetained";RegisterClassW(&cls);retained_window=CreateWindowExW(WS_EX_CONTROLPARENT,L"BitSkimRetained",L"Retained partial files - BitSkim",WS_OVERLAPPEDWINDOW|WS_VISIBLE,CW_USEDEFAULT,CW_USEDEFAULT,S(700),S(560),main_window,NULL,instance,NULL);if(!retained_window){bs_retained_close(client);error_box(prefs_window,L"Cannot open the partial-file review.");return;}repaint(retained_window);
 }
 static void choose_folder(void) {
     BROWSEINFOW browse; PIDLIST_ABSOLUTE item; wchar_t path[PATH_CAP];
@@ -663,6 +705,8 @@ static LRESULT CALLBACK prefs_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
             const wchar_t *url=id==PREF_GITHUB?L"https://github.com/retrocs-org/bitskim":L"https://bitskim.retrocs.org";
             if((INT_PTR)ShellExecuteW(w,L"open",url,NULL,NULL,SW_SHOWNORMAL)<=32) error_box(w,L"Could not open your browser. The project address is shown on the button.");
         }
+        else if(id==PREF_RETAINED) review_retained();
+        else if(id==PREF_SHOW_KEY) { HWND field=GetDlgItem(w,PREF_KEY);int hidden=SendMessageW(field,EM_GETPASSWORDCHAR,0,0)!=0;SendMessageW(field,EM_SETPASSWORDCHAR,hidden?0:0x25cf,0);text(source,hidden?L"Hide key":L"Show key");InvalidateRect(field,NULL,TRUE); }
         else if(id==PREF_GENERATE) {char key[65];wchar_t value[65];if(bs_generate_pairing_key(key)){utf16(key,value,65);text(GetDlgItem(w,PREF_KEY),value);SecureZeroMemory(key,sizeof key);}}
         else if(id==PREF_BROWSE) choose_folder();
         else if(id==PREF_CANCEL) DestroyWindow(w);
@@ -722,7 +766,7 @@ static LRESULT CALLBACK main_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
         main_window=w;
         create_peer_view(w);
         ip_edit=control(w,L"EDIT",L"",WS_TABSTOP|WS_BORDER|ES_AUTOHSCROLL,ID_IP); SendMessageW(ip_edit,EM_SETLIMITTEXT,70,0); SendMessageW(ip_edit,EM_SETCUEBANNER,FALSE,(LPARAM)L"192.168.1.20 or 192.168.1.20:46440");
-        {HMENU bar=CreateMenu();AppendMenuW(bar,MF_STRING,9010,L"Transfer tools");AppendMenuW(bar,MF_STRING,9011,L"Send folder...");AppendMenuW(bar,MF_STRING|(completion_alerts?MF_CHECKED:0),9012,L"Completion alerts");{HMENU more=CreatePopupMenu();AppendMenuW(more,MF_STRING,9013,L"Connection QR...");AppendMenuW(more,MF_STRING,9014,L"Clear saved history...");AppendMenuW(more,MF_STRING|(retro_metadata?MF_CHECKED:0),9015,L"Preserve retro metadata");AppendMenuW(bar,MF_POPUP,(UINT_PTR)more,L"More");}SetMenu(w,bar);}
+        {HMENU bar=CreateMenu();AppendMenuW(bar,MF_STRING,9010,L"Transfer tools");AppendMenuW(bar,MF_STRING,9011,L"Send folder...");AppendMenuW(bar,MF_STRING|(completion_alerts?MF_CHECKED:0),9012,L"Completion alerts");{HMENU more=CreatePopupMenu();AppendMenuW(more,MF_STRING,9013,L"Connection QR...");AppendMenuW(more,MF_STRING,9014,L"Clear saved history...");AppendMenuW(more,MF_STRING|(retro_metadata?MF_CHECKED:0),9015,L"Preserve file dates and retro metadata");AppendMenuW(bar,MF_POPUP,(UINT_PTR)more,L"More");}SetMenu(w,bar);}
         button(w,L"Refresh",ID_REFRESH); button(w,L"Send file...",ID_SEND); button(w,L"Preferences",ID_PREFS); button(w,L"Cancel",ID_CANCEL); button(w,L"Hide to tray",ID_HIDE);
         status_text=control(w,L"STATIC",L"Ready on your local network",SS_ENDELLIPSIS,0);
         amount_text=control(w,L"STATIC",L"",SS_ENDELLIPSIS,0); speed_text=control(w,L"STATIC",L"",0,0);
@@ -743,7 +787,7 @@ static LRESULT CALLBACK main_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
     case WM_TIMER: bs_service(client,4); refresh(); return 0;
     case WM_ENGINE:
         if(wp==BS_EVENT_COMPLETE){if(bs_completion_notice(client,&completion_serial) && completion_alerts)notify(L"Transfer complete",L"Delivery finished successfully.");}
-        else if(wp==BS_EVENT_ERROR) { wchar_t s[512]; utf16(bs_status(client)->message,s,512); notify(L"Transfer stopped",s); }
+        else if(wp==BS_EVENT_ERROR) { wchar_t s[512]; utf16(bs_user_status(client),s,512); notify(L"Transfer stopped",s); }
         return 0;
     case WM_OFFER: incoming(); return 0;
     case WM_COMMAND:
@@ -875,6 +919,7 @@ int WINAPI wWinMain(HINSTANCE h,HINSTANCE previous,PWSTR command,int show) {
     if(!prefs.start || !prefs.tray || !tray_added) show_main();
     while(GetMessageW(&msg,NULL,0,0)>0) {
         if(bs_tools_window && IsDialogMessageW(bs_tools_window,&msg))continue;
+        if(retained_window && IsDialogMessageW(retained_window,&msg))continue;
         if(prefs_window && IsDialogMessageW(prefs_window,&msg)) continue;
         if(IsDialogMessageW(main_window,&msg)) continue;
         TranslateMessage(&msg); DispatchMessageW(&msg);

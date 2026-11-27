@@ -160,7 +160,7 @@ static int send_file(const char *native) {
     else { int i;for(i=0;i<bs_peer_count(engine);i++){const BSPeer *candidate=bs_peer(engine,i);if(!strcmp(candidate->id,selected_id)){peer=candidate;break;}} if(!peer) { report("Select a computer or enter an IPv4 address."); return 0; } copy(address,peer->address,sizeof(address)); port=peer->port; }
     if(!native_to_unix(native,path,sizeof(path))) { report("Path cannot be converted or is too long."); return 0; }
     bs_queue_clear(engine);
-    if(!(peer?bs_queue_peer(engine,peer->id,path):bs_queue_address(engine,address,port,path))){report(bs_last_error(engine));return 0;}bs_queue_continue(engine);return 1;
+    if(!(peer?bs_queue_peer(engine,peer->id,path):bs_queue_address(engine,address,port,path))){report(bs_user_error(engine));return 0;}bs_queue_continue(engine);return 1;
 }
 static void pref_labels(void) {
     const char *labels[]={"Visible on the network","Allow incoming transfers","Automatically accept offers","Always ask where to save","Start on the icon bar","Close window to icon bar","Completion sound"};
@@ -174,11 +174,11 @@ static void show_network(void){char value[32];if(network_view.handle>=0){open_wi
     make_icon(&network_view,20,20,950,36,"Transfer limits (KiB/s; 0 = Unlimited)",0);
     make_icon(&network_view,20,80,220,36,"Send",0);sprintf(value,"%lu",prefs.send_limit/1024UL);net_send=make_icon(&network_view,260,80,700,40,value,WRITABLE);
     make_icon(&network_view,20,140,220,36,"Receive",0);sprintf(value,"%lu",prefs.receive_limit/1024UL);net_receive=make_icon(&network_view,260,140,700,40,value,WRITABLE);
-    net_metadata=make_icon(&network_view,20,204,950,36,prefs.metadata?"[x] Preserve retro filetypes and metadata":"[ ] Preserve retro filetypes and metadata",BUTTON);
+    net_metadata=make_icon(&network_view,20,204,950,36,prefs.metadata?"[x] Preserve dates, filetypes and metadata":"[ ] Preserve dates, filetypes and metadata",BUTTON);
     net_cancel=make_icon(&network_view,580,274,180,44,"Cancel",BUTTON);net_save=make_icon(&network_view,780,274,180,44,"Save",BUTTON);open_window(&network_view,1000,340);
 }
 static void click_network(int icon){int i=clicked(&network_view,icon);unsigned long up,down;Preferences old;
-    if(i==net_metadata){if(bs_status(engine)->active || bs_queue_count(engine)){report("Finish or clear queued transfers first.");return;}prefs.metadata=!prefs.metadata;bs_metadata_enable(engine,prefs.metadata);preferences_write();icon_set(&network_view,net_metadata,prefs.metadata?"[x] Preserve retro filetypes and metadata":"[ ] Preserve retro filetypes and metadata");return;}if(i==net_cancel){delete_window(&network_view);return;}if(i!=net_save)return;
+    if(i==net_metadata){if(bs_status(engine)->active || bs_queue_count(engine)){report("Finish or clear queued transfers first.");return;}prefs.metadata=!prefs.metadata;bs_metadata_enable(engine,prefs.metadata);preferences_write();icon_set(&network_view,net_metadata,prefs.metadata?"[x] Preserve dates, filetypes and metadata":"[ ] Preserve dates, filetypes and metadata");return;}if(i==net_cancel){delete_window(&network_view);return;}if(i!=net_save)return;
     if(!bs_limit_parse(network_view.icons[net_send].text,&up) || !bs_limit_parse(network_view.icons[net_receive].text,&down)){report("Enter 0..1048575 KiB/s; zero is Unlimited.");return;}
     old=prefs;prefs.send_limit=up;prefs.receive_limit=down;if(!preferences_write()){prefs=old;report("Cannot save preferences.");return;}
     draft.send_limit=up;draft.receive_limit=down;bs_limits_configure(engine,up,down);delete_window(&network_view);
@@ -214,7 +214,7 @@ static void incoming(void) {
     if((bs_batch_count(engine)>1 || bs_batch_is_tree(engine)!=0)) {
         int index=bs_batch_index(engine),count=bs_batch_count(engine),row=0;char folder[BS_PATH_MAX+1],save_name[256];
         if(prefs.automatic && !prefs.ask) {
-            if(!native_to_unix(prefs.folder,folder,sizeof folder) || !bs_accept_batch(engine,folder)){bs_decline(engine);report(bs_last_error(engine));}return;
+            if(!native_to_unix(prefs.folder,folder,sizeof folder) || !bs_accept_batch(engine,folder)){bs_decline(engine);report(bs_user_error(engine));}return;
         }
         show_main();make_window(&offer_view,"Incoming batch - BitSkim",1100,560);offer_open=1;offer_top=index;
         bs_batch_summary(engine,label,sizeof label);make_icon(&offer_view,20,16,1060,36,label,0);
@@ -233,7 +233,7 @@ static void incoming(void) {
         open_window(&offer_view,1100,560);return;
     }
     if(!destination(native,s->filename)) { bs_decline(engine); report("Rename this file on the sender: this client requires Latin-1 filenames."); return; }
-    if(prefs.automatic && !prefs.ask) { if(!accept_path(native)) { report(bs_last_error(engine)); bs_decline(engine); } return; }
+    if(prefs.automatic && !prefs.ask) { if(!accept_path(native)) { report(bs_user_error(engine)); bs_decline(engine); } return; }
     show_main(); make_window(&offer_view,"Incoming file - BitSkim",1100,390); offer_open=1;
     if(!bs_to_local(s->peer_name,name,sizeof(name))) copy(name,"Remote computer",sizeof(name));
     sprintf(label,"%.63s wants to send %lu bytes",name,s->total); make_icon(&offer_view,20,20,1060,36,label,0);
@@ -263,7 +263,7 @@ static void update(void) {
         } peers_dirty=0;
     }
     if(ticks()-last_ui<20) return; last_ui=ticks();
-    {char state[350];sprintf(state,"%.255s | Waiting: %d%s",s->message,(s->active && s->incoming && (bs_batch_count(engine)>1 || bs_batch_is_tree(engine)!=0)?bs_batch_count(engine)-bs_batch_index(engine)-1:bs_queue_waiting(engine)),bs_queue_paused(engine)?(s->active?" - stops after file":" paused"):"");icon_set(&main_view,status_icon,state);}
+    {char state[350];sprintf(state,"%.255s | Waiting: %d%s",bs_user_status(engine),(s->active && s->incoming && (bs_batch_count(engine)>1 || bs_batch_is_tree(engine)!=0)?bs_batch_count(engine)-bs_batch_index(engine)-1:bs_queue_waiting(engine)),bs_queue_paused(engine)?(s->active?" - stops after file":" paused"):"");icon_set(&main_view,status_icon,state);}
     if(!bs_to_local(s->filename,local,sizeof(local))) copy(local,"Unicode filename",sizeof(local));
     text[0]=0;if(s->active) {unsigned long position=1,total=1;
         if(!s->incoming && bs_queue_count(engine))bs_queue_progress(engine,&position,&total);
@@ -287,10 +287,10 @@ static void show_tools(void){int i;if(tools_view.handle>=0){open_window(&tools_v
     make_icon(&tools_view,20,530,1100,36,"Recent history is saved locally. Conflict policy applies to this collection.",0);tools_update();open_window(&tools_view,1160,620);
 }
 static void click_tools(int icon){int id=clicked(&tools_view,icon);BSHistoryItem h;
-    if(id==tools_buttons[6]){if(!bs_network_test(engine,main_view.icons[ip_icon].text,0))report(bs_last_error(engine));tools_mode=-1;tools_top=0;}
+    if(id==tools_buttons[6]){if(!bs_network_test(engine,main_view.icons[ip_icon].text,0))report(bs_user_error(engine));tools_mode=-1;tools_top=0;}
     else if(id==tools_buttons[0]){tools_mode=-1;tools_top=0;}else if(id==tools_buttons[1]){tools_mode=0;tools_top=0;if(bs_history_item(engine,0,&h))tools_serial=h.serial;}
     else if(id==tools_buttons[2]){if(tools_mode+1<bs_history_count(engine))tools_mode++;else tools_mode=0;tools_top=0;if(bs_history_item(engine,tools_mode,&h))tools_serial=h.serial;}
-    else if(id==tools_buttons[3]){int i;for(i=0;i<bs_history_count(engine);i++)if(bs_history_item(engine,i,&h) && h.serial==tools_serial){if(!bs_retry_history(engine,i))report(bs_last_error(engine));break;}}
+    else if(id==tools_buttons[3]){int i;for(i=0;i<bs_history_count(engine);i++)if(bs_history_item(engine,i,&h) && h.serial==tools_serial){if(!bs_retry_history(engine,i))report(bs_user_error(engine));break;}}
     else if(id==tools_buttons[4])bs_conflict_policy(engine,(bs_conflict_get(engine)+1)%3);else if(id==tools_buttons[5]){char line[81];if(bs_tools_line(engine,tools_mode,tools_top+10,line,sizeof line))tools_top+=10;else tools_top=0;}tools_update();
 }
 static void click_main(int icon) {
@@ -380,7 +380,7 @@ int main(void) {
             else if(b[3]==pref_view.handle) click_preferences(b[4]);
             else if(b[3]==network_view.handle)click_network(b[4]);
             else if(b[3]==tools_view.handle)click_tools(b[4]);
-            else if(b[3]==offer_view.handle) { i=clicked(&offer_view,b[4]); if(i==offer_conflict){bs_conflict_policy(engine,(bs_conflict_get(engine)+1)%3);icon_set(&offer_view,offer_conflict,bs_conflict_get(engine)==2?"Existing: Replace":bs_conflict_get(engine)==1?"Existing: Skip":"Existing: Rename");}else if((bs_batch_count(engine)>1 || bs_batch_is_tree(engine)!=0) && (i==offer_previous || i==offer_next))page_offer(i==offer_previous?-1:1);else if(i==offer_decline) { bs_decline(engine); delete_window(&offer_view); offer_open=0; } else if(i==offer_accept) { char batch_folder[BS_PATH_MAX+1];int accepted=(bs_batch_count(engine)>1 || bs_batch_is_tree(engine)!=0)?(native_to_unix(offer_view.icons[offer_path].text,batch_folder,sizeof batch_folder) && bs_accept_batch(engine,batch_folder)):accept_path(offer_view.icons[offer_path].text);if(!accepted) report(bs_last_error(engine)); else { delete_window(&offer_view); offer_open=0; } } }
+            else if(b[3]==offer_view.handle) { i=clicked(&offer_view,b[4]); if(i==offer_conflict){bs_conflict_policy(engine,(bs_conflict_get(engine)+1)%3);icon_set(&offer_view,offer_conflict,bs_conflict_get(engine)==2?"Existing: Replace":bs_conflict_get(engine)==1?"Existing: Skip":"Existing: Rename");}else if((bs_batch_count(engine)>1 || bs_batch_is_tree(engine)!=0) && (i==offer_previous || i==offer_next))page_offer(i==offer_previous?-1:1);else if(i==offer_decline) { bs_decline(engine); delete_window(&offer_view); offer_open=0; } else if(i==offer_accept) { char batch_folder[BS_PATH_MAX+1];int accepted=(bs_batch_count(engine)>1 || bs_batch_is_tree(engine)!=0)?(native_to_unix(offer_view.icons[offer_path].text,batch_folder,sizeof batch_folder) && bs_accept_batch(engine,batch_folder)):accept_path(offer_view.icons[offer_path].text);if(!accepted) report(bs_user_error(engine)); else { delete_window(&offer_view); offer_open=0; } } }
         } else if(reason==8) { memset(&r,0,sizeof(r)); r.r[0]=b[6]; call(Wimp_ProcessKey,&r); }
         else if(reason==17 || reason==18) message(b);
     }

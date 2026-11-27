@@ -14,11 +14,12 @@ mtcp=drive/'mtcp'
 if mtcp.exists():shutil.rmtree(mtcp)
 shutil.copytree(ROOT/'third_party/mtcp/src',mtcp)
 for obj in stage.glob('*.obj'):obj.unlink()
-header_names={'retro-metadata.h':'retromet.h','saved-state.h':'savstate.h','invitations.h':'invites.h'}
-for name in ('bitskim.c','bitskim.h','platform.h','dos-net.h','queue.h','folders.h','netcheck.h','batch.h','caps.h','rate.h','activity.h','trust.h','fs.h','storage.h','run.h','treeq.h','tree.h','resume.h','tls-api.h','retro-metadata.h','saved-state.h','invitations.h'):shutil.copy2(ROOT/'core'/name,stage/header_names.get(name,name))
-source=(stage/'bitskim.c').read_text()
-for original,short in header_names.items():source=source.replace('\"'+original+'\"','\"'+short+'\"')
-(stage/'bitskim.c').write_text(source)
+header_names={'mtime-platform.h':'mtime.h','retro-metadata.h':'retromet.h','saved-state.h':'savstate.h','invitations.h':'invites.h'}
+for name in ('bitskim.c','bitskim.h','platform.h','dos-net.h','queue.h','folders.h','netcheck.h','batch.h','caps.h','rate.h','activity.h','trust.h','fs.h','storage.h','run.h','treeq.h','tree.h','resume.h','tls-api.h','retro-metadata.h','mtime-platform.h','session.h','recovery.h','retained.h','saved-state.h','invitations.h'):shutil.copy2(ROOT/'core'/name,stage/header_names.get(name,name))
+for path in [stage/'bitskim.c',*stage.glob('*.h')]:
+ source=path.read_text()
+ for original,short in header_names.items():source=source.replace('"'+original+'"','"'+short+'"')
+ path.write_text(source)
 for path in (ROOT/'clients/dos').iterdir():
  if path.is_file():shutil.copy2(path,stage/path.name)
 units=('packet','arp','eth','ip','tcp','tcpsockm','udp','utils','timer','trace')
@@ -27,7 +28,7 @@ shutil.copy2(mtcp/'TCPLIB/IPASM.ASM',stage/'ipasm.asm')
 flags='-0 -ml -os -s -ei -zp2 -fi=bsdos.cfg'
 batch=['@echo off','set WATCOM=C:\\WATCOM','set PATH=C:\\WATCOM\\BINW','set INCLUDE=C:\\WATCOM\\H;C:\\MTCP\\TCPINC;C:\\MTCP\\INCLUDE;C:\\BUILD','cd \\build','echo Compiling > build.log']
 for name in ('bitskim','files','main'):
- batch += [f'wcc {name}.c -0 -ml -os -s -dBS_DOS >> build.log','if errorlevel 1 goto failed']
+ batch += [f'wcc {name}.c -0 -ml -os -s -fi=buildid.h -dBS_DOS >> build.log','if errorlevel 1 goto failed']
 for name in ('net',)+units:
  batch += [f'wpp {name}.cpp {flags} -dBS_DOS >> build.log','if errorlevel 1 goto failed']
 batch += ['wasm -0 -ml ipasm.asm >> build.log','if errorlevel 1 goto failed','wlink @link.lnk >> build.log','if errorlevel 1 goto failed','echo success > result.txt','goto done',':failed','echo failed > result.txt',':done','exit']
@@ -41,6 +42,7 @@ config=drive/'build.conf';config.write_text('[sdl]\noutput=texture\n[mixer]\nnos
 result=stage/'result.txt'
 if result.exists():result.unlink()
 begin('dos')
+shutil.copy2(ROOT/'build/generated/build-id.h',stage/'buildid.h')
 env=dict(os.environ,SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy')
 with (drive/'test system.log').open('w') as log:
  command=['cmd.exe','/c',str(stage/'build.bat')] if a.native else [str(runner),'--noprimaryconf','--nolocalconf','--conf',str(config)]

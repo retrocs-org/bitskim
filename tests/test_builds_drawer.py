@@ -9,13 +9,19 @@ class BuildsDrawer(unittest.TestCase):
  def test_deploys_installer_and_sibling_icon_with_packages_nested(self):
   with tempfile.TemporaryDirectory() as d:
    root=Path(d)/'source';out=root/'outputs';out.mkdir(parents=True);base=Path(d)/'Builds';base.mkdir();(base/'unrelated').write_text('keep')
+   for name in ('Install-BitSkim','Install-BitSkim.info'):
+    old=base/'BitSkim'/name;old.parent.mkdir(exist_ok=True);old.write_bytes(('old '+name).encode())
    files={}
-   for name in ['BitSkim.info','BitSkim/Install-BitSkim','BitSkim/Install-BitSkim.info']:
+   for name in ['BitSkim.info','BitSkim/Install','BitSkim/Install.info']:
     path=root/'fixture'/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(name.encode());files[name]=path
    with zipfile.ZipFile(out/'BitSkim-0.2-AmigaOS.zip','w') as package:
     for name,path in files.items():package.write(path,name)
    with patch.object(module,'verify'),patch.object(module,'payload',return_value=files):module.sync(base,root)
-   self.assertEqual((base/'BitSkim.info').read_bytes(),b'BitSkim.info');self.assertTrue((base/'BitSkim/Install-BitSkim.info').is_file());self.assertTrue((base/'BitSkim/packages/BitSkim-0.2-AmigaOS.zip').is_file());self.assertFalse((base/'BitSkim-0.2-AmigaOS.zip').exists());self.assertEqual((base/'unrelated').read_text(),'keep')
+   self.assertEqual((base/'BitSkim.info').read_bytes(),b'BitSkim.info');self.assertTrue((base/'BitSkim/Install.info').is_file());self.assertTrue((base/'BitSkim/packages/BitSkim-0.2-AmigaOS.zip').is_file());self.assertFalse((base/'BitSkim-0.2-AmigaOS.zip').exists());self.assertEqual((base/'unrelated').read_text(),'keep')
+   for name in ('Install-BitSkim','Install-BitSkim.info'):
+    self.assertFalse((base/'BitSkim'/name).exists())
+    backups=list((root/'work/builds-sync-backups').glob('*/BitSkim/'+name))
+    self.assertEqual(len(backups),1);self.assertEqual(backups[0].read_bytes(),('old '+name).encode())
  def test_refuses_symbolic_link_destinations(self):
   with tempfile.TemporaryDirectory() as d:
    root=Path(d);base=root/'Builds';base.mkdir();outside=root/'outside';outside.mkdir();(base/'BitSkim').symlink_to(outside,target_is_directory=True)

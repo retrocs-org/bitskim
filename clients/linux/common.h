@@ -25,4 +25,5 @@ gboolean linux_enqueue(LinuxClient *,const char *peer,const char *address,unsign
 gboolean linux_accept(LinuxClient *,const char *folder,gboolean allow_unknown,GError **);
 char *linux_display(const char *);
 void linux_json_string(const char *);
+gboolean linux_resume_folder(LinuxClient *,const char *,GError **);
 #endif

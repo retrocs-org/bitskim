@@ -213,6 +213,16 @@ Validate the packaged links/assets with `python3 scripts/check-release-site.py` 
 
 Only regenerate assets when editing their sources. `python3 scripts/generate-themes.py` uses the standard library; `python3 scripts/build-icons.py` and `python3 scripts/build-riscos-icon.py` need Pillow. Generated assets are already included for ordinary builds.
 
+## Package dates
+
+Release ZIP, LHA and tar.gz entries use the build host’s current date and time when packaging, including generated files and RISC OS date metadata. The staged Mac DMG contents use the current packaging time too. Original source/build file timestamps are preserved; only archive metadata and disposable staging copies change. ZIP and classic LHA dates have two-second resolution. The host clock must be correct before packaging. Repackaging changes archive checksums, so prepare the release manifest from the final archives and retain those exact bytes for publication.
+
 ## Local installer drawer
 
-Builds are mirrored by `python3 scripts/sync-builds.py` to `~/Development/builds/BitSkim` by default. The complete Amiga installation drawer is unpacked there, with its sibling `BitSkim.info` and `Install-BitSkim.info` using the shared classic package/installer artwork. Open `Install-BitSkim` from that drawer. Versioned archives and checksums are kept inside `BitSkim/packages/`, rather than cluttering the builds root. Set `BITSKIM_BUILDS_DIR` or pass `--builds-dir` to select another builds parent directory. Matching current Amiga provenance and archive contents are required before refreshing the unpacked installer; unrelated files are preserved.
+Builds are mirrored by `python3 scripts/sync-builds.py` to `~/Development/builds/BitSkim` by default. The complete Amiga installation drawer is unpacked there, with its sibling `BitSkim.info` and `Install.info` using AmiRocket’s classic drawer/installer artwork. Open `Install` from that drawer. Versioned archives and checksums are kept inside `BitSkim/packages/`, rather than cluttering the builds root. Set `BITSKIM_BUILDS_DIR` or pass `--builds-dir` to select another builds parent directory. Matching current Amiga provenance and archive contents are required before refreshing the unpacked installer; unrelated files are preserved.
+
+## Additional classic targets under development
+
+`python3 scripts/build-windows16.py` builds a native Windows 3.1/3.11 Win16 executable with shared Open Watcom. See [Windows 3.x](WINDOWS16.md) for the installed Winsock requirement, ASCII/8.3 limits and pending native acceptance. It is not part of the normal public release inventory yet.
+
+[Classic Mac OS 8/9](MAC-CLASSIC.md) currently has a pinned shared Retro68 bootstrap and an SDK preflight, not a usable transfer application. The separately supplied Open Transport SDK and safe HFS/network adapters are prerequisites.

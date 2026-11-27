@@ -14,6 +14,12 @@ class AminetRelease(unittest.TestCase):
   self.assertLessEqual(len(fields['Short'].strip()),40)
   self.assertEqual(fields['Version'].strip(),'0.2');self.assertEqual(fields['Type'].strip(),'comm/tcp')
   self.assertIn('Distribution:',text);self.assertIn('VERSION CHANGELOG',text);self.assertNotIn('initial public release',text)
+  self.assertRegex(text,r'(?m)^0\.2(?: - .*)?$');self.assertIn('0.1 - Initial release',text)
+  self.assertLess(text.index('\n0.2'),text.index('\n0.1 - Initial release'))
+  flattened=' '.join(text.split())
+  self.assertIn('Written-file CRC32 readback verification for incoming files from legacy peers',flattened)
+  self.assertIn('Direct file sharing between native macOS, Windows and AmigaOS clients',flattened)
+  self.assertIn('Platform installers and portable packages, plus coordinated build, signing, packaging and release-publication scripts.',flattened)
  def test_missing_contact_and_header_injection_are_rejected(self):
   for value in (None,'','not-an-email','a@example.org\nType: bad','a@example.org\x00'):
    with self.assertRaises(ValueError):a.readme(value)
@@ -74,6 +80,7 @@ class AminetRelease(unittest.TestCase):
    file=stage/'BitSkim/demo';file.write_bytes(b'fixture payload')
    archive=out/'BitSkim-0.2.lha'
    subprocess.run([tool,'ao5g0q2',str(archive),'BitSkim/demo'],cwd=stage,check=True)
+   amiga_release.normalize_lha_paths(archive,{'BitSkim/demo'})
    (out/'BitSkim-0.2.lha.sha256').write_text(a.digest(archive)+'  '+archive.name+'\n')
    with patch.object(amiga_release,'payload',return_value={'BitSkim/demo':file}):
     folder=a.prepare('sender@example.org',root=root)

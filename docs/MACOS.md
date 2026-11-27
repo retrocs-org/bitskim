@@ -64,3 +64,15 @@ Incoming file and folder approvals attach to the main BitSkim window after Trans
 Nearby devices are grouped by installation identity. A device with several advertised interfaces has one card; clicking it or dropping files asks which address to use. The same grouping applies to the menu-bar Send File To list. Selected endpoints retain the advertised identity check. iOS devices use iPhone/iPad icons.
 
 For a locally built development copy, quit the running BitSkim using its app/menu-bar Quit command, then run `open build/macos/BitSkim.app` from the project root. This opens the build product rather than the installed Applications copy.
+
+## Pairing-key storage
+
+Optional shared pairing keys are stored in the login Keychain as a device-local generic password, scoped to the private BitSkim profile. Existing UserDefaults keys migrate only after a verified Keychain write, then the plaintext entry is removed. An inaccessible Keychain prevents engine startup instead of silently dropping authentication. Unchanged keys are not rewritten when saving theme/settings changes. Keep the login Keychain available when using a shared key. This migration does not rewrite old backups or Git history.
+
+## Build identity and retained partial files
+
+About/Settings and Diagnostics display the source build fingerprint alongside version 0.2. It identifies the source contents, including uncommitted edits, independently of checkout path or Git history. Direct compiler invocations that omit the generated identity header are explicitly labeled as unidentified. Regenerate builds with the supplied scripts after source changes. Different target configurations may share a source ID; it is not a binary checksum.
+
+Open **Retained partial files** from Settings/Preferences or Linux Transfer tools. Desktop clients let you choose a receive folder; mobile clients review Received. The bounded scan lists recognized checkpoint pairs and their disk usage. Review every listed entry, then confirm **Remove reviewed partials** to discard that resume progress. Completed files, unrecognized files, links and changed/locked checkpoints are kept. Older unmarked checkpoints and volumes that cannot store the local marker are excluded from cleanup; they remain usable for resume. Transfers or queued work prevent cleanup; any intervening transfer requires another scan. Closing the review stops further cleanup. A limit notice means only the listed files were reviewed; other files are kept.
+
+During folder recovery, progress distinguishes checking existing content from transferring remaining data, with counts for verified, resumed, received and remaining files. Hashing bytes are shown as checked bytes, not network payload.

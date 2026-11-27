@@ -19,6 +19,7 @@ settings:
     BITSKIM_BROADCAST: 'NO'
     BITSKIM_BROADCAST_DEFINE: BS_NO_BROADCAST
     BITSKIM_ENTITLEMENTS: '$(BITSKIM_ROOT)/clients/ios/Manual.entitlements'
+    GCC_PREFIX_HEADER: '$(BITSKIM_ROOT)/build/generated/build-id.h'
     GCC_PREPROCESSOR_DEFINITIONS: ['$(inherited)', BS_OPENSSL, '$(BITSKIM_BROADCAST_DEFINE)']
     HEADER_SEARCH_PATHS: ['$(BITSKIM_ROOT)/core', '$(BITSKIM_ROOT)/work/openssl-ios-$(PLATFORM_NAME)/include']
     LIBRARY_SEARCH_PATHS: ['$(BITSKIM_ROOT)/work/openssl-ios-$(PLATFORM_NAME)/lib']

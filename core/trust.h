@@ -11,13 +11,13 @@ int bs_trust_status(const BSClient *c){char path[BS_PATH_MAX+1];unsigned char sa
     f=bsp_open_file(path,"rb");if(!f)return -1;okay=fread(saved,1,32,f)==32;fclose(f);return okay && !CRYPTO_memcmp(saved,pin,32)?1:-1;
 }
 int bs_trust_current(BSClient *c,const char *code){char expected[20],path[BS_PATH_MAX+1];unsigned char pin[32];FILE *f;int okay;
-    if(!c || !code || !c->status.active || !bs_pairing_code(c,expected) || strlen(code)!=strlen(expected) || CRYPTO_memcmp(code,expected,strlen(expected)) || !trust_path(c,path) || !bsp_tls_peer_pin(c->sock,pin)){if(c)copystr(c->error,"Compare the full code on both screens during the encrypted connection",256);return 0;}
+    if(!c || !code || !c->status.active || !bs_pairing_code(c,expected) || strlen(code)!=strlen(expected) || CRYPTO_memcmp(code,expected,strlen(expected)) || !trust_path(c,path) || !bsp_tls_peer_pin(c->sock,pin)){if(c)set_error(c,BS_ERR_TRUST,"Compare the full code on both screens during the encrypted connection");return 0;}
     if(bs_trust_status(c)==1)return 1;
-    f=bsp_create_file(path);if(!f){copystr(c->error,"Cannot save trust pin; existing pins are never overwritten",256);return 0;}
-    okay=fwrite(pin,1,32,f)==32;if(fclose(f))okay=0;if(!okay){bsp_remove_file(path);copystr(c->error,"Could not save device trust",256);}return okay;
+    f=bsp_create_file(path);if(!f){set_error(c,BS_ERR_INTERNAL,"Cannot save trust pin; existing pins are never overwritten");return 0;}
+    okay=fwrite(pin,1,32,f)==32;if(fclose(f))okay=0;if(!okay){bsp_remove_file(path);set_error(c,BS_ERR_INTERNAL,"Could not save device trust");}return okay;
 }
 int bs_forget_current(BSClient *c){char path[BS_PATH_MAX+1];return c && trust_path(c,path)?bsp_remove_file(path)==0:0;}
-static int trust_check(BSClient *c){if(!invitation_check(c))return 0;if(bs_trust_status(c)<0){finish_error(c,FRAME_ERROR,"Trusted device identity changed or encryption is unavailable; verify the device before forgetting its saved identity");return 0;}return 1;}
+static int trust_check(BSClient *c){if(!invitation_check(c))return 0;if(bs_trust_status(c)<0){finish_error(c,FRAME_ERROR,BS_ERR_TRUST,"Trusted device identity changed or encryption is unavailable; verify the device before forgetting its saved identity");return 0;}return 1;}
 #else
 int bs_trust_configure(BSClient *c,const char *d){(void)c;(void)d;return 0;}
 int bs_pairing_code(const BSClient *c,char out[20]){(void)c;(void)out;return 0;}

@@ -8,7 +8,7 @@ SOURCE_ROOTS=('VERSION','CONTRIBUTING.md','.gitignore','Makefile','README.MD','C
 ARTIFACTS={
  'dos':['build/dos/BITSKIM.EXE'],
  'macos':['build/macos/BitSkim.app'],
- 'amiga':['build/amiga/'+x for x in ('BitSkim','BitSkimPrefs','BitSkim.info','BitSkimPrefs.info','BitSkimDrawer.info','StartInstaller','StartBitSkim','StopBitSkim','BitSkim.guide','BitSkim.guide.info','Install-BitSkim','Install-BitSkim.info','InstallAssets/SettingsDrawer.info','InstallAssets/BitSkim.prefs.info','InstallAssets/Startup.info')],
+ 'amiga':['build/amiga/'+x for x in ('BitSkim','BitSkimPrefs','BitSkim.info','BitSkimPrefs.info','BitSkimDrawer.info','StartInstaller','StartBitSkim','StopBitSkim','BitSkim.guide','BitSkim.guide.info','Install','Install.info','InstallAssets/SettingsDrawer.info','InstallAssets/BitSkim.prefs.info','InstallAssets/Startup.info')],
  'windows-legacy':['build/windows-legacy/BitSkim.exe'],
  'windows':['build/windows/BitSkim.exe','build/windows/BitSkim-CoreCheck.exe'],
  'dmg':['outputs/BitSkim-0.2-macOS-arm64.dmg'],
@@ -74,6 +74,8 @@ def verify(target,root=ROOT):
 
 def begin(target,root=ROOT):
  if (root/'VERSION').read_text().strip()!='0.2':raise StaleBuild('Version must remain 0.2')
+ from build_identity import write_identity
+ write_identity(root)
  dependencies={dep:verify(dep,root)['artifacts'] for dep in DEPENDENCIES.get(target,[])}
  path=record_path(root,target)
  if path.exists():path.unlink()

@@ -123,7 +123,7 @@ When several files are queued together for one recipient, updated clients show t
 
 Mac uses a folder chooser; Amiga uses the batch dialog's Save all in folder field. Modern Windows uses its folder chooser. Classic Windows uses its existing Save dialog to select the folder and explicitly ignores the filename field. DOS F6 opens one folder prompt; CLI uses `ACCEPTALL <folder>` (the single-file `/RECEIVE` automation remains per-file). RISC OS and Atari show modeless lists with an editable folder field and Accept all. Native visual/driver verification on the experimental platforms remains pending.
 
-Cancelling or failing a file stops automatic batch acceptance and pauses the sender. Explicit retry may ask for consent again. Files added after the initial list was sent require a new offer. Batch transfers currently restart interrupted files from the beginning; individually offered modern-client files retain their existing negotiated resume feature. TLS works for batches on capable clients. See PROTOCOL.md for the scope and timeout rules.
+Cancelling or failing a file stops automatic batch acceptance and pauses the sender. Explicit retry may ask for consent again. Files added after the initial list was sent require a new offer. Older batch peers restart interrupted files. Updated trusted encrypted peers offer an explicit Resume existing folder choice after fresh approval; completed files and retained prefixes are verified before remaining data is received. Individually offered modern-client files keep their negotiated resume support. TLS works for batches on capable clients. See PROTOCOL.md for the scope and timeout rules.
 
 ## Queue storage and practical limits
 
@@ -186,3 +186,21 @@ Enable **Preserve retro metadata** on both clients before queuing a transfer. It
 When queuing a file or drawer with metadata enabled, an adjacent `.info` is added as a normal, visible file in the collection preview. Folder contents already include icons. Recognized .bskmeta companions are sent as metadata rather than duplicate collection files. Safe conflict handling can rename payload and icon separately; review names after collisions. Only regular-file attributes are supported; directory attributes, timestamps, Mac resource forks and arbitrary RISC OS load/exec addresses are outside this extension. Clients without the negotiated capability receive normal file data. CRC32 detects accidental changes and is not authentication: use a trusted local network or verified TLS device identities.
 
 On mobile, use a received file’s **Send to client** action for onward transfer with its adjacent metadata. Provider imports copy only user-selected files; an unrelated cloud provider cannot supply hidden companion files implicitly. Exporting/renaming a payload separately requires keeping its .bskmeta companion with the matching base name.
+
+## Preserve file modification dates
+
+Preservation is off by default. Enable **Preserve file dates and retro metadata** on both clients before queuing work. Use the Network preferences on AmigaOS, Atari and RISC OS, Settings on mobile, the preferences checkbox on Windows Classic, `METADATA ON` on DOS, or `--metadata` on the Linux CLI. Older clients and clients with preservation disabled receive normal file contents without the date extension.
+
+The sender captures each regular file's modification time and sends it only if it remains unchanged when reading finishes. After verifying the written contents, the receiver restores the date on its temporary file before finalizing it. The completion result reports whether restoration succeeded. A date that the destination cannot represent does not discard verified contents; the result includes a warning. File-system resolution and the retro system's configured clock/time zone can limit precision. Access times, directory dates, ownership and foreign permission bits are not copied. File dates are descriptive metadata, not proof of when content was created.
+
+This preference also controls the existing Amiga/RISC OS metadata companions. It does not affect release packaging: packaged archives continue to use the current packaging date.
+
+## Recover after a transfer error
+
+The app keeps the original technical error in Diagnostics and adds a **Next:** suggestion to user-facing errors. Network failures offer Test connection; a failed outgoing file can be retried from Transfer tools/history after checking the recipient. Mac error dialogs and iOS failure status expose the relevant actions directly. Windows Transfer tools shows the recovery guidance beside Retry outgoing, Test connection and Open folder. Retry sends a new offer and still requires approval; it does not bypass device trust, overwrite an existing file or reuse an unrelated previous transfer. For identity errors, compare the two devices before changing saved trust.
+
+## Resume an interrupted folder
+
+On updated modern clients, enable retained partial files and establish a trusted encrypted connection (remembered device identity or matching shared key). Re-send the folder, then explicitly choose **Resume existing folder** at the receiver and select the parent of the previous root. Linux CLI uses `receive --resume-folder --directory PARENT` and still prompts unless `--accept` is explicitly supplied. A fresh manifest approval is required.
+
+Completed files are checked against the sender with SHA-256 prefix validation and CRC32 disk readback. Partial files are validated before appending. Different contents, sizes, unsafe paths or mismatched checkpoints stop the job and preserve originals. Files absent from the new manifest are kept. Cancellation removes the current partial file; a broken connection retains its checkpoint. Other files may have completed before a mismatch is encountered. Automatic acceptance never selects recovery mode on desktop clients. Without the negotiated extensions, normal safe receiving remains available.

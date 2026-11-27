@@ -85,6 +85,9 @@ int bsp_commit(const char *temp,const char *dest) {
 }
 #else
 #include <fcntl.h>
+#ifdef BS_OPENSSL
+#include <sys/file.h>
+#endif
 #include <sys/stat.h>
 #ifndef __riscos__
 #include <ifaddrs.h>
@@ -131,6 +134,9 @@ int bsp_connected(BSSocket s) {
 FILE *bsp_create_file(const char *path) {
     int fd=open(path,O_WRONLY|O_CREAT|O_EXCL,0600); FILE *f;
     if(fd<0) return NULL;
+#ifdef BS_OPENSSL
+    if(flock(fd,LOCK_EX|LOCK_NB)){close(fd);unlink(path);return NULL;}
+#endif
     f=fdopen(fd,"wb"); if(!f) { close(fd); unlink(path); } return f;
 }
 int bsp_commit(const char *temp,const char *dest) {
@@ -283,6 +289,19 @@ int bs_to_local(const char *source,char *out,size_t cap) {
 #endif
 
 #ifdef BS_OPENSSL
+FILE *bsp_resume_read(const char *path,unsigned long expected) {
+#ifdef _WIN32
+    wchar_t wide[BS_PATH_MAX+1];HANDLE h;BY_HANDLE_FILE_INFORMATION info;LARGE_INTEGER size;int fd;FILE *f;
+    if(!windows_path(path,wide))return NULL;
+    h=CreateFileW(wide,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT,NULL);if(h==INVALID_HANDLE_VALUE)return NULL;
+    if(!GetFileInformationByHandle(h,&info) || (info.dwFileAttributes&(FILE_ATTRIBUTE_REPARSE_POINT|FILE_ATTRIBUTE_DIRECTORY)) || !GetFileSizeEx(h,&size) || size.QuadPart!=(LONGLONG)expected){CloseHandle(h);return NULL;}
+    fd=_open_osfhandle((intptr_t)h,_O_RDONLY|_O_BINARY);if(fd<0){CloseHandle(h);return NULL;}f=_fdopen(fd,"rb");if(!f)_close(fd);return f;
+#else
+    int fd;struct stat st;FILE *f;fd=open(path,O_RDONLY|O_NOFOLLOW|O_NONBLOCK);if(fd<0)return NULL;
+    if(fstat(fd,&st) || !S_ISREG(st.st_mode) || st.st_size<0 || (unsigned long)st.st_size!=expected){close(fd);return NULL;}
+    f=fdopen(fd,"rb");if(!f)close(fd);return f;
+#endif
+}
 FILE *bsp_resume_file(const char *path,unsigned long expected) {
 #ifdef _WIN32
     wchar_t wide[BS_PATH_MAX+1];HANDLE h;BY_HANDLE_FILE_INFORMATION info;LARGE_INTEGER size;int fd;FILE *f;
@@ -293,6 +312,7 @@ FILE *bsp_resume_file(const char *path,unsigned long expected) {
 #else
     int fd;struct stat st;FILE *f;
     fd=open(path,O_RDWR|O_NOFOLLOW);if(fd<0)return NULL;
+    if(flock(fd,LOCK_EX|LOCK_NB)){close(fd);return NULL;}
     if(fstat(fd,&st) || !S_ISREG(st.st_mode) || st.st_size<0 || (unsigned long)st.st_size!=expected){close(fd);return NULL;}
     f=fdopen(fd,"r+b");if(!f)close(fd);return f;
 #endif
@@ -302,3 +322,7 @@ FILE *bsp_resume_file(const char *path,unsigned long expected) {
 #include "fs.h"
 
 #include "metadata-platform.h"
+
+#ifdef BS_OPENSSL
+#include "retained-platform.h"
+#endif

@@ -39,7 +39,7 @@ const BSPeer *bs_peer(const BSClient *c,int i) {return i>=0 && i<peer_count?&pee
 unsigned long bs_transfer_serial(const BSClient *c) {return serial;}
 BSResult bs_transfer_result(const BSClient *c) {return (BSResult)outcome;}
 unsigned long bs_transfer_rate(const BSClient *c) {return state.active?12345:0;}
-const char *bs_last_error(const BSClient *c) {return "Cannot open file";}
+const char *bs_user_error(BSClient *c) {return "Cannot open file";}
 int bs_send(BSClient *c,const char *a,unsigned short port,const char *path) {
  if(!strcmp(path,"missing"))return 0;
  strcpy(sent_address,a);strcpy(sent_path,path);sent_port=port;

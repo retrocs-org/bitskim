@@ -12,7 +12,7 @@ static int prepare_single_send(BSClient *client)
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-static unsigned long send_limit,receive_limit,bell_serial;static int completion_bell;
+static unsigned long send_limit,receive_limit,bell_serial;static int completion_bell,preserve_dates;
 static BSClient *client; static BSConfig config;
 static int redraw=1,offer_seen,files_changed;
 static char settings_path[BS_PATH_MAX+1]="BITSKIM.CFG"; static char input[192]; static unsigned used;
@@ -23,12 +23,12 @@ static void help(void) {
     puts("ACCEPT <new 8.3 path> | ACCEPTALL <folder> | DECLINE | CANCEL | STATUS");
     puts("TEST <IPv4[:port]> | DIAGNOSTICS | HISTORY | RETRY <number> | CONFLICT RENAME/SKIP/REPLACE");
     puts("LIMITS <send KiB/s> <receive KiB/s> (0 = Unlimited)");
-    puts("NAME <ASCII name> | VISIBLE ON/OFF | RECEIVE ON/OFF | HELP | QUIT");
+    puts("METADATA ON/OFF (file dates and retro attributes) | NAME <ASCII name> | VISIBLE ON/OFF | RECEIVE ON/OFF | HELP | QUIT");
     puts("Incoming batches list all files; ACCEPTALL chooses one existing folder.");
 }
 static int save_config(void) {
     FILE *f=fopen(settings_path,"w"); if(!f) return 0;
-    fprintf(f,"ID=%s\nNAME=%s\nVISIBLE=%d\nRECEIVE=%d\nSEND_KIB=%lu\nRECEIVE_KIB=%lu\nBELL=%d\n",config.id,config.name,config.visible,config.receiving,send_limit/1024UL,receive_limit/1024UL,completion_bell); return fclose(f)==0;
+    fprintf(f,"ID=%s\nNAME=%s\nVISIBLE=%d\nRECEIVE=%d\nSEND_KIB=%lu\nRECEIVE_KIB=%lu\nBELL=%d\nMETADATA=%d\n",config.id,config.name,config.visible,config.receiving,send_limit/1024UL,receive_limit/1024UL,completion_bell,preserve_dates); return fclose(f)==0;
 }
 static int read_config(void) {
     char line[160]; const char *port_text=getenv("BITSKIM_PORT"); FILE *f=fopen(settings_path,"r");
@@ -36,6 +36,7 @@ static int read_config(void) {
     if(f) { while(fgets(line,sizeof line,f)) { char *value=strchr(line,'='); if(!value) continue; *value++=0; value[strcspn(value,"\r\n")]=0;
         if(!strcmp(line,"NAME") && *value && strlen(value)<=BS_NAME_MAX) strcpy(config.name,value);
         else if(!strcmp(line,"ID") && strlen(value)==32) strcpy(config.id,value);
+        else if(!strcmp(line,"METADATA")) preserve_dates=atoi(value)!=0;
         else if(!strcmp(line,"BELL")) completion_bell=atoi(value)!=0;
         else if(!strcmp(line,"VISIBLE")) config.visible=atoi(value)!=0;
         else if(!strcmp(line,"SEND_KIB")){if(!bs_limit_parse(value,&send_limit))send_limit=0;}
@@ -48,7 +49,7 @@ static int read_config(void) {
 }
 static void peers(void) { int i; printf("\nNearby (%d):\n",bs_peer_count(client)); for(i=0;i<bs_peer_count(client);i++) { const BSPeer *p=bs_peer(client,i); char label[64]; if(!bs_to_local(p->name,label,sizeof label)) strcpy(label,"[non-ASCII name]"); printf("%2d  %-24s %-12s %s\n",i+1,label,p->platform,p->address); } }
 static void status(void) {
-    const BSStatus *s=bs_status(client); printf("\n%s\n",s->message);
+    const BSStatus *s=bs_status(client); printf("\n%s\n",bs_user_status(client));
     if(s->active) printf("%s: %lu / %lu bytes, %lu left, %lu bytes/s\n",s->filename,s->transferred,s->total,s->total-s->transferred,bs_transfer_rate(client));
     if(s->awaiting_decision && !offer_seen) { offer_seen=1; printf("Offer from %s (%s).\n",s->peer_name,s->peer_address);
       if((bs_batch_count(client)>1 || bs_batch_is_tree(client)!=0)) {int i;char name[256];bs_batch_summary(client,name,sizeof name);puts(name);for(i=bs_batch_index(client);i<bs_batch_count(client);i++){const BSBatchItem *item=bs_batch_item(client,i);bs_batch_save_name(client,i,name,sizeof name);printf("  %s -> %s (%lu bytes)\n",item->filename,name,item->total);}puts("Type ACCEPTALL <folder> to receive this batch, or DECLINE.");}
@@ -66,6 +67,7 @@ static int command(char *line) {
     else if(!strcmp(line,"CONTINUE"))bs_queue_continue(client);
     else if(!strcmp(line,"PAUSE"))bs_queue_pause(client);
     else if(!strcmp(line,"CLEARHISTORY")){bs_history_clear(client);bs_state_flush(client);}
+    else if(!strcmp(line,"METADATA")){if(bs_status(client)->active || bs_queue_count(client)){puts("Finish or clear queued work first.");return 1;}preserve_dates=!strcmp(argument,"ON");bs_metadata_enable(client,preserve_dates);save_config();}
     else if(!strcmp(line,"RETRY"))ok=bs_retry_history(client,atoi(argument)-1);
     else if(!strcmp(line,"CONFLICT")){int policy=!strcmp(argument,"SKIP")?1:!strcmp(argument,"REPLACE")?2:0;bs_conflict_policy(client,policy);}
     else if(!strcmp(line,"HELP")) help();
@@ -89,7 +91,7 @@ static int command(char *line) {
         strupr(argument); if(strcmp(argument,"ON") && strcmp(argument,"OFF")) puts("Use ON or OFF.");
         else { if(!strcmp(line,"VISIBLE")) config.visible=!strcmp(argument,"ON"); else config.receiving=!strcmp(argument,"ON"); bs_configure(client,config.name,config.visible,config.receiving); if(!save_config()) puts("Could not save BITSKIM.CFG in the launch directory."); }
     } else if(*line) puts("Unknown command. Type HELP.");
-    if(!ok) printf("Cannot do that: %s\n",bs_last_error(client)); return 1;
+    if(!ok) printf("Cannot do that: %s\n",bs_user_error(client)); return 1;
 }
 static int selftest(void) {
     FILE *f; unsigned long size; int failures=0;
@@ -121,12 +123,12 @@ int main(int argc,char **argv) {
     if(!client) { puts("Cannot create BitSkim client (memory, config or port error)."); bs_platform_cleanup(); return 1; }
     {char store[sizeof settings_path],*leaf;strcpy(store,settings_path);leaf=strrchr(store,'\\');if(leaf)strcpy(leaf+1,"BSFOLD.DAT");else strcpy(store,"BSFOLD.DAT");bs_folders_configure(client,store);if(leaf)strcpy(leaf+1,"BSTRANS.DAT");else strcpy(store,"BSTRANS.DAT");bs_state_configure(client,store);}
     if(!batch_receive)bs_batch_enable(client,1);
+    bs_limits_configure(client,send_limit,receive_limit);bs_metadata_enable(client,preserve_dates);
     if(batch_send) { char cmd[192];
         if(strlen(argv[2])+strlen(argv[3])+9>=sizeof cmd) { bs_destroy(client); bs_platform_cleanup(); return 1; }
         sprintf(cmd,"SENDIP %s %s",argv[2],argv[3]); command(cmd); bs_tick(client);if(bs_completion_notice(client,&bell_serial) && completion_bell)putch(7); batch_started=bs_status(client)->active;
         if(!batch_started) { bs_destroy(client); bs_platform_cleanup(); return 1; }
     }
-    bs_limits_configure(client,send_limit,receive_limit);
     if(!save_config()) puts("Cannot save BITSKIM.CFG in the launch directory.");
     if(!batch_send && !batch_receive && !cli) ui_start();
     else {help(); printf("Visible as %s. Type HELP for commands.\n> ",config.name);}
@@ -140,7 +142,7 @@ int main(int argc,char **argv) {
         if(!ui_active && redraw && bsp_seconds()!=last) { status(); last=bsp_seconds(); redraw=0; printf("> %s",input); }
         if(batch_receive && bs_status(client)->active) batch_started=1;
         if(batch_receive && bs_status(client)->awaiting_decision) {
-            if(!bs_accept(client,argv[2])) { printf("Cannot save: %s\n",bs_last_error(client)); bs_decline(client); }
+            if(!bs_accept(client,argv[2])) { printf("Cannot save: %s\n",bs_user_error(client)); bs_decline(client); }
         }
         if((batch_send || batch_receive) && batch_started && !bs_status(client)->active) break;
         if(kbhit()) { int ch=getch(); if(!ch || ch==224) ch=0x100+getch(); if(ch==3) break;

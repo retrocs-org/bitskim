@@ -1,3 +1,46 @@
+int bs_recovery_progress(const BSClient *c, BSRecoveryProgress *out) {
+    if (!out)
+        return 0;
+    memset(out, 0, sizeof *out);
+    if (!c || !c->recovery.phase)
+        return 0;
+    *out = c->recovery;
+#ifdef BS_OPENSSL
+    if (c->batch_approval && c->batch_approval->resume_existing) {
+        if (c->state == CHECK_RECEIVE || c->state == WAIT_RESUME ||
+            (c->state == VERIFY_DISK && c->recovery_file_kind == 2)) {
+            out->phase = 2;
+            out->check_total = c->resume_offset;
+            out->checked_bytes = c->resume_offset - c->verify_remaining;
+            if (c->state == VERIFY_DISK) {
+                out->checked_bytes = c->disk_bytes;
+                out->check_total = c->status.total;
+            }
+        } else if (c->state != TREE_PREPARE)
+            out->phase = 3;
+    }
+#endif
+    return 1;
+}
+int bs_recovery_summary(const BSClient *c, char *out, size_t capacity) {
+    BSRecoveryProgress p;
+    char text[300];
+    const char *phase;
+    if (!out || !capacity)
+        return 0;
+    out[0] = 0;
+    if (!bs_recovery_progress(c, &p))
+        return 0;
+    phase = p.phase == 1   ? "Preparing folder recovery"
+            : p.phase == 2 ? "Checking existing files"
+            : p.phase == 3 ? "Transferring remaining files"
+            : p.phase == 4 ? "Folder recovery complete"
+                           : "Folder recovery stopped";
+    sprintf(text, "%s: %lu verified, %lu resumed, %lu received, %lu remaining / %lu files", phase,
+            p.verified, p.resumed, p.received, p.remaining, p.total);
+    copystr(out, text, capacity);
+    return 1;
+}
 /* Bounded local history. Not a wire response; never contains pairing secrets. */
 static void history_record(BSClient *c) {
     BSHistoryItem *h;
@@ -16,7 +59,7 @@ int bs_history_find(const BSClient *c,unsigned long serial){int i;BSHistoryItem 
 void bs_history_clear(BSClient *c){if(c){memset(c->history,0,sizeof c->history);c->history_count=c->history_next=0;state_mark(c);}}
 int bs_history_text(const BSClient *c,int i,char *out,size_t capacity){const BSHistoryItem *h;char text[2048];if(!out || !capacity || !c || i<0 || i>=c->history_count)return 0;h=&c->history[(c->history_next+BS_HISTORY_MAX-1-i)%BS_HISTORY_MAX];
     sprintf(text,"%s: %.255s\nPeer: %.63s\n%lu / %lu bytes\nResult: %.255s\nPath: %.1023s\nIntegrity: %s",h->incoming?"Received":"Sent",h->filename,h->peer,h->transferred,h->total,h->message,h->path,h->result!=BS_RESULT_COMPLETE?"not verified (transfer incomplete)":h->verified?"written file verified (CRC32)":"receiver disk verification not confirmed");copystr(out,text,capacity);return strlen(text)<capacity;}
-int bs_retry_history(BSClient *c,int i){BSHistoryItem h;if(!bs_history_item(c,i,&h) || h.incoming || h.result==BS_RESULT_COMPLETE){if(c)copystr(c->error,"Retry is available for unsuccessful outgoing files only",256);return 0;}
+int bs_retry_history(BSClient *c,int i){BSHistoryItem h;if(!bs_history_item(c,i,&h) || h.incoming || h.result==BS_RESULT_COMPLETE){if(c)set_error(c,BS_ERR_INPUT,"Retry is available for unsuccessful outgoing files only");return 0;}
     if(h.peer_id[0])return bs_queue_peer(c,h.peer_id,h.path);
     return bs_queue_address(c,h.address,h.port,h.path);
 }
@@ -35,7 +78,7 @@ int bs_diagnostics(const BSClient *c,char *out,size_t capacity){char text[2048],
     stack="MiNTNet sockets";
 #elif defined(__riscos__)
     stack="RISC OS Internet sockets";
-#elif defined(_WIN32)
+#elif defined(_WIN32) || defined(BS_WIN16)
     stack="Winsock";
 #else
     stack="System BSD sockets";
@@ -48,13 +91,15 @@ int bs_diagnostics(const BSClient *c,char *out,size_t capacity){char text[2048],
 #endif
     if(!strcmp(local,"not connected") && c->check_local[0])copystr(local,c->check_local,sizeof local);
     bs_local_capabilities(c,&caps);
-    sprintf(text,"BitSkim 0.2 / %.31s\nConnection check: %.159s\nStack: %s\nName: %.63s\nBind: %.47s (all interfaces if empty)\nLocal connection address: %.47s\nTCP %u / discovery UDP %u\nVisible %s / incoming %s / peers %d\nSecurity: %s; transport %s\nSend / receive cap: %lu / %lu bytes/s (0 unlimited)\nLocal feature masks: %lu / %lu (rate, skip, disk verification negotiated)\nReceive file limit %lu B; local filename %u bytes\nPeer: %.63s at %.47s:%u\nNegotiation: %s / peer masks %lu / %lu\nLast status: %.255s\nLast error: %.255s\nNo peers? Check same LAN, UDP broadcasts, firewall and NAT/router settings. Use the host LAN address, not 127.0.0.1, from another computer.",c->config.platform,c->check_result[0]?c->check_result:"Use Test connection (no file is sent)",stack,c->config.name,c->config.bind_address,local,c->config.port,c->config.discovery_port?c->config.discovery_port:c->config.port,c->config.visible?"yes":"no",c->config.receiving?"yes":"no",c->peer_count,c->security_mode==2?"Force":c->security_mode==1?"Prefer":"Disabled",bs_transfer_encrypted(c)?"encrypted":"plaintext",c->send_limit,c->receive_limit,caps.send_features,caps.receive_features,caps.max_receive_file,caps.local_name_bytes,c->status.peer_name,c->status.peer_address,c->remote_port,c->cap_ready?"profile received":"legacy/none",c->remote_caps.send_features,c->remote_caps.receive_features,c->status.message,c->error);if(bs_run_summary(c,0,report,sizeof report) && strlen(text)+strlen(report)+2<sizeof text){strcat(text,"\n");strcat(text,report);}if(bs_run_summary(c,1,report,sizeof report) && strlen(text)+strlen(report)+2<sizeof text){strcat(text,"\n");strcat(text,report);}sprintf(report,"\nDiscovery: %s; %lu probes sent; %lu valid peer packets received",c->discovery_paused?"paused":"searching",c->discovery_sent,c->discovery_received);
+    sprintf(text,"BitSkim 0.2 / %.31s\nBuild: %s\nConnection check: %.159s\nStack: %s\nName: %.63s\nBind: %.47s (all interfaces if empty)\nLocal connection address: %.47s\nTCP %u / discovery UDP %u\nVisible %s / incoming %s / peers %d\nSecurity: %s; transport %s\nSend / receive cap: %lu / %lu bytes/s (0 unlimited)\nLocal feature masks: %lu / %lu (rate, skip, disk verification negotiated)\nReceive file limit %lu B; local filename %u bytes\nPeer: %.63s at %.47s:%u\nNegotiation: %s / peer masks %lu / %lu\nLast status: %.255s\nLast error: %.255s\nError code: %d / written-file verification: %s\nNo peers? Check same LAN, UDP broadcasts, firewall and NAT/router settings. Use the host LAN address, not 127.0.0.1, from another computer.",c->config.platform,bs_build_id(),c->check_result[0]?c->check_result:"Use Test connection (no file is sent)",stack,c->config.name,c->config.bind_address,local,c->config.port,c->config.discovery_port?c->config.discovery_port:c->config.port,c->config.visible?"yes":"no",c->config.receiving?"yes":"no",c->peer_count,c->security_mode==2?"Force":c->security_mode==1?"Prefer":"Disabled",bs_transfer_encrypted(c)?"encrypted":"plaintext",c->send_limit,c->receive_limit,caps.send_features,caps.receive_features,caps.max_receive_file,caps.local_name_bytes,c->status.peer_name,c->status.peer_address,c->remote_port,c->cap_ready?"profile received":"legacy/none",c->remote_caps.send_features,c->remote_caps.receive_features,c->status.message,c->error,(int)bs_error_code(c),bs_transfer_verified(c)?"confirmed":"not confirmed");if(bs_run_summary(c,0,report,sizeof report) && strlen(text)+strlen(report)+2<sizeof text){strcat(text,"\n");strcat(text,report);}if(bs_run_summary(c,1,report,sizeof report) && strlen(text)+strlen(report)+2<sizeof text){strcat(text,"\n");strcat(text,report);}sprintf(report,"\nDiscovery: %s; %lu probes sent; %lu valid peer packets received",c->discovery_paused?"paused":"searching",c->discovery_sent,c->discovery_received);
     copystr(text+strlen(text),report,sizeof text-strlen(text));
     if(c->discovery_received){sprintf(report,"\nLast peer packet: %lu seconds ago",bsp_seconds()-c->discovery_last);copystr(text+strlen(text),report,sizeof text-strlen(text));}
     if(!c->peer_count){copystr(text+strlen(text),"\nNo peers: check guest Wi-Fi/client isolation and VPN routing; try a direct IPv4 connection.",sizeof text-strlen(text));}
     if(c->cap_ready){sprintf(report,"\nPeer compatibility: %s; %s; %s",c->remote_caps.receive_features&BS_CAP_DIRECTORIES?"folders supported":"files only",c->remote_caps.receive_features&BS_CAP_DISK_VERIFY?"disk verification":"disk verification unconfirmed",c->remote_caps.receive_features&BS_CAP_TLS?"TLS supported":"plaintext only");copystr(text+strlen(text),report,sizeof text-strlen(text));}
     if(bs_state_restored(c)){sprintf(report,"\nSaved queue: %d entries restored paused; review before Continue",bs_queue_count(c));copystr(text+strlen(text),report,sizeof text-strlen(text));}
     if(bs_state_error(c)[0]){copystr(text+strlen(text),"\nSaved state: ",sizeof text-strlen(text));copystr(text+strlen(text),bs_state_error(c),sizeof text-strlen(text));}
+    if(c->error[0]){copystr(text+strlen(text),"\nNext: ",sizeof text-strlen(text));copystr(text+strlen(text),recovery_hint(recovery_kind(c->error_code)),sizeof text-strlen(text));}
+    if(bs_recovery_summary(c,report,sizeof report)){copystr(text+strlen(text),"\n",sizeof text-strlen(text));copystr(text+strlen(text),report,sizeof text-strlen(text));}
     copystr(out,text,capacity);return strlen(text)<capacity;
 }
 

@@ -2,6 +2,8 @@
 #define BITSKIM_H
 #include <stddef.h>
 #define BS_VERSION "0.2"
+/* Build scripts supply a source fingerprint; direct compiler invocations are explicit. */
+const char *bs_build_id(void);
 #define BS_PORT 46440
 #define BS_NAME_MAX 63
 #define BS_PATH_MAX 1023
@@ -29,6 +31,8 @@
 #define BS_CAP_DEVICE_TRUST 2048
 #define BS_CAP_RETRO_METADATA 4096
 #define BS_CAP_INVITATION 8192
+#define BS_CAP_FILE_TIMES 16384
+#define BS_CAP_SESSION 32768UL
 typedef struct BSMetadata {unsigned long protection,filetype;unsigned char kind;char comment[160];} BSMetadata;
 
 #define BS_CONFLICT_RENAME 0
@@ -75,6 +79,7 @@ BSClient *bs_create(const BSConfig *, BSCallback, void *context);
 /* Manual-only startup: no discovery probe or well-known UDP listener. */
 BSClient *bs_create_manual(const BSConfig *,BSCallback,void *);
 BSClient *bs_create_app(const char *name, const char *platform, const char *id, int visible, int receiving);
+int bs_session_enable(BSClient *,int enabled);
 void bs_destroy(BSClient *);
 void bs_tick(BSClient *);
 /* Service immediately available work with a 0..8 ms budget, checked between
@@ -125,6 +130,14 @@ int bs_batch_save_name(const BSClient *,int index,char *out,size_t capacity);
 /* Explicit approval of the remaining manifest into one existing folder.
    Preserves existing files; does not change permanent auto-accept settings. */
 int bs_accept_batch(BSClient *,const char *folder);
+int bs_accept_batch_resume(BSClient *,const char *parent_folder);
+int bs_batch_can_resume(const BSClient *);
+/* Folder-recovery phases: 0 none, 1 preparing, 2 checking, 3 transferring,
+   4 complete, 5 stopped. Counts include files only, excluding directories. */
+typedef struct {int phase;unsigned long verified,resumed,received,remaining,total,checked_bytes,check_total;} BSRecoveryProgress;
+int bs_recovery_progress(const BSClient *,BSRecoveryProgress *);
+int bs_recovery_summary(const BSClient *,char *out,size_t capacity);
+
 void bs_decline(BSClient *);
 /* Cancels the entire local run, discards waiting entries and revokes batch approval.
    Explicit cancellation removes the active partial file, including resume caches.
@@ -187,6 +200,21 @@ int bs_peer_summary(const BSClient *,const char *id,char *out,size_t capacity);
 int bs_resume_enable(BSClient *,int enabled);
 int bs_resume_available(BSClient *,const char *destination);
 int bs_accept_resumable(BSClient *,const char *destination,int restart);
+/* Bounded local checkpoint review. 1 scanning, 2 ready, 3 removing, 4 done,
+   5 stopped/error. Only a ready, unchanged review can be confirmed for cleanup.
+   Transfers/queued work block cleanup. Completed files are never candidates. */
+/* removed: 0 listed, 1 removed, -1 preserved, -2 not fully removed. */
+typedef struct {char path[BS_PATH_MAX+1];unsigned long bytes,total;int removed;} BSRetainedItem;
+unsigned long bs_retained_scan(BSClient *,const char *receive_folder);
+int bs_retained_step(BSClient *);
+int bs_retained_phase(const BSClient *);
+unsigned long bs_retained_serial(const BSClient *);
+int bs_retained_count(const BSClient *);
+int bs_retained_item(const BSClient *,int index,BSRetainedItem *);
+int bs_retained_summary(const BSClient *,char *out,size_t capacity);
+int bs_retained_remove(BSClient *,unsigned long reviewed_serial);
+void bs_retained_close(BSClient *);
+
 int bs_peer_count(const BSClient *);
 const BSPeer *bs_peer(const BSClient *, int index);
 const BSStatus *bs_status(const BSClient *);
@@ -202,7 +230,19 @@ void bs_limits_get(const BSClient *,unsigned long *send_bps,unsigned long *recei
 /* Strict shared parser for UI/config KiB/s values (0..BS_RATE_KIB_MAX). */
 int bs_limit_parse(const char *kib,unsigned long *bytes_per_second);
 unsigned long bs_transfer_rate(const BSClient *);
+typedef enum { BS_ERR_NONE=0, BS_ERR_INPUT, BS_ERR_BUSY, BS_ERR_SOURCE, BS_ERR_DESTINATION,
+ BS_ERR_STORAGE, BS_ERR_NETWORK, BS_ERR_TIMEOUT, BS_ERR_PROTOCOL, BS_ERR_SECURITY,
+ BS_ERR_TRUST, BS_ERR_LIMIT, BS_ERR_DECLINED, BS_ERR_CANCELLED, BS_ERR_REMOTE, BS_ERR_INTERNAL } BSErrorCode;
+BSErrorCode bs_error_code(const BSClient *);
+int bs_transfer_verified(const BSClient *);
 const char *bs_last_error(const BSClient *);
+#define BS_ERROR_RETRY 1
+#define BS_ERROR_TEST_CONNECTION 2
+#define BS_ERROR_OPEN_FOLDER 4
+const char *bs_user_error(BSClient *);
+const char *bs_user_status(BSClient *);
+unsigned bs_error_actions(const BSClient *);
+int bs_error_retry(BSClient *);
 unsigned long bs_crc32(unsigned long crc, const unsigned char *, size_t);
 int bs_safe_name(const char *);
 int bs_to_utf8(const char *, char *, size_t);
