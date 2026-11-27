@@ -389,6 +389,25 @@ class API:
             response = connection.getresponse()
             if optional and response.status == 404:
                 response.read(); return None
+            latest = re.fullmatch(r'/api/v4/projects/([^/]+)/releases/permalink/latest', path)
+            if (response.status == 302 and method == 'GET' and latest and not self.github
+                    and host == self.host and body is None and file is None and not hash_body):
+                location = urlsplit(response.getheader('Location', ''))
+                response.read()
+                if (location.scheme not in ('', 'https')
+                        or (location.netloc and location.netloc.lower() != self.host.lower())
+                        or location.query or location.fragment):
+                    raise ValueError('Untrusted GitLab latest-release redirect')
+                target = re.fullmatch(r'/api/v4/projects/([^/]+)/releases/([^/]+)', location.path)
+                if not target or target[2] in ('.', '..'):
+                    raise ValueError('Unexpected GitLab latest-release redirect path')
+                project = self.request('GET', '/api/v4/projects/' + latest[1])
+                project_id = project.get('id')
+                if (type(project_id) is not int or project_id <= 0
+                        or target[1] not in (latest[1], str(project_id))):
+                    raise ValueError('GitLab latest-release redirect changed project')
+                connection.close()
+                return self.request('GET', location.path, optional=optional)
             if not 200 <= response.status < 300:
                 response.read()
                 raise RuntimeError('Release API returned HTTP %d for %s %s (no automatic retry)' % (response.status, method, self.host))

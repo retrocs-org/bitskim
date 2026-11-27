@@ -217,7 +217,7 @@ Checksums contain the SHA-256 digest, two spaces, exact filename and newline. Up
 
 The hosts supply tagged source ZIP/tar downloads. Local source ZIP/tar, website ZIP and aggregate SHA256SUMS are built/validated but not attached to repository releases. Neither mobile development APKs/apps, logs, settings, manifests nor receipts are public release assets. Deploy the PHP website separately from `public-web/`.
 
-Preparation retains exact upload copies at `<output>/release/publish/outputs/`. Hashes are checked before each destination and each upload. GitHub checks digest and size, reuses only matching assets and publishes its verified draft last. An incomplete existing public release is refused. GitLab uses versioned generic packages, downloads/hash-checks their bytes and links them from the normal release. Unexpected public assets/links and differing notes are refused. API writes reject redirects; credentials are never forwarded to another download origin. `gh`/`glab` are not required.
+Preparation retains exact upload copies at `<output>/release/publish/outputs/`. Hashes are checked before each destination and each upload. GitHub checks digest and size, reuses only matching assets and publishes its verified draft last. An incomplete existing public release is refused. GitLab uses versioned generic packages, downloads/hash-checks their bytes and links them from the normal release. Unexpected public assets/links and differing notes are refused. API writes reject redirects. The GitLab latest-release lookup accepts a read-only redirect only to the same HTTPS host and a verified release path in the same project; credentials are never forwarded to another download origin. `gh`/`glab` are not required.
 
 ## Aminet submission
 

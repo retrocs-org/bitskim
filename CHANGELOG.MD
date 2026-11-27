@@ -55,6 +55,7 @@
 
 ### Bugs
 
+- GitLab latest-release verification accepts only same-host, same-project read redirects; redirected writes remain refused.
 - Fully verified existing files now advance folder recovery exactly once, including jobs containing only completed files.
 - Corrected outdated batch-resume and website-launch wording in apps, guides and public website copy.
 - Queued preconnection failures receive a fresh failed receipt, preserving history identity and allowing result notifications instead of reusing the previous successful transfer.
